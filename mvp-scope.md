@@ -274,23 +274,23 @@ Tool: Vitest
 
 ### Project Setup
 
-* [ ] Initialize SvelteKit project
-* [ ] Install dependencies
+* [x] Initialize SvelteKit project
+* [x] Install dependencies
 * [ ] Configure linting/formatting
 
 ---
 
 ### Database
 
-* [ ] Create SQLite schema
-* [ ] Initialize DB connection module
+* [x] Create SQLite schema
+* [x] Initialize DB connection module
 
 ---
 
 ### Backend API
 
-* [ ] Canvases endpoints
-* [ ] Nodes endpoints
+* [x] Canvases endpoints (create/list is defined)
+* [ ] Nodes endpoints (create is defined, at least)
 * [ ] Edges endpoints
 * [ ] Tags endpoints
 
