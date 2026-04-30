@@ -290,7 +290,7 @@ Tool: Vitest
 ### Backend API
 
 * [x] Canvases endpoints (create/list is defined)
-* [ ] Nodes endpoints (create is defined, at least)
+* [x] Nodes endpoints (create is defined, at least)
 * [ ] Edges endpoints
 * [ ] Tags endpoints
 
@@ -306,9 +306,9 @@ Tool: Vitest
 
 ### Nodes
 
-* [ ] Create node
-* [ ] Delete node
-* [ ] Edit title
+* [x] Create node
+* [x] Delete node
+* [x] Edit title
 * [ ] Edit body
 * [ ] Expand/collapse node
 

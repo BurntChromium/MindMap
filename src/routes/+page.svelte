@@ -44,7 +44,7 @@
 
 <!-- Create Canvas -->
 <input bind:value={name} placeholder="New canvas name" />
-<button on:click={() => canvasStore.create(name)}>Create Canvas</button>
+<button onclick={() => canvasStore.create(name)}>Create Canvas</button>
 
 <hr />
 
@@ -53,10 +53,10 @@
 <ul>
   {#each canvases as canvas}
     <li>
-      <button on:click={() => canvasStore.setActive(canvas.id)}>
+      <button onclick={() => canvasStore.setActive(canvas.id)}>
         {canvas.name}
       </button>
-      <button on:click={() => canvasStore.remove(canvas.id)}>X</button>
+      <button onclick={() => canvasStore.remove(canvas.id)}>X</button>
     </li>
   {/each}
 </ul>
@@ -67,7 +67,7 @@
 {#if activeCanvasId}
   <h2>Nodes</h2>
 
-  <button on:click={() => nodeStore.create(activeCanvasId, 100, 100)}>
+  <button onclick={() => nodeStore.create(activeCanvasId, 100, 100)}>
     + Add Node
   </button>
 
@@ -76,13 +76,13 @@
       <li>
         <input
           value={node.title}
-          on:input={(e) =>
+          oninput={(e) =>
             nodeStore.updateNode({
               id: node.id,
               title: e.currentTarget.value
             })}
         />
-        <button on:click={() => nodeStore.remove(node.id)}>Delete</button>
+        <button onclick={() => nodeStore.remove(node.id)}>Delete</button>
       </li>
     {/each}
   </ul>
