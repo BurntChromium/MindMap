@@ -1,6 +1,11 @@
 <script lang="ts">
   import { SvelteFlow, Background, Controls } from '@xyflow/svelte';
   import { onMount } from 'svelte';
+  import CustomNode from '$lib/components/CustomNode.svelte';
+
+  const nodeTypes = {
+    custom: CustomNode
+  };
 
   import { canvasStore, type Canvas } from '$lib/stores/canvasStore';
   import { nodeStore, type Node } from '$lib/stores/nodeStore';
@@ -81,6 +86,7 @@
   <div style="flex: 1; position: relative;">
     <SvelteFlow
         nodes={flowNodes}
+        nodeTypes={nodeTypes}
         onnodedragstop={handleNodeDragStop}
         fitView
         style="width: 100%; height: 100%;"

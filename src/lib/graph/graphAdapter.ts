@@ -7,7 +7,7 @@ export function toFlowNodes(nodes: AppNode[]) {
     data: {
       label: n.title || 'Untitled'
     },
-    type: 'default',
+    type: 'custom',
     draggable: true
   }));
 }
