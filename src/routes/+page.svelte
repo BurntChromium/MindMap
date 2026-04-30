@@ -61,7 +61,7 @@
 
 <div style="display: flex; height: 100vh; overflow: hidden;">
   <!-- LEFT PANEL -->
-  <div style="width: 250px; border-right: 1px solid #ccc; padding: 8px;">
+  <div class="sidebar">
     <h3>Canvases</h3>
 
     <input bind:value={name} placeholder="New canvas name" />
@@ -94,7 +94,6 @@
           }
         }}
         fitView
-        style="width: 100%; height: 100%;"
     >
       <Background />
       <Controls />

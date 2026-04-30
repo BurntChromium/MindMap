@@ -6,6 +6,7 @@
 
 <style global>
   @import '@xyflow/svelte/dist/style.css';
+  @import '../app.css';
 </style>
 
 <svelte:head>

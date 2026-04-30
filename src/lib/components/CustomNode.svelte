@@ -37,12 +37,12 @@
   }
 
   // Determine border style based on state
-  let borderColor = $derived(isEditing ? '#007bff' : (selected ? '#000' : '#777'));
+  let borderColor = $derived(isEditing ? '1px solid var(--accent)' : (selected ? '1px solid var(--text-main)' : '1px solid #dcdcdc'));
   let boxShadow = $derived(selected ? '0 4px 6px rgba(0,0,0,0.1)' : 'none');
 </script>
 
 <div 
-  style="background: white; border: 2px solid {borderColor}; padding: 10px; border-radius: 5px; transition: all 0.2s; box-shadow: {boxShadow};"
+  style="background: white; border: {borderColor}; padding: 10px; border-radius: 4px; transition: all 0.2s; box-shadow: {boxShadow};"
   ondblclick={handleDoubleClick}
 >
   <div
@@ -50,7 +50,7 @@
     contenteditable={isEditing}
     onblur={handleBlur}
     onkeydown={handleKeyDown}
-    style="cursor: {isEditing ? 'text' : 'pointer'}; outline: none;"
+    style="cursor: {isEditing ? 'text' : 'pointer'}; outline: none; min-width: 50px;"
   >
     {data.label}
   </div>
