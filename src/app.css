@@ -1,6 +1,5 @@
 :root {
-  --bg-app: #f9f9f9;
-  --text-main: #2d2d2d;
+  --text-main: black;
   --border-thin: 1px solid #dcdcdc;
   --accent: #2563eb;
   --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -14,10 +13,54 @@ body {
   background-color: var(--bg-app);
 }
 
+button {
+  background-color: white;
+  padding: 5px;
+  margin: 5px;
+}
+
+button:hover {
+  background-color: lightgray;
+}
+
+.primary-button {
+  -webkit-appearance: none; /* Chrome, Safari */
+  -moz-appearance: none;    /* Firefox */
+  appearance: none;
+
+  border-radius: 10px;
+  background-color: white;
+  border: 1px solid black;  
+  outline: none;
+  padding-top: 3px;
+  padding-bottom: 3px;
+}
+
+.icon-button {
+  width: 16px;
+  height: 16px;
+  border: none;
+}
+
+.implied-button {
+  -webkit-appearance: none; /* Chrome, Safari */
+  -moz-appearance: none;    /* Firefox */
+  appearance: none;
+  border: none;
+  outline: none;
+  padding-top: 3px;
+  padding-bottom: 3px;
+}
+
+ul {
+  list-style-type: none; /* Removes bullets */
+  padding: 0;            /* Removes default left padding */
+  margin: 0;             /* Removes default margins */
+}
+
 /* Sidebar Styling */
 .sidebar {
   width: 250px;
-  background: white;
   border-right: var(--border-thin);
   padding: 1.5rem;
   display: flex;
@@ -27,7 +70,6 @@ body {
 
 .sidebar h3 {
   font-size: 0.85rem;
-  text-transform: uppercase;
   letter-spacing: 0.05em;
   margin: 0;
   color: #666;

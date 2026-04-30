@@ -1,7 +1,8 @@
 <script lang="ts">
-  import { SvelteFlow, Background, Controls } from '@xyflow/svelte';
+  import { SvelteFlow, Background, Controls, type ColorMode } from '@xyflow/svelte';
   import { onMount } from 'svelte';
   import CustomNode from '$lib/components/CustomNode.svelte';
+  import trash from '$lib/assets/trash-icon.svg';
 
   const nodeTypes = {
     custom: CustomNode
@@ -57,29 +58,34 @@
     // place near origin for now
     nodeStore.create(activeCanvasId, 100, 100);
   }
+
+  let colorMode: ColorMode = "light";
 </script>
 
 <div style="display: flex; height: 100vh; overflow: hidden;">
   <!-- LEFT PANEL -->
   <div class="sidebar">
-    <h3>Canvases</h3>
+    <h3>Canvas List</h3>
 
     <input bind:value={name} placeholder="New canvas name" />
-    <button onclick={() => canvasStore.create(name)}>Create</button>
+    <button class="primary-button" onclick={() => canvasStore.create(name)}>Create</button>
 
     <ul>
       {#each canvases as canvas}
         <li>
-          <button onclick={() => canvasStore.setActive(canvas.id)}>
+          <button 
+            class="implied-button"
+            onclick={() => canvasStore.setActive(canvas.id)}>
             {canvas.name}
           </button>
-          <button onclick={() => canvasStore.remove(canvas.id)}>X</button>
+          <button class="icon-button" onclick={() => canvasStore.remove(canvas.id)}>
+            <img src={trash} alt="trashcan icon" height="15px"/>
+          </button>
         </li>
       {/each}
     </ul>
 
-    <hr />
-    <button onclick={addNode}>+ Node</button>
+    <button class="primary-button" onclick={addNode}>Add Node</button>
   </div>
 
   <!-- CANVAS -->
@@ -93,6 +99,7 @@
             nodeStore.remove(node.id);
           }
         }}
+        {colorMode}
         fitView
     >
       <Background />
