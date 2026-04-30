@@ -2,7 +2,7 @@
   import { Handle, Position } from '@xyflow/svelte';
   import { nodeStore } from '$lib/stores/nodeStore';
 
-  let { id, data } = $props();
+  let { id, data, selected } = $props();
   let isEditing = $state(false);
   let titleRef: HTMLDivElement;
 
@@ -35,10 +35,14 @@
       titleRef.blur();
     }
   }
+
+  // Determine border style based on state
+  let borderColor = $derived(isEditing ? '#007bff' : (selected ? '#000' : '#777'));
+  let boxShadow = $derived(selected ? '0 4px 6px rgba(0,0,0,0.1)' : 'none');
 </script>
 
 <div 
-  style="background: white; border: 2px solid {isEditing ? '#007bff' : '#777'}; padding: 10px; border-radius: 5px; transition: border-color 0.2s;"
+  style="background: white; border: 2px solid {borderColor}; padding: 10px; border-radius: 5px; transition: all 0.2s; box-shadow: {boxShadow};"
   ondblclick={handleDoubleClick}
 >
   <div

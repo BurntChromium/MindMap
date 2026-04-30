@@ -88,6 +88,11 @@
         nodes={flowNodes}
         nodeTypes={nodeTypes}
         onnodedragstop={handleNodeDragStop}
+        ondelete={(event) => {
+          for (const node of event.nodes) {
+            nodeStore.remove(node.id);
+          }
+        }}
         fitView
         style="width: 100%; height: 100%;"
     >
