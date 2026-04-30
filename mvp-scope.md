@@ -291,7 +291,7 @@ Tool: Vitest
 
 * [x] Canvases endpoints (create/list is defined)
 * [x] Nodes endpoints (create is defined, at least)
-* [ ] Edges endpoints
+* [x] Edges endpoints
 * [ ] Tags endpoints
 
 ---
@@ -316,8 +316,8 @@ Tool: Vitest
 
 ### Edges
 
-* [ ] Connect nodes
-* [ ] Delete edges
+* [x] Connect nodes
+* [x] Delete edges
 
 ---
 
@@ -349,8 +349,8 @@ Tool: Vitest
 ### UX Basics
 
 * [ ] Prevent accidental edits (lock/edit mode)
-* [ ] Basic keyboard delete
-* [ ] Node selection
+* [x] Basic keyboard delete
+* [x] Node selection
 
 ---
 
