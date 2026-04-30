@@ -2,17 +2,20 @@
   import { SvelteFlow, Background, Controls } from '@xyflow/svelte';
   import { onMount } from 'svelte';
 
-  import { canvasStore } from '$lib/stores/canvasStore';
-  import { nodeStore } from '$lib/stores/nodeStore';
-  import { toFlowNodes, fromFlowPositionChange } from '$lib/graph/graphAdapter';
+  import { canvasStore, type Canvas } from '$lib/stores/canvasStore';
+  import { nodeStore, type Node } from '$lib/stores/nodeStore';
+  import {
+    toFlowNodes,
+    handleNodeDragStop
+  } from '$lib/graph/graphAdapter';
 
   let name = $state('');
 
-  let canvases = $state([]);
+  let canvases = $state<Canvas[]>([]);
   let activeCanvasId = $state<string | null>(null);
-  let nodes = $state([]);
+  let nodes = $state<Node[]>([]);
 
-  let flowNodes = $state([]);
+  let flowNodes = $state<any[]>([]);
 
   onMount(async () => {
     await canvasStore.load();
@@ -42,13 +45,6 @@
   $effect(() => {
     flowNodes = toFlowNodes(nodes);
   });
-
-  function handleNodeDragStop(event) {
-    const { id, position } = event;
-
-    const update = fromFlowPositionChange(id, position);
-    nodeStore.updateNode(update);
-  }
 
   function addNode() {
     if (!activeCanvasId) return;
@@ -85,7 +81,7 @@
   <div style="flex: 1; position: relative;">
     <SvelteFlow
         nodes={flowNodes}
-        onnodeDragStop={handleNodeDragStop}
+        onnodedragstop={handleNodeDragStop}
         fitView
         style="width: 100%; height: 100%;"
     >

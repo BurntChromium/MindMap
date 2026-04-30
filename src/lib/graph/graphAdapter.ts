@@ -1,4 +1,4 @@
-import type { Node as AppNode } from '$lib/stores/nodeStore';
+import { nodeStore, type Node as AppNode } from '$lib/stores/nodeStore';
 
 export function toFlowNodes(nodes: AppNode[]) {
   return nodes.map((n) => ({
@@ -12,14 +12,11 @@ export function toFlowNodes(nodes: AppNode[]) {
   }));
 }
 
-function handleNodeDragStop(event) {
-  const { node } = event;
-
-  nodeStore.updateNode({
-    id: node.id,
-    x: node.position.x,
-    y: node.position.y
-  });
+export function handleNodeDragStop(...args: any[]) {
+  const [{ targetNode }] = args;
+  const node = targetNode;
+  const update = fromFlowPositionChange(node.id, node.position);
+  nodeStore.updateNode(update);
 }
 
 export function fromFlowPositionChange(

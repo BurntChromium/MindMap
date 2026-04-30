@@ -42,6 +42,7 @@ export async function POST({ request }) {
 // PATCH /api/nodes
 export async function PATCH({ request }) {
   const { id, title, body, x, y, collapsed } = await request.json();
+  console.log('PATCH /api/nodes received:', { id, title, body, x, y, collapsed });
 
   db.prepare(`
     UPDATE nodes
