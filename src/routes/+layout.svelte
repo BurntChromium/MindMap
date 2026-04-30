@@ -4,6 +4,10 @@
 	let { children } = $props();
 </script>
 
+<style global>
+  @import '@xyflow/svelte/dist/style.css';
+</style>
+
 <svelte:head>
 	<link rel="icon" href={favicon} />
 </svelte:head>

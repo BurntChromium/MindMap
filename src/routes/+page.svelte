@@ -1,7 +1,10 @@
 <script lang="ts">
+  import { SvelteFlow, Background, Controls } from '@xyflow/svelte';
   import { onMount } from 'svelte';
+
   import { canvasStore } from '$lib/stores/canvasStore';
   import { nodeStore } from '$lib/stores/nodeStore';
+  import { toFlowNodes, fromFlowPositionChange } from '$lib/graph/graphAdapter';
 
   let name = $state('');
 
@@ -9,81 +12,85 @@
   let activeCanvasId = $state<string | null>(null);
   let nodes = $state([]);
 
+  let flowNodes = $state([]);
+
   onMount(async () => {
     await canvasStore.load();
   });
 
-  // subscribe to canvas store
   $effect(() => {
-    const unsubscribe = canvasStore.subscribe((value) => {
-      canvases = value.canvases;
-      activeCanvasId = value.activeCanvasId;
+    const unsub = canvasStore.subscribe((v) => {
+      canvases = v.canvases;
+      activeCanvasId = v.activeCanvasId;
     });
-
-    return unsubscribe;
+    return unsub;
   });
 
-  // load nodes when canvas changes
   $effect(() => {
     if (!activeCanvasId) return;
-
     nodeStore.load(activeCanvasId);
   });
 
-  // subscribe to node store
   $effect(() => {
-    const unsubscribe = nodeStore.subscribe((value) => {
-      nodes = Array.from(value.nodes.values());
+    const unsub = nodeStore.subscribe((v) => {
+      nodes = Array.from(v.nodes.values());
     });
-
-    return unsubscribe;
+    return unsub;
   });
+
+  // derive flow nodes
+  $effect(() => {
+    flowNodes = toFlowNodes(nodes);
+  });
+
+  function handleNodeDragStop(event) {
+    const { id, position } = event;
+
+    const update = fromFlowPositionChange(id, position);
+    nodeStore.updateNode(update);
+  }
+
+  function addNode() {
+    if (!activeCanvasId) return;
+
+    // place near origin for now
+    nodeStore.create(activeCanvasId, 100, 100);
+  }
 </script>
 
-<h1>Mind Map MVP</h1>
+<div style="display: flex; height: 100vh; overflow: hidden;">
+  <!-- LEFT PANEL -->
+  <div style="width: 250px; border-right: 1px solid #ccc; padding: 8px;">
+    <h3>Canvases</h3>
 
-<!-- Create Canvas -->
-<input bind:value={name} placeholder="New canvas name" />
-<button onclick={() => canvasStore.create(name)}>Create Canvas</button>
+    <input bind:value={name} placeholder="New canvas name" />
+    <button onclick={() => canvasStore.create(name)}>Create</button>
 
-<hr />
+    <ul>
+      {#each canvases as canvas}
+        <li>
+          <button onclick={() => canvasStore.setActive(canvas.id)}>
+            {canvas.name}
+          </button>
+          <button onclick={() => canvasStore.remove(canvas.id)}>X</button>
+        </li>
+      {/each}
+    </ul>
 
-<!-- Canvas List -->
-<h2>Canvases</h2>
-<ul>
-  {#each canvases as canvas}
-    <li>
-      <button onclick={() => canvasStore.setActive(canvas.id)}>
-        {canvas.name}
-      </button>
-      <button onclick={() => canvasStore.remove(canvas.id)}>X</button>
-    </li>
-  {/each}
-</ul>
+    <hr />
+    <button onclick={addNode}>+ Node</button>
+  </div>
 
-<hr />
-
-<!-- Nodes -->
-{#if activeCanvasId}
-  <h2>Nodes</h2>
-
-  <button onclick={() => nodeStore.create(activeCanvasId, 100, 100)}>
-    + Add Node
-  </button>
-
-  <ul>
-    {#each nodes as node}
-      <li>
-        <input
-          value={node.title}
-          oninput={(e) =>
-            nodeStore.updateNode({
-              id: node.id,
-              title: e.currentTarget.value
-            })}
-        />
-        <button onclick={() => nodeStore.remove(node.id)}>Delete</button>
-      </li>
-    {/each}
-  </ul>
-{/if}
+  <!-- CANVAS -->
+  <div style="flex: 1; position: relative;">
+    <SvelteFlow
+        nodes={flowNodes}
+        onnodeDragStop={handleNodeDragStop}
+        fitView
+        style="width: 100%; height: 100%;"
+    >
+      <Background />
+      <Controls />
+    </SvelteFlow>
+  </div>
+</div>
