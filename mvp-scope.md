@@ -298,9 +298,9 @@ Tool: Vitest
 
 ### Canvas (UI)
 
-* [ ] Render Xyflow canvas
-* [ ] Add "+" node creation button
-* [ ] Implement node positioning
+* [x] Render Xyflow canvas
+* [x] Add "+" node creation button
+* [x] Implement node positioning
 
 ---
 
@@ -331,7 +331,7 @@ Tool: Vitest
 
 ### Persistence
 
-* [ ] Fetch initial data
+* [x] Fetch initial data
 * [ ] Save node changes (debounced)
 * [ ] Save edges (immediate)
 
@@ -339,10 +339,10 @@ Tool: Vitest
 
 ### Left Panel
 
-* [ ] List canvases
-* [ ] Create canvas
-* [ ] Delete canvas
-* [ ] Switch canvas
+* [x] List canvases
+* [x] Create canvas
+* [x] Delete canvas
+* [x] Switch canvas
 
 ---
 
