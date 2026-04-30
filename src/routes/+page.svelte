@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { SvelteFlow, Background, Controls, type ColorMode } from '@xyflow/svelte';
+  import { SvelteFlow, Background, Controls, type Connection, addEdge } from '@xyflow/svelte';
   import { onMount } from 'svelte';
   import CustomNode from '$lib/components/CustomNode.svelte';
   import trash from '$lib/assets/trash-icon.svg';
@@ -10,8 +10,10 @@
 
   import { canvasStore, type Canvas } from '$lib/stores/canvasStore';
   import { nodeStore, type Node } from '$lib/stores/nodeStore';
+  import { edgeStore, type Edge } from '$lib/stores/edgeStore';
   import {
     toFlowNodes,
+    toFlowEdges,
     handleNodeDragStop
   } from '$lib/graph/graphAdapter';
 
@@ -20,8 +22,10 @@
   let canvases = $state<Canvas[]>([]);
   let activeCanvasId = $state<string | null>(null);
   let nodes = $state<Node[]>([]);
+  let edges = $state<Edge[]>([]);
 
   let flowNodes = $state<any[]>([]);
+  let flowEdges = $state<any[]>([]);
 
   onMount(async () => {
     await canvasStore.load();
@@ -38,6 +42,7 @@
   $effect(() => {
     if (!activeCanvasId) return;
     nodeStore.load(activeCanvasId);
+    edgeStore.load(activeCanvasId);
   });
 
   $effect(() => {
@@ -47,9 +52,17 @@
     return unsub;
   });
 
-  // derive flow nodes
+  $effect(() => {
+    const unsub = edgeStore.subscribe((v) => {
+      edges = Array.from(v.edges.values());
+    });
+    return unsub;
+  });
+
+  // derive flow nodes/edges
   $effect(() => {
     flowNodes = toFlowNodes(nodes);
+    flowEdges = toFlowEdges(edges);
   });
 
   function addNode() {
@@ -59,7 +72,10 @@
     nodeStore.create(activeCanvasId, 100, 100);
   }
 
-  let colorMode: ColorMode = "light";
+  function onConnect(connection: Connection) {
+    if (!activeCanvasId || !connection.source || !connection.target) return;
+    edgeStore.create(activeCanvasId, connection.source, connection.target);
+  }
 </script>
 
 <div style="display: flex; height: 100vh; overflow: hidden;">
@@ -91,19 +107,24 @@
   <!-- CANVAS -->
   <div style="flex: 1; position: relative;">
     <SvelteFlow
-        nodes={flowNodes}
-        nodeTypes={nodeTypes}
-        onnodedragstop={handleNodeDragStop}
-        ondelete={(event) => {
-          for (const node of event.nodes) {
-            nodeStore.remove(node.id);
-          }
-        }}
-        {colorMode}
-        fitView
-    >
-      <Background />
-      <Controls />
-    </SvelteFlow>
+        <SvelteFlow
+            nodes={flowNodes}
+            edges={flowEdges}
+            nodeTypes={nodeTypes}
+            onconnect={onConnect}
+            onnodedragstop={handleNodeDragStop}
+            ondelete={(event) => {
+              for (const node of event.nodes) {
+                nodeStore.remove(node.id);
+              }
+              for (const edge of event.edges) {
+                edgeStore.remove(edge.id);
+              }
+            }}
+            fitView
+        >
+          <Background />
+          <Controls />
+        </SvelteFlow>
   </div>
 </div>
