@@ -1,5 +1,5 @@
 export function normalizeTagName(raw: string) {
-  return raw.replace(/^#+/, '').trim().toLowerCase().replace(/\s+/g, ' ');
+  return raw.trim().replace(/^#+/, '').trim().toLowerCase().replace(/\s+/g, ' ');
 }
 
 export function normalizeTagList(tags: string[]) {

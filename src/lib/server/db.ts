@@ -1,8 +1,7 @@
 import Database from 'better-sqlite3';
 import { dev } from '$app/environment';
-import path from 'path';
 
-const dbPath = dev ? 'dev.db' : '/data/prod.db';
+const dbPath = process.env.MINDMAP_DB_PATH ?? (dev ? 'dev.db' : '/data/prod.db');
 
 export const db = new Database(dbPath);
 
