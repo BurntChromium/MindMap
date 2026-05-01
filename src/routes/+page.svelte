@@ -212,8 +212,8 @@ import type { Connection } from '@xyflow/svelte';
       onpointerdown={focusCanvasShell}
     >
       <CanvasStage
-        nodes={flowNodes}
-        edges={flowEdges}
+        flowNodes={flowNodes}
+        flowEdges={flowEdges}
         onAddNode={addNode}
         onConnect={onConnect}
         onNodeClick={(nodeId) => {

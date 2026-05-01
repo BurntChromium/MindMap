@@ -9,8 +9,8 @@
   };
 
   interface Props {
-    nodes: any[];
-    edges: any[];
+    flowNodes: any[];
+    flowEdges: any[];
     onAddNode: () => void;
     onConnect: (connection: Connection) => void;
     onNodeClick: (nodeId: string) => void;
@@ -19,8 +19,8 @@
   }
 
   let {
-    nodes,
-    edges,
+    flowNodes,
+    flowEdges,
     onAddNode,
     onConnect,
     onNodeClick,
@@ -45,8 +45,8 @@
 
   <SvelteFlow
     style="width: 100%; height: 100%;"
-    nodes={nodes}
-    edges={edges}
+    nodes={flowNodes}
+    edges={flowEdges}
     nodeTypes={nodeTypes}
     onconnect={onConnect}
     onnodedragstop={handleNodeDragStop}
