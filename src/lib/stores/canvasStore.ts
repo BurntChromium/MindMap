@@ -51,6 +51,31 @@ function createCanvasStore() {
       }));
     },
 
+    async rename(id: string, name: string) {
+      const trimmed = name.trim();
+      if (!trimmed) {
+        return;
+      }
+
+      await fetch('/api/canvases', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, name: trimmed })
+      });
+
+      update((state) => ({
+        ...state,
+        canvases: state.canvases.map((canvas) =>
+          canvas.id === id
+            ? {
+                ...canvas,
+                name: trimmed
+              }
+            : canvas
+        )
+      }));
+    },
+
     async remove(id: string) {
       await fetch(`/api/canvases?id=${id}`, { method: 'DELETE' });
 

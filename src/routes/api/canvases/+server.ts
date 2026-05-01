@@ -23,6 +23,26 @@ export async function POST({ request }) {
   return json({ id, name });
 }
 
+// PATCH /api/canvases
+export async function PATCH({ request }) {
+  const { id, name } = await request.json();
+  const trimmed = typeof name === 'string' ? name.trim() : '';
+
+  if (!id || !trimmed) {
+    return json({ success: false }, { status: 400 });
+  }
+
+  const timestamp = now();
+
+  db.prepare(`
+    UPDATE canvases
+    SET name = ?, updated_at = ?
+    WHERE id = ?
+  `).run(trimmed, timestamp, id);
+
+  return json({ success: true, id, name: trimmed, updated_at: timestamp });
+}
+
 // DELETE /api/canvases/:id
 export async function DELETE({ url }) {
   const id = url.searchParams.get('id');

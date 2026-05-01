@@ -64,6 +64,25 @@ describe('API integration', () => {
     expect(canvases[0].name).toBe('World');
   });
 
+  it('renames canvases through patch', async () => {
+    const created = await canvasesApi.POST({
+      request: request({ name: 'Draft' })
+    } as any);
+    const { id: canvasId } = await created.json();
+
+    await canvasesApi.PATCH({
+      request: request({ id: canvasId, name: 'Final Draft' })
+    } as any);
+
+    const listed = await canvasesApi.GET();
+    const canvases = await listed.json();
+
+    expect(canvases[0]).toMatchObject({
+      id: canvasId,
+      name: 'Final Draft'
+    });
+  });
+
   it('persists node tags through patch and fetch', async () => {
     const canvas = await canvasesApi.POST({
       request: request({ name: 'Campaign' })
