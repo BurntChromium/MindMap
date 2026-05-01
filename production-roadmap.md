@@ -22,7 +22,7 @@ This means the next work is about making the app easier to navigate, faster to u
 - View means the expanded read-only node card.
 - Edit means the expanded editor state with mutable title, body, and tags.
 
-## Stage 2: Find Things Quickly
+## Stage 2: Find Things Quickly (Done)
 
 User benefit:
 
