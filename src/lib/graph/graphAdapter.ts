@@ -1,7 +1,7 @@
 import { nodeStore, type Node as AppNode } from '$lib/stores/nodeStore';
 import { type Edge as AppEdge } from '$lib/stores/edgeStore';
 
-export function toFlowNodes(nodes: AppNode[]) {
+export function toFlowNodes(nodes: AppNode[], editingNodeId: string | null) {
   return nodes.map((n) => ({
     id: n.id,
     position: { x: n.x, y: n.y },
@@ -10,7 +10,7 @@ export function toFlowNodes(nodes: AppNode[]) {
       body: n.body ?? ''
     },
     type: 'custom',
-    draggable: true
+    draggable: editingNodeId !== n.id
   }));
 }
 

@@ -1,159 +1,141 @@
 <script lang="ts">
+  import { tick } from 'svelte';
   import { Handle, Position } from '@xyflow/svelte';
   import { nodeStore } from '$lib/stores/nodeStore';
+  import { nodeUiStore } from '$lib/stores/nodeUiStore';
 
   let { id, data, selected } = $props();
 
-  let isTitleEditing = $state(false);
-  let bodyMode = $state<'display' | 'edit'>('display');
-  let titleRef = $state<HTMLDivElement | undefined>(undefined);
-  let bodyRef = $state<HTMLTextAreaElement | undefined>(undefined);
-  let bodyDraft = $state('');
+  let editingNodeId = $state<string | null>(null);
+  let titleInput = $state<HTMLInputElement | undefined>(undefined);
+  let bodyInput = $state<HTMLTextAreaElement | undefined>(undefined);
+  let draftTitle = $state('');
+  let draftBody = $state('');
 
+  const isEditing = $derived(editingNodeId === id);
+  const isExpanded = $derived(Boolean(selected) || isEditing);
   const bodyText = $derived(data.body ?? '');
-  const isExpanded = $derived(Boolean(selected));
-  const isBodyEditing = $derived(bodyMode === 'edit');
 
   $effect(() => {
-    if (!isBodyEditing) {
-      bodyDraft = bodyText;
+    const unsub = nodeUiStore.subscribe((v) => {
+      editingNodeId = v.editingNodeId;
+    });
+
+    return unsub;
+  });
+
+  $effect(() => {
+    if (!isEditing) {
+      draftTitle = data.label || 'Untitled';
+      draftBody = bodyText;
     }
   });
 
-  function focusTitleEnd() {
-    setTimeout(() => {
-      if (!titleRef) return;
-
-      titleRef.focus();
-
-      const range = document.createRange();
-      const sel = window.getSelection();
-      range.selectNodeContents(titleRef);
-      range.collapse(false);
-      sel?.removeAllRanges();
-      sel?.addRange(range);
-    }, 0);
+  async function beginEdit() {
+    draftTitle = data.label || 'Untitled';
+    draftBody = bodyText;
+    nodeUiStore.beginEdit(id);
+    await tick();
+    titleInput?.focus();
+    titleInput?.select();
   }
 
-  function focusBody() {
-    setTimeout(() => {
-      if (!bodyRef) return;
-
-      bodyRef.focus();
-      bodyRef.setSelectionRange(bodyRef.value.length, bodyRef.value.length);
-    }, 0);
+  function endEdit() {
+    nodeUiStore.endEdit(id);
   }
 
-  function handleDoubleClick() {
-    isTitleEditing = true;
-    focusTitleEnd();
-  }
+  async function saveAndLock() {
+    const nextTitle = draftTitle.trim() || 'Untitled';
+    const nextBody = draftBody;
+    const changed = nextTitle !== (data.label || 'Untitled') || nextBody !== bodyText;
 
-  function handleTitleBlur(e: FocusEvent) {
-    isTitleEditing = false;
-    const target = e.target as HTMLElement;
-    const newTitle = target.innerText.trim();
-
-    if (newTitle !== data.label) {
-      nodeStore.updateNode({ id, title: newTitle || 'Untitled' });
+    if (changed) {
+      await nodeStore.updateNode({
+        id,
+        title: nextTitle,
+        body: nextBody
+      });
     }
+
+    endEdit();
+  }
+
+  function handleEditToggle() {
+    if (isEditing) {
+      void saveAndLock();
+      return;
+    }
+
+    void beginEdit();
   }
 
   function handleTitleKeyDown(e: KeyboardEvent) {
     if (e.key === 'Enter') {
       e.preventDefault();
-      titleRef?.blur();
+      void saveAndLock();
     }
-  }
-
-  function startBodyEdit() {
-    bodyMode = 'edit';
-    focusBody();
-  }
-
-  function toggleBodyMode() {
-    if (isBodyEditing) {
-      bodyRef?.blur();
-      return;
-    }
-
-    startBodyEdit();
-  }
-
-  async function commitBody() {
-    bodyMode = 'display';
-
-    if (bodyDraft !== bodyText) {
-      await nodeStore.updateNode({ id, body: bodyDraft });
-    }
-  }
-
-  function handleBodyBlur() {
-    void commitBody();
   }
 
   function handleBodyKeyDown(e: KeyboardEvent) {
-    if (e.key === 'Escape') {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
       e.preventDefault();
-      bodyRef?.blur();
+      void saveAndLock();
     }
   }
 
-  $effect(() => {
-    if (!selected && isBodyEditing) {
-      void commitBody();
-    }
-  });
-
   const nodeWidth = $derived(isExpanded ? '360px' : '180px');
   const borderColor = $derived(
-    isTitleEditing || isBodyEditing
+    isEditing
       ? '1px solid var(--accent)'
       : selected
         ? '1px solid var(--text-main)'
         : '1px solid #dcdcdc'
   );
-  const boxShadow = $derived(selected ? '0 4px 10px rgba(0,0,0,0.12)' : 'none');
+  const boxShadow = $derived(isExpanded ? '0 4px 10px rgba(0,0,0,0.12)' : 'none');
 </script>
 
-<div
-  class="node-shell"
-  style={`width: ${nodeWidth};`}
->
-  <div
-    class="node-card"
-    style={`border: ${borderColor}; box-shadow: ${boxShadow};`}
-  >
+<div class="node-shell" style={`width: ${nodeWidth};`}>
+  <div class="node-card" style={`border: ${borderColor}; box-shadow: ${boxShadow};`}>
     <div class="node-header">
-      <div
-        bind:this={titleRef}
-        class:editing={isTitleEditing}
-        role="textbox"
-        tabindex="0"
-        aria-multiline="false"
-        contenteditable={isTitleEditing}
-        ondblclick={handleDoubleClick}
-        onblur={handleTitleBlur}
-        onkeydown={handleTitleKeyDown}
-      >
-        {data.label}
-      </div>
-
-      {#if selected}
-        <button class="mode-button" onclick={toggleBodyMode}>
-          {isBodyEditing ? 'Done' : 'Edit'}
-        </button>
+      {#if isEditing}
+        <input
+          bind:this={titleInput}
+          bind:value={draftTitle}
+          class="title-input nodrag"
+          aria-label="Node title"
+          onkeydown={handleTitleKeyDown}
+        />
+      {:else}
+        <div class="title-display">{data.label}</div>
       {/if}
+
+      <button
+        class="mode-button nodrag"
+        type="button"
+        aria-label={isEditing ? 'Save node' : 'Edit node'}
+        title={isEditing ? 'Save node' : 'Edit node'}
+        onclick={handleEditToggle}
+      >
+        {#if isEditing}
+          <svg viewBox="0 0 16 16" aria-hidden="true">
+            <path d="M6.5 11.2 3.3 8l1.1-1.1 2.1 2.1 5-5 1.1 1.1-6.1 6.1z" />
+          </svg>
+        {:else}
+          <svg viewBox="0 0 16 16" aria-hidden="true">
+            <path d="M11.7 2.3a1 1 0 0 1 1.4 0l.6.6a1 1 0 0 1 0 1.4l-7.8 7.8-2.9.6.6-2.9 8.1-7.5zM3.2 12.8h9.6v1.4H3.2z" />
+          </svg>
+        {/if}
+      </button>
     </div>
 
     {#if isExpanded}
       <div class="body-area">
-        {#if isBodyEditing}
+        {#if isEditing}
           <textarea
-            bind:this={bodyRef}
-            bind:value={bodyDraft}
-            class="body-editor"
-            onblur={handleBodyBlur}
+            bind:this={bodyInput}
+            bind:value={draftBody}
+            class="body-editor nodrag"
+            placeholder="Add body text"
             onkeydown={handleBodyKeyDown}
           ></textarea>
         {:else if bodyText}
@@ -186,33 +168,51 @@
 
   .node-header {
     display: flex;
-    align-items: start;
+    align-items: flex-start;
     gap: 8px;
     justify-content: space-between;
   }
 
-  .node-header > div:first-child {
+  .title-display {
     min-width: 0;
     flex: 1;
     font-weight: 600;
-    outline: none;
     word-break: break-word;
+    line-height: 1.25;
   }
 
-  .node-header > div:first-child.editing {
-    cursor: text;
+  .title-input {
+    min-width: 0;
+    flex: 1;
+    border: 1px solid #dcdcdc;
+    border-radius: 4px;
+    padding: 4px 6px;
+    font: inherit;
+    font-weight: 600;
+    line-height: 1.25;
+    outline: none;
+    box-sizing: border-box;
   }
 
   .mode-button {
     flex: 0 0 auto;
+    width: 22px;
+    height: 22px;
     border: 1px solid #dcdcdc;
     background: #f7f7f7;
     color: #333;
     border-radius: 4px;
-    padding: 2px 8px;
-    font-size: 12px;
-    line-height: 1.4;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     cursor: pointer;
+  }
+
+  .mode-button svg {
+    width: 12px;
+    height: 12px;
+    fill: currentColor;
   }
 
   .body-area {

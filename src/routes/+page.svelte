@@ -10,6 +10,7 @@
 
   import { canvasStore, type Canvas } from '$lib/stores/canvasStore';
   import { nodeStore, type Node } from '$lib/stores/nodeStore';
+  import { nodeUiStore } from '$lib/stores/nodeUiStore';
   import { edgeStore, type Edge } from '$lib/stores/edgeStore';
   import {
     toFlowNodes,
@@ -23,6 +24,7 @@
   let activeCanvasId = $state<string | null>(null);
   let nodes = $state<Node[]>([]);
   let edges = $state<Edge[]>([]);
+  let editingNodeId = $state<string | null>(null);
 
   let flowNodes = $state<any[]>([]);
   let flowEdges = $state<any[]>([]);
@@ -41,6 +43,7 @@
 
   $effect(() => {
     if (!activeCanvasId) return;
+    nodeUiStore.clear();
     nodeStore.load(activeCanvasId);
     edgeStore.load(activeCanvasId);
   });
@@ -59,9 +62,16 @@
     return unsub;
   });
 
+  $effect(() => {
+    const unsub = nodeUiStore.subscribe((v) => {
+      editingNodeId = v.editingNodeId;
+    });
+    return unsub;
+  });
+
   // derive flow nodes/edges
   $effect(() => {
-    flowNodes = toFlowNodes(nodes);
+    flowNodes = toFlowNodes(nodes, editingNodeId);
     flowEdges = toFlowEdges(edges);
   });
 
