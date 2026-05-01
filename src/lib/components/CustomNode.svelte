@@ -7,18 +7,19 @@
   let { id, data, selected } = $props();
 
   let editingNodeId = $state<string | null>(null);
+  let expanded = $state(false);
   let titleInput = $state<HTMLInputElement | undefined>(undefined);
-  let bodyInput = $state<HTMLTextAreaElement | undefined>(undefined);
   let draftTitle = $state('');
   let draftBody = $state('');
 
   const isEditing = $derived(editingNodeId === id);
-  const isExpanded = $derived(Boolean(selected) || isEditing);
+  const isExpanded = $derived(expanded || isEditing);
   const bodyText = $derived(data.body ?? '');
 
   $effect(() => {
     const unsub = nodeUiStore.subscribe((v) => {
       editingNodeId = v.editingNodeId;
+      expanded = Boolean(v.expandedNodeIds[id]);
     });
 
     return unsub;
@@ -40,10 +41,6 @@
     titleInput?.select();
   }
 
-  function endEdit() {
-    nodeUiStore.endEdit(id);
-  }
-
   async function saveAndLock() {
     const nextTitle = draftTitle.trim() || 'Untitled';
     const nextBody = draftBody;
@@ -57,7 +54,7 @@
       });
     }
 
-    endEdit();
+    nodeUiStore.endEdit(id);
   }
 
   function handleEditToggle() {
@@ -67,6 +64,10 @@
     }
 
     void beginEdit();
+  }
+
+  function handleExpandToggle() {
+    nodeUiStore.toggleExpanded(id);
   }
 
   function handleTitleKeyDown(e: KeyboardEvent) {
@@ -109,30 +110,49 @@
         <div class="title-display">{data.label}</div>
       {/if}
 
-      <button
-        class="mode-button nodrag"
-        type="button"
-        aria-label={isEditing ? 'Save node' : 'Edit node'}
-        title={isEditing ? 'Save node' : 'Edit node'}
-        onclick={handleEditToggle}
-      >
-        {#if isEditing}
-          <svg viewBox="0 0 16 16" aria-hidden="true">
-            <path d="M6.5 11.2 3.3 8l1.1-1.1 2.1 2.1 5-5 1.1 1.1-6.1 6.1z" />
-          </svg>
-        {:else}
-          <svg viewBox="0 0 16 16" aria-hidden="true">
-            <path d="M11.7 2.3a1 1 0 0 1 1.4 0l.6.6a1 1 0 0 1 0 1.4l-7.8 7.8-2.9.6.6-2.9 8.1-7.5zM3.2 12.8h9.6v1.4H3.2z" />
-          </svg>
-        {/if}
-      </button>
+      <div class="header-actions">
+        <button
+          class="mode-button nodrag"
+          type="button"
+          aria-label={isExpanded ? 'Collapse node preview' : 'Expand node preview'}
+          title={isExpanded ? 'Collapse node preview' : 'Expand node preview'}
+          onclick={handleExpandToggle}
+        >
+          {#if isExpanded}
+            <svg viewBox="0 0 16 16" aria-hidden="true">
+              <path d="M8 5.2 3.2 10l1.1 1.1L8 7.4l3.7 3.7L12.8 10 8 5.2z" />
+            </svg>
+          {:else}
+            <svg viewBox="0 0 16 16" aria-hidden="true">
+              <path d="M8 10.8 12.8 6l-1.1-1.1L8 8.6 4.3 4.9 3.2 6 8 10.8z" />
+            </svg>
+          {/if}
+        </button>
+
+        <button
+          class="mode-button nodrag"
+          type="button"
+          aria-label={isEditing ? 'Save node' : 'Edit node'}
+          title={isEditing ? 'Save node' : 'Edit node'}
+          onclick={handleEditToggle}
+        >
+          {#if isEditing}
+            <svg viewBox="0 0 16 16" aria-hidden="true">
+              <path d="M6.5 11.2 3.3 8l1.1-1.1 2.1 2.1 5-5 1.1 1.1-6.1 6.1z" />
+            </svg>
+          {:else}
+            <svg viewBox="0 0 16 16" aria-hidden="true">
+              <path d="M11.7 2.3a1 1 0 0 1 1.4 0l.6.6a1 1 0 0 1 0 1.4l-7.8 7.8-2.9.6.6-2.9 8.1-7.5zM3.2 12.8h9.6v1.4H3.2z" />
+            </svg>
+          {/if}
+        </button>
+      </div>
     </div>
 
     {#if isExpanded}
       <div class="body-area">
         {#if isEditing}
           <textarea
-            bind:this={bodyInput}
             bind:value={draftBody}
             class="body-editor nodrag"
             placeholder="Add body text"
@@ -194,8 +214,13 @@
     box-sizing: border-box;
   }
 
-  .mode-button {
+  .header-actions {
+    display: inline-flex;
+    gap: 4px;
     flex: 0 0 auto;
+  }
+
+  .mode-button {
     width: 22px;
     height: 22px;
     border: 1px solid #dcdcdc;
