@@ -309,8 +309,8 @@ Tool: Vitest
 * [x] Create node
 * [x] Delete node
 * [x] Edit title
-* [ ] Edit body
-* [ ] Expand/collapse node
+* [x] Edit body
+* [x] Expand/collapse node
 
 ---
 
@@ -332,8 +332,8 @@ Tool: Vitest
 ### Persistence
 
 * [x] Fetch initial data
-* [ ] Save node changes (debounced)
-* [ ] Save edges (immediate)
+* [x] Save node changes (debounced)
+* [x] Save edges (immediate)
 
 ---
 
@@ -348,7 +348,7 @@ Tool: Vitest
 
 ### UX Basics
 
-* [ ] Prevent accidental edits (lock/edit mode)
+* [x] Prevent accidental edits (lock/edit mode)
 * [x] Basic keyboard delete
 * [x] Node selection
 
