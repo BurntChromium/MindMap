@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { buildClipboardFragment, buildPastedGraph, getConnectedEdgeIds } from './clipboard';
+import {
+  buildClipboardFragment,
+  buildPastedGraph,
+  buildSubtreeClipboardFragment,
+  collectDescendantNodeIds,
+  getConnectedEdgeIds
+} from './clipboard';
 
 describe('clipboard graph helpers', () => {
   it('captures only selected nodes and internal edges', () => {
@@ -45,6 +51,90 @@ describe('clipboard graph helpers', () => {
           id: 'edge-1',
           source_node_id: 'node-1',
           target_node_id: 'node-2'
+        }
+      ]
+    });
+  });
+
+  it('collects descendants through outgoing edges without cycling forever', () => {
+    expect(
+      collectDescendantNodeIds(
+        [
+          { id: 'node-1', canvas_id: 'canvas-1', title: 'A', body: '', tags: [], x: 0, y: 0, collapsed: 0 },
+          { id: 'node-2', canvas_id: 'canvas-1', title: 'B', body: '', tags: [], x: 0, y: 0, collapsed: 0 },
+          { id: 'node-3', canvas_id: 'canvas-1', title: 'C', body: '', tags: [], x: 0, y: 0, collapsed: 0 },
+          { id: 'node-4', canvas_id: 'canvas-1', title: 'D', body: '', tags: [], x: 0, y: 0, collapsed: 0 }
+        ],
+        [
+          { id: 'edge-1', canvas_id: 'canvas-1', source_node_id: 'node-1', target_node_id: 'node-2' },
+          { id: 'edge-2', canvas_id: 'canvas-1', source_node_id: 'node-2', target_node_id: 'node-3' },
+          { id: 'edge-3', canvas_id: 'canvas-1', source_node_id: 'node-3', target_node_id: 'node-1' },
+          { id: 'edge-4', canvas_id: 'canvas-1', source_node_id: 'node-3', target_node_id: 'node-4' }
+        ],
+        ['node-1']
+      )
+    ).toEqual(new Set(['node-1', 'node-2', 'node-3', 'node-4']));
+  });
+
+  it('builds a subtree fragment from selected roots', () => {
+    expect(
+      buildSubtreeClipboardFragment(
+        [
+          { id: 'node-1', canvas_id: 'canvas-1', title: 'A', body: '', tags: ['lore'], x: 10, y: 20, collapsed: 0 },
+          { id: 'node-2', canvas_id: 'canvas-1', title: 'B', body: '', tags: ['npc'], x: 30, y: 40, collapsed: 1 },
+          { id: 'node-3', canvas_id: 'canvas-1', title: 'C', body: '', tags: [], x: 50, y: 60, collapsed: 0 },
+          { id: 'node-4', canvas_id: 'canvas-1', title: 'D', body: '', tags: [], x: 70, y: 80, collapsed: 0 }
+        ],
+        [
+          { id: 'edge-1', canvas_id: 'canvas-1', source_node_id: 'node-1', target_node_id: 'node-2' },
+          { id: 'edge-2', canvas_id: 'canvas-1', source_node_id: 'node-2', target_node_id: 'node-3' },
+          { id: 'edge-3', canvas_id: 'canvas-1', source_node_id: 'node-4', target_node_id: 'node-1' }
+        ],
+        ['node-1'],
+        'canvas-1'
+      )
+    ).toEqual({
+      version: 1,
+      sourceCanvasId: 'canvas-1',
+      nodes: [
+        {
+          id: 'node-1',
+          title: 'A',
+          body: '',
+          tags: ['lore'],
+          x: 10,
+          y: 20,
+          collapsed: 0
+        },
+        {
+          id: 'node-2',
+          title: 'B',
+          body: '',
+          tags: ['npc'],
+          x: 30,
+          y: 40,
+          collapsed: 1
+        },
+        {
+          id: 'node-3',
+          title: 'C',
+          body: '',
+          tags: [],
+          x: 50,
+          y: 60,
+          collapsed: 0
+        }
+      ],
+      edges: [
+        {
+          id: 'edge-1',
+          source_node_id: 'node-1',
+          target_node_id: 'node-2'
+        },
+        {
+          id: 'edge-2',
+          source_node_id: 'node-2',
+          target_node_id: 'node-3'
         }
       ]
     });

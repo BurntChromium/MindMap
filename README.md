@@ -1,42 +1,25 @@
-# sv
+# Mindmap
 
-Everything you need to build a Svelte project, powered by [`sv`](https://github.com/sveltejs/cli).
+A Svelte and SQLite app for building mind maps and linked notebooks on a shared canvas.
 
-## Creating a project
+## Usage
 
-If you're seeing this, you've probably already done this step. Congrats!
+### Major UI Pieces
 
-```sh
-# create a new project
-npx sv create my-app
-```
+- Left panel: browse, create, rename, switch, and delete canvases.
+- Center canvas: create nodes, connect them with edges, drag them around, and edit node content.
+- Right panel: search by keyword, filter by tag, inspect selected nodes, and apply bulk tag edits.
 
-To recreate this project with the same configuration:
+### Keyboard Commands
 
-```sh
-# recreate this project
-npx sv@0.15.2 create --template minimal --types ts --install npm mindmap
-```
+- `N`: create a new node
+- `C`: toggle the left canvas panel
+- `F`: toggle the right search panel
+- `Cmd/Ctrl+A`: select all nodes on the active canvas
+- `Cmd/Ctrl+C`: copy the current selection
+- `Cmd/Ctrl+X`: cut the current selection
+- `Cmd/Ctrl+V`: paste the copied fragment
+- `Cmd/Ctrl+D`: duplicate the current selection
+- `Cmd/Ctrl+Shift+D`: duplicate the selected subtree
 
-## Developing
-
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
-
-```sh
-npm run dev
-
-# or start the server and open the app in a new browser tab
-npm run dev -- --open
-```
-
-## Building
-
-To create a production version of your app:
-
-```sh
-npm run build
-```
-
-You can preview the production build with `npm run preview`.
-
-> To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.
+Keyboard shortcuts are disabled while typing in text inputs, textareas, and other editable fields.

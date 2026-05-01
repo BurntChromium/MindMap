@@ -43,13 +43,13 @@ function cloneTags(tags: string[]) {
   return normalizeTagList(tags);
 }
 
-export function buildClipboardFragment(
+function buildFragmentFromNodeIds(
   nodes: Node[],
   edges: Edge[],
-  selectedNodeIds: string[],
+  nodeIds: Iterable<string>,
   sourceCanvasId: string | null
 ): ClipboardFragmentV1 | null {
-  const selectedIds = new Set(selectedNodeIds);
+  const selectedIds = new Set(nodeIds);
 
   if (selectedIds.size === 0) {
     return null;
@@ -83,6 +83,66 @@ export function buildClipboardFragment(
         target_node_id: edge.target_node_id
       }))
   };
+}
+
+export function buildClipboardFragment(
+  nodes: Node[],
+  edges: Edge[],
+  selectedNodeIds: string[],
+  sourceCanvasId: string | null
+) {
+  return buildFragmentFromNodeIds(nodes, edges, selectedNodeIds, sourceCanvasId);
+}
+
+export function collectDescendantNodeIds(
+  nodes: Node[],
+  edges: Edge[],
+  rootNodeIds: string[]
+) {
+  const nodeIds = new Set(nodes.map((node) => node.id));
+  const adjacency = new Map<string, string[]>();
+
+  for (const edge of edges) {
+    if (!nodeIds.has(edge.source_node_id) || !nodeIds.has(edge.target_node_id)) {
+      continue;
+    }
+
+    const neighbors = adjacency.get(edge.source_node_id) ?? [];
+    neighbors.push(edge.target_node_id);
+    adjacency.set(edge.source_node_id, neighbors);
+  }
+
+  const visited = new Set<string>();
+  const queue = rootNodeIds.filter((id) => nodeIds.has(id));
+
+  while (queue.length > 0) {
+    const currentId = queue.shift();
+
+    if (!currentId || visited.has(currentId)) {
+      continue;
+    }
+
+    visited.add(currentId);
+
+    for (const nextId of adjacency.get(currentId) ?? []) {
+      if (!visited.has(nextId)) {
+        queue.push(nextId);
+      }
+    }
+  }
+
+  return visited;
+}
+
+export function buildSubtreeClipboardFragment(
+  nodes: Node[],
+  edges: Edge[],
+  rootNodeIds: string[],
+  sourceCanvasId: string | null
+) {
+  const subtreeNodeIds = collectDescendantNodeIds(nodes, edges, rootNodeIds);
+
+  return buildFragmentFromNodeIds(nodes, edges, subtreeNodeIds, sourceCanvasId);
 }
 
 export function buildPastedGraph(
@@ -139,4 +199,3 @@ export function getConnectedEdgeIds(edges: Edge[], selectedNodeIds: string[]) {
     .filter((edge) => selectedIds.has(edge.source_node_id) || selectedIds.has(edge.target_node_id))
     .map((edge) => edge.id);
 }
-

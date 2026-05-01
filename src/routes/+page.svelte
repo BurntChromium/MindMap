@@ -9,6 +9,7 @@
   import {
     buildClipboardFragment,
     buildPastedGraph,
+    buildSubtreeClipboardFragment,
     getConnectedEdgeIds,
     type ClipboardFragmentV1
   } from '$lib/graph/clipboard';
@@ -48,6 +49,7 @@
   let storeSelectedNodeIds = $state<string[] | null>(null);
   let storeClipboardFragment = $state<ClipboardFragmentV1 | null>(null);
   let storeClipboardPasteCount = $state(0);
+  let duplicateCount = $state(0);
   let searchQuery = $state('');
   let activeTag = $state<string | null>(null);
   let focusedNodeId = $state<string | null>(null);
@@ -119,6 +121,16 @@
         if (key === 'v' && clipboardFragment) {
           event.preventDefault();
           void pasteClipboardFragment();
+          return;
+        }
+
+        if (key === 'd' && selectedNodeIds.length > 0) {
+          event.preventDefault();
+          if (event.shiftKey) {
+            void duplicateSubtreeSelection();
+          } else {
+            void duplicateSelection();
+          }
           return;
         }
       }
@@ -199,6 +211,7 @@
 
     nodeUiStore.clear();
     selectionStore.clear();
+    duplicateCount = 0;
     searchQuery = '';
     activeTag = null;
     focusedNodeId = null;
@@ -279,6 +292,66 @@
     }
   }
 
+  async function commitPastedGraph(
+    fragment: ClipboardFragmentV1,
+    pasteIndex: number,
+    onSuccess?: () => void
+  ) {
+    if (!activeCanvasId || fragment.nodes.length === 0) {
+      return;
+    }
+
+    const pastedGraph = buildPastedGraph(
+      fragment,
+      activeCanvasId,
+      pasteIndex,
+      () => createClientId('node'),
+      () => createClientId('edge')
+    );
+
+    if (pastedGraph.nodes.length === 0) {
+      return;
+    }
+
+    const previousNodes = [...nodes];
+    const previousEdges = [...edges];
+    const previousSelection = [...selectedNodeIds];
+    const previousFocusedNodeId = focusedNodeId;
+    const nextNodes = [...previousNodes, ...pastedGraph.nodes];
+    const nextEdges = [...previousEdges, ...pastedGraph.edges];
+
+    nodeStore.hydrate(nextNodes, activeCanvasId);
+    edgeStore.hydrate(nextEdges, activeCanvasId);
+    selectionStore.setSelection(pastedGraph.nodes.map((node) => node.id));
+    focusedNodeId = pastedGraph.nodes[0]?.id ?? null;
+    nodeUiStore.clear();
+
+    try {
+      const response = await fetch('/api/graph-fragments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'paste',
+          canvasId: activeCanvasId,
+          nodes: pastedGraph.nodes,
+          edges: pastedGraph.edges
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Paste graph fragment failed with ${response.status}`);
+      }
+
+      onSuccess?.();
+    } catch (error) {
+      nodeStore.hydrate(previousNodes, activeCanvasId);
+      edgeStore.hydrate(previousEdges, activeCanvasId);
+      selectionStore.setSelection(previousSelection);
+      focusedNodeId = previousFocusedNodeId;
+      console.error(error);
+    }
+  }
+
   async function cutSelection() {
     const fragment = buildClipboardFragment(nodes, edges, selectedNodeIds, activeCanvasId);
 
@@ -291,6 +364,30 @@
       fragment.nodes.map((node) => node.id),
       getConnectedEdgeIds(edges, fragment.nodes.map((node) => node.id))
     );
+  }
+
+  async function duplicateSelection() {
+    const fragment = buildClipboardFragment(nodes, edges, selectedNodeIds, activeCanvasId);
+
+    if (!fragment) {
+      return;
+    }
+
+    await commitPastedGraph(fragment, duplicateCount, () => {
+      duplicateCount += 1;
+    });
+  }
+
+  async function duplicateSubtreeSelection() {
+    const fragment = buildSubtreeClipboardFragment(nodes, edges, selectedNodeIds, activeCanvasId);
+
+    if (!fragment) {
+      return;
+    }
+
+    await commitPastedGraph(fragment, duplicateCount, () => {
+      duplicateCount += 1;
+    });
   }
 
   async function deleteGraphSelection(nodeIds: string[], edgeIds: string[]) {
@@ -385,55 +482,9 @@
       return;
     }
 
-    const pastedGraph = buildPastedGraph(
-      clipboardFragment,
-      activeCanvasId,
-      clipboardPasteCount,
-      () => createClientId('node'),
-      () => createClientId('edge')
-    );
-
-    if (pastedGraph.nodes.length === 0) {
-      return;
-    }
-
-    const previousNodes = [...nodes];
-    const previousEdges = [...edges];
-    const previousSelection = [...selectedNodeIds];
-    const previousFocusedNodeId = focusedNodeId;
-    const nextNodes = [...previousNodes, ...pastedGraph.nodes];
-    const nextEdges = [...previousEdges, ...pastedGraph.edges];
-
-    nodeStore.hydrate(nextNodes, activeCanvasId);
-    edgeStore.hydrate(nextEdges, activeCanvasId);
-    selectionStore.setSelection(pastedGraph.nodes.map((node) => node.id));
-    focusedNodeId = pastedGraph.nodes[0]?.id ?? null;
-    nodeUiStore.clear();
-
-    try {
-      const response = await fetch('/api/graph-fragments', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'paste',
-          canvasId: activeCanvasId,
-          nodes: pastedGraph.nodes,
-          edges: pastedGraph.edges
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error(`Paste graph fragment failed with ${response.status}`);
-      }
-
+    await commitPastedGraph(clipboardFragment, clipboardPasteCount, () => {
       clipboardStore.incrementPasteCount();
-    } catch (error) {
-      nodeStore.hydrate(previousNodes, activeCanvasId);
-      edgeStore.hydrate(previousEdges, activeCanvasId);
-      selectionStore.setSelection(previousSelection);
-      focusedNodeId = previousFocusedNodeId;
-      console.error(error);
-    }
+    });
   }
 </script>
 
@@ -485,6 +536,8 @@
       onFocusSearchResult={focusSearchResult}
       onAddSelectedTag={addTagToSelection}
       onRemoveSelectedTag={removeTagFromSelection}
+      onDuplicateSelection={duplicateSelection}
+      onDuplicateSubtree={duplicateSubtreeSelection}
       onClearSelection={clearSelection}
     />
   </main>

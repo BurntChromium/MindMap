@@ -18,6 +18,8 @@
     onFocusSearchResult: (nodeId: string) => void;
     onAddSelectedTag: (tag: string) => void;
     onRemoveSelectedTag: (tag: string) => void;
+    onDuplicateSelection: () => void;
+    onDuplicateSubtree: () => void;
     onClearSelection: () => void;
   }
 
@@ -36,6 +38,8 @@
     onFocusSearchResult,
     onAddSelectedTag,
     onRemoveSelectedTag,
+    onDuplicateSelection,
+    onDuplicateSubtree,
     onClearSelection
   }: Props = $props();
 
@@ -201,6 +205,14 @@
         <button class="button" type="button" onclick={onClearSelection}>
           Clear selection
         </button>
+        <div class="discovery-selection-actions">
+          <button class="button" type="button" onclick={onDuplicateSelection}>
+            Duplicate
+          </button>
+          <button class="button" type="button" onclick={onDuplicateSubtree}>
+            Duplicate subtree
+          </button>
+        </div>
       {:else}
         <p class="discovery-empty">Select one or more nodes to add or remove tags in bulk.</p>
       {/if}
@@ -338,6 +350,12 @@
 
   .discovery-search-clear {
     flex: 0 0 auto;
+  }
+
+  .discovery-selection-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
   }
 
   .discovery-section {
