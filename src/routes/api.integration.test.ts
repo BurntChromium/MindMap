@@ -11,6 +11,7 @@ vi.stubEnv('MINDMAP_DB_PATH', dbPath);
 let canvasesApi: typeof import('./api/canvases/+server');
 let nodesApi: typeof import('./api/nodes/+server');
 let edgesApi: typeof import('./api/edges/+server');
+let searchApi: typeof import('./api/search/+server');
 let db: any;
 
 beforeAll(async () => {
@@ -20,6 +21,7 @@ beforeAll(async () => {
   canvasesApi = await import('./api/canvases/+server');
   nodesApi = await import('./api/nodes/+server');
   edgesApi = await import('./api/edges/+server');
+  searchApi = await import('./api/search/+server');
   db = (await import('$lib/server/db')).db;
 });
 
@@ -121,6 +123,71 @@ describe('API integration', () => {
 
     expect(tagRows.map((row: { name: string }) => row.name)).toEqual(['lore', 'npc']);
     expect(nodeTagRows).toHaveLength(2);
+
+    const tagColors = db.prepare('SELECT name, color FROM tags ORDER BY name').all();
+
+    expect(tagColors).toEqual([
+      expect.objectContaining({ name: 'lore', color: expect.stringMatching(/^#[0-9a-f]{6}$/i) }),
+      expect.objectContaining({ name: 'npc', color: expect.stringMatching(/^#[0-9a-f]{6}$/i) })
+    ]);
+  });
+
+  it('searches nodes by keyword and tag', async () => {
+    const canvas = await canvasesApi.POST({
+      request: request({ name: 'Searchable' })
+    } as any);
+    const { id: canvasId } = await canvas.json();
+
+    const firstNode = await nodesApi.POST({
+      request: request({ canvasId, x: 0, y: 0 })
+    } as any);
+    const secondNode = await nodesApi.POST({
+      request: request({ canvasId, x: 120, y: 120 })
+    } as any);
+
+    const { id: firstNodeId } = await firstNode.json();
+    const { id: secondNodeId } = await secondNode.json();
+
+    await nodesApi.PATCH({
+      request: request({
+        id: firstNodeId,
+        title: 'Smaug',
+        body: 'The dragon keeps the treasure.',
+        tags: ['lore']
+      })
+    } as any);
+
+    await nodesApi.PATCH({
+      request: request({
+        id: secondNodeId,
+        title: 'Guide',
+        body: 'A helpful NPC for the player.',
+        tags: ['npc']
+      })
+    } as any);
+
+    const keywordMatch = await searchApi.GET({
+      url: new URL(`http://localhost/api/search?canvasId=${canvasId}&query=dragon`)
+    } as any);
+    const keywordNodes = await keywordMatch.json();
+
+    expect(keywordNodes).toHaveLength(1);
+    expect(keywordNodes[0]).toMatchObject({
+      id: firstNodeId,
+      title: 'Smaug'
+    });
+
+    const tagMatch = await searchApi.GET({
+      url: new URL(`http://localhost/api/search?canvasId=${canvasId}&tag=npc`)
+    } as any);
+    const tagNodes = await tagMatch.json();
+
+    expect(tagNodes).toHaveLength(1);
+    expect(tagNodes[0]).toMatchObject({
+      id: secondNodeId,
+      title: 'Guide',
+      tags: ['npc']
+    });
   });
 
   it('creates and lists edges', async () => {

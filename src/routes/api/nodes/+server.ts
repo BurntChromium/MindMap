@@ -3,18 +3,27 @@ import { db } from '$lib/server/db';
 import { createId, now } from '$lib/server/utils';
 import { normalizeTagList } from '$lib/tagUtils';
 import { getNodesByCanvasId } from '$lib/server/graphData';
+import { getTagColor } from '$lib/tagColors';
 
 function getOrCreateTagId(name: string) {
   const existing = db.prepare('SELECT id FROM tags WHERE name = ?').get(name) as
-    | { id: string }
+    | { id: string; color: string | null }
     | undefined;
 
   if (existing) {
+    if (!existing.color) {
+      db.prepare('UPDATE tags SET color = ? WHERE id = ?').run(getTagColor(name), existing.id);
+    }
+
     return existing.id;
   }
 
   const id = createId();
-  db.prepare('INSERT INTO tags (id, name, color) VALUES (?, ?, ?)').run(id, name, null);
+  db.prepare('INSERT INTO tags (id, name, color) VALUES (?, ?, ?)').run(
+    id,
+    name,
+    getTagColor(name)
+  );
   return id;
 }
 

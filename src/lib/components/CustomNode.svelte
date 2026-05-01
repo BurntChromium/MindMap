@@ -14,6 +14,7 @@
     normalizeTagList,
     normalizeTagName
   } from '$lib/tagUtils';
+  import { getTagColor, getTagColorWithAlpha } from '$lib/tagColors';
 
   let { id, data, selected } = $props();
 
@@ -28,6 +29,9 @@
   const isExpanded = $derived(nodeMode !== 'compact');
   const bodyText = $derived(data.body ?? '');
   const nodeTags = $derived(Array.isArray(data.tags) ? data.tags : []);
+  const isSearchHit = $derived(Boolean(data.isSearchHit));
+  const isDimmed = $derived(Boolean(data.isDimmed));
+  const activeTagColor = $derived(data.activeTagColor ?? null);
 
   $effect(() => {
     const unsub = nodeUiStore.subscribe((v: NodeUiState) => {
@@ -171,15 +175,39 @@
   const borderColor = $derived(
     isEditing
       ? '1px solid var(--accent)'
-      : selected
-        ? '1px solid var(--text-main)'
-        : '1px solid var(--border-color)'
+      : isSearchHit && activeTagColor
+        ? `1px solid ${getTagColorWithAlpha(data.activeTag ?? '', 0.85)}`
+        : isSearchHit
+          ? '1px solid var(--accent)'
+          : selected
+            ? '1px solid var(--text-main)'
+            : '1px solid var(--border-color)'
   );
   const boxShadow = $derived(isExpanded ? 'var(--shadow-soft)' : 'none');
+  const nodeBackground = $derived(
+    isEditing
+      ? 'var(--surface)'
+      : isSearchHit && activeTagColor
+        ? getTagColorWithAlpha(data.activeTag ?? '', 0.18)
+        : 'var(--surface)'
+  );
+  const nodeOpacity = $derived(isDimmed ? 0.45 : 1);
+
+  function tagChipStyle(tag: string) {
+    const color = data.tagColors?.[tag] ?? getTagColor(tag);
+    return `
+      border-color: ${getTagColorWithAlpha(tag, 0.4)};
+      background: ${getTagColorWithAlpha(tag, 0.18)};
+      color: ${color};
+    `;
+  }
 </script>
 
 <div class="node-shell" style={`width: ${nodeWidth};`}>
-  <div class="node-card" style={`border: ${borderColor}; box-shadow: ${boxShadow};`}>
+  <div
+    class="node-card"
+    style={`border: ${borderColor}; box-shadow: ${boxShadow}; background: ${nodeBackground}; opacity: ${nodeOpacity};`}
+  >
     <div class="node-header">
       {#if isEditing}
         <input
@@ -229,7 +257,7 @@
       <div class="tags-area" class:tags-area--compact={nodeMode === 'compact'}>
         {#if isEditing}
           {#each draftTags as tag}
-            <span class="tag-chip">
+            <span class="tag-chip" style={tagChipStyle(tag)}>
               <span>{formatTagLabel(tag)}</span>
               <button
                 class="tag-remove nodrag"
@@ -256,7 +284,9 @@
           </span>
         {:else}
           {#each nodeTags as tag}
-            <span class="tag-chip tag-chip-readonly">{formatTagLabel(tag)}</span>
+            <span class="tag-chip tag-chip-readonly" style={tagChipStyle(tag)}>
+              {formatTagLabel(tag)}
+            </span>
           {/each}
         {/if}
       </div>
@@ -294,7 +324,9 @@
     border-radius: 8px;
     padding: 10px 12px;
     transition:
+      background-color 0.2s ease,
       border 0.2s ease,
+      opacity 0.2s ease,
       box-shadow 0.2s ease,
       width 0.2s ease;
   }

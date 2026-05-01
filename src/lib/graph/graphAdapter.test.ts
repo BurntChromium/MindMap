@@ -31,17 +31,29 @@ describe('graphAdapter', () => {
           collapsed: 0
         }
       ],
-      '1'
+      {
+        editingNodeId: '1',
+        activeTag: null,
+        searchHitIds: new Set<string>(),
+        tagColors: {}
+      }
     );
 
     expect(flowNodes).toEqual([
       {
         id: '1',
         position: { x: 1, y: 2 },
+        selected: false,
         data: {
           label: 'First',
           body: 'Body',
-          tags: ['lore']
+          tags: ['lore'],
+          tagColors: {},
+          activeTag: null,
+          activeTagColor: null,
+          isSearchHit: false,
+          isDimmed: false,
+          isFocused: false
         },
         type: 'custom',
         draggable: false

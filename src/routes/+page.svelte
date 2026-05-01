@@ -4,6 +4,8 @@
   import { Check, ChevronLeft, ChevronRight, PencilLine, Plus, Trash2, X } from 'lucide-svelte';
   import type { PageData } from './$types';
   import CustomNode from '$lib/components/CustomNode.svelte';
+  import { collectTagSummaries } from '$lib/discovery';
+  import { formatTagLabel, normalizeTagName } from '$lib/tagUtils';
   import { isCreateNodeShortcut, isTextInputElement } from '$lib/shortcutUtils';
 
   const nodeTypes = {
@@ -28,6 +30,12 @@
   let storeActiveCanvasId = $state<string | null>(null);
   let storeNodes = $state<Node[] | null>(null);
   let storeEdges = $state<Edge[] | null>(null);
+  let searchQuery = $state('');
+  let searchResults = $state<Node[]>([]);
+  let searchLoading = $state(false);
+  let searchError = $state<string | null>(null);
+  let activeTag = $state<string | null>(null);
+  let focusedNodeId = $state<string | null>(null);
   let editingNodeId = $state<string | null>(null);
   let editingCanvasId = $state<string | null>(null);
   let editingCanvasName = $state('');
@@ -44,8 +52,34 @@
   const activeCanvasId = $derived(storeActiveCanvasId ?? initialActiveCanvasId);
   const nodes = $derived(storeNodes ?? initialNodes);
   const edges = $derived(storeEdges ?? initialEdges);
-  const flowNodes = $derived(toFlowNodes(nodes, editingNodeId));
+  const tagSummaries = $derived(collectTagSummaries(nodes));
+  const tagColorMap = $derived(
+    Object.fromEntries(tagSummaries.map((tag) => [tag.name, tag.color]))
+  );
+  const searchHitIds = $derived(new Set(searchResults.map((node) => node.id)));
+  const flowNodes = $derived(
+    toFlowNodes(nodes, {
+      editingNodeId,
+      focusedNodeId,
+      activeTag,
+      searchHitIds,
+      tagColors: tagColorMap
+    })
+  );
   const flowEdges = $derived(toFlowEdges(edges));
+  const activeFilterLabel = $derived.by(() => {
+    const filters: string[] = [];
+
+    if (searchQuery.trim()) {
+      filters.push(`"${searchQuery.trim()}"`);
+    }
+
+    if (activeTag) {
+      filters.push(formatTagLabel(activeTag));
+    }
+
+    return filters.length ? filters.join(' + ') : 'none';
+  });
   let canvasShell: HTMLDivElement | undefined;
 
   onMount(() => {
@@ -113,8 +147,88 @@
     loadedCanvasId = activeCanvasId;
 
     nodeUiStore.clear();
+    searchQuery = '';
+    searchResults = [];
+    searchLoading = false;
+    searchError = null;
+    activeTag = null;
+    focusedNodeId = null;
     void nodeStore.load(activeCanvasId);
     void edgeStore.load(activeCanvasId);
+  });
+
+  $effect(() => {
+    const canvasId = activeCanvasId;
+    const query = searchQuery.trim();
+    const tag = activeTag;
+
+    if (!canvasId || (!query && !tag)) {
+      searchResults = [];
+      searchLoading = false;
+      searchError = null;
+      return;
+    }
+
+    searchLoading = true;
+    searchError = null;
+    searchResults = [];
+
+    const controller = new AbortController();
+    const timeout = window.setTimeout(async () => {
+      try {
+        const url = new URL('/api/search', window.location.origin);
+        url.searchParams.set('canvasId', canvasId);
+
+        if (query) {
+          url.searchParams.set('query', query);
+        }
+
+        if (tag) {
+          url.searchParams.set('tag', tag);
+        }
+
+        const res = await fetch(url, { signal: controller.signal });
+
+        if (!res.ok) {
+          throw new Error(`Search request failed with ${res.status}`);
+        }
+
+        const data = (await res.json()) as Node[];
+        searchResults = data;
+      } catch (error) {
+        if (controller.signal.aborted) {
+          return;
+        }
+
+        searchResults = [];
+        searchError = error instanceof Error ? error.message : 'Search failed';
+      } finally {
+        if (!controller.signal.aborted) {
+          searchLoading = false;
+        }
+      }
+    }, 160);
+
+    return () => {
+      controller.abort();
+      window.clearTimeout(timeout);
+    };
+  });
+
+  $effect(() => {
+    if (!focusedNodeId) {
+      return;
+    }
+
+    const filteredIds = searchHitIds;
+
+    if (
+      !searchLoading &&
+      (searchQuery.trim() || activeTag) &&
+      (!filteredIds.size || !filteredIds.has(focusedNodeId))
+    ) {
+      focusedNodeId = null;
+    }
   });
 
   function addNode() {
@@ -122,6 +236,22 @@
 
     // place near origin for now
     nodeStore.create(activeCanvasId, 100, 100);
+  }
+
+  function toggleTagFilter(tag: string) {
+    const normalizedTag = normalizeTagName(tag);
+
+    activeTag = activeTag === normalizedTag ? null : normalizedTag;
+    focusedNodeId = null;
+  }
+
+  function clearDiscoveryFilters() {
+    searchQuery = '';
+    activeTag = null;
+    focusedNodeId = null;
+    searchResults = [];
+    searchLoading = false;
+    searchError = null;
   }
 
   function startRenameCanvas(canvas: Canvas) {
@@ -156,6 +286,10 @@
   function onConnect(connection: Connection) {
     if (!activeCanvasId || !connection.source || !connection.target) return;
     edgeStore.create(activeCanvasId, connection.source, connection.target);
+  }
+
+  function focusSearchResult(nodeId: string) {
+    focusedNodeId = nodeId;
   }
 </script>
 
@@ -282,46 +416,351 @@
     </div>
   </div>
 
-  <div
-    bind:this={canvasShell}
-    class="canvas-shell"
-    tabindex="-1"
-    role="region"
-    aria-label="Mind map canvas"
-    onpointerdown={focusCanvasShell}
-  >
-    <div class="canvas-toolbar">
-      <button
-        class="button button--primary canvas-create-button"
-        type="button"
-        aria-label="Add node"
-        title="Add node (N)"
-        onclick={addNode}
+  <main class="workspace">
+    <div
+      bind:this={canvasShell}
+      class="canvas-shell"
+      tabindex="-1"
+      role="region"
+      aria-label="Mind map canvas"
+      onpointerdown={focusCanvasShell}
+    >
+      <div class="canvas-toolbar">
+        <button
+          class="button button--primary canvas-create-button"
+          type="button"
+          aria-label="Add node"
+          title="Add node (N)"
+          onclick={addNode}
+        >
+          <Plus size={16} aria-hidden="true" />
+          <span>Node</span>
+        </button>
+      </div>
+
+      <SvelteFlow
+        style="width: 100%; height: 100%;"
+        nodes={flowNodes}
+        edges={flowEdges}
+        nodeTypes={nodeTypes}
+        onconnect={onConnect}
+        onnodedragstop={handleNodeDragStop}
+        onnodeclick={(event) => {
+          focusedNodeId = event.node.id;
+        }}
+        ondelete={(event) => {
+          for (const node of event.nodes) {
+            nodeStore.remove(node.id);
+          }
+          for (const edge of event.edges) {
+            edgeStore.remove(edge.id);
+          }
+        }}
+        fitView
       >
-        <Plus size={16} aria-hidden="true" />
-        <span>Node</span>
-      </button>
+        <Background />
+        <Controls />
+      </SvelteFlow>
     </div>
 
-    <SvelteFlow
-      style="width: 100%; height: 100%;"
-      nodes={flowNodes}
-      edges={flowEdges}
-      nodeTypes={nodeTypes}
-      onconnect={onConnect}
-      onnodedragstop={handleNodeDragStop}
-      ondelete={(event) => {
-        for (const node of event.nodes) {
-          nodeStore.remove(node.id);
-        }
-        for (const edge of event.edges) {
-          edgeStore.remove(edge.id);
-        }
-      }}
-      fitView
-      >
-      <Background />
-      <Controls />
-    </SvelteFlow>
-  </div>
+    <aside class="discovery-panel" aria-label="Search and filters">
+      <div class="discovery-panel__header">
+        <div>
+          <h3>Find</h3>
+          <p>Search titles, bodies, and tags without leaving the canvas.</p>
+        </div>
+        <button
+          class="icon-button discovery-clear-button"
+          type="button"
+          aria-label="Clear search and tag filters"
+          title="Clear search and tag filters"
+          onclick={clearDiscoveryFilters}
+          disabled={!searchQuery.trim() && !activeTag}
+        >
+          <X size={14} aria-hidden="true" />
+        </button>
+      </div>
+
+      <label class="discovery-search">
+        <span>Keyword search</span>
+        <input
+          bind:value={searchQuery}
+          class="sidebar-input discovery-search-input"
+          placeholder="Search titles or body"
+          aria-label="Search nodes by keyword"
+        />
+      </label>
+
+      <section class="discovery-section">
+        <div class="discovery-section__header">
+          <h4>Tags</h4>
+          <span>{tagSummaries.length} total</span>
+        </div>
+
+        {#if tagSummaries.length}
+          <div class="tag-filter-list">
+            {#each tagSummaries as tag}
+              <button
+                type="button"
+                class="tag-filter-chip"
+                class:tag-filter-chip--active={activeTag === tag.name}
+                style={`--tag-color: ${tag.color};`}
+                onclick={() => toggleTagFilter(tag.name)}
+              >
+                <span>{formatTagLabel(tag.name)}</span>
+                <span class="tag-filter-chip__count">{tag.count}</span>
+              </button>
+            {/each}
+          </div>
+        {:else}
+          <p class="discovery-empty">No tags yet. Add tags to make them easy to find.</p>
+        {/if}
+      </section>
+
+      <section class="discovery-section discovery-results">
+        <div class="discovery-section__header">
+          <h4>Matches</h4>
+          <span>{activeFilterLabel}</span>
+        </div>
+
+        {#if searchLoading}
+          <p class="discovery-empty">Searching...</p>
+        {:else if searchError}
+          <p class="discovery-error">{searchError}</p>
+        {:else if !searchQuery.trim() && !activeTag}
+          <p class="discovery-empty">Type a keyword or click a tag to see matches.</p>
+        {:else if searchResults.length === 0}
+          <p class="discovery-empty">No nodes match the current filters.</p>
+        {:else}
+          <div class="search-results">
+            {#each searchResults as node}
+              <button
+                type="button"
+                class="search-result"
+                class:search-result--focused={focusedNodeId === node.id}
+                onclick={() => focusSearchResult(node.id)}
+              >
+                <span class="search-result__title">{node.title || 'Untitled'}</span>
+                {#if node.body}
+                  <span class="search-result__body">
+                    {node.body.length > 96 ? `${node.body.slice(0, 96).trim()}…` : node.body}
+                  </span>
+                {/if}
+                {#if node.tags?.length}
+                  <span class="search-result__tags">
+                    {#each node.tags.slice(0, 4) as tag}
+                      <span class="search-result__tag">{formatTagLabel(tag)}</span>
+                    {/each}
+                  </span>
+                {/if}
+              </button>
+            {/each}
+          </div>
+        {/if}
+      </section>
+    </aside>
+  </main>
 </div>
+
+<style>
+  .workspace {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+  }
+
+  .discovery-panel {
+    width: 320px;
+    min-width: 320px;
+    border-left: var(--border-thin);
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(244, 246, 248, 0.95)),
+      var(--surface-muted);
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    overflow: auto;
+  }
+
+  .discovery-panel__header {
+    display: flex;
+    align-items: start;
+    justify-content: space-between;
+    gap: 0.75rem;
+  }
+
+  .discovery-panel__header h3,
+  .discovery-section__header h4 {
+    margin: 0;
+  }
+
+  .discovery-panel__header h3 {
+    font-size: 0.8rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+
+  .discovery-panel__header p {
+    margin: 0.2rem 0 0;
+    color: var(--text-muted);
+    font-size: 0.88rem;
+    line-height: 1.4;
+  }
+
+  .discovery-search {
+    display: grid;
+    gap: 0.45rem;
+  }
+
+  .discovery-search > span {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+  }
+
+  .discovery-search-input {
+    width: 100%;
+  }
+
+  .discovery-section {
+    display: grid;
+    gap: 0.75rem;
+  }
+
+  .discovery-section__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+  }
+
+  .discovery-section__header h4 {
+    font-size: 0.74rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+
+  .discovery-section__header span {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+  }
+
+  .tag-filter-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .tag-filter-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    border: 1px solid var(--tag-color);
+    border-radius: 999px;
+    padding: 0.35rem 0.65rem;
+    background: color-mix(in srgb, var(--tag-color) 18%, white);
+    color: var(--tag-color);
+    font-size: 0.8rem;
+    line-height: 1;
+    text-align: left;
+  }
+
+  .tag-filter-chip--active {
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--tag-color) 20%, transparent);
+  }
+
+  .tag-filter-chip__count {
+    min-width: 1.5rem;
+    padding: 0.1rem 0.35rem;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--tag-color) 30%, white);
+    color: var(--tag-color);
+    font-size: 0.72rem;
+    text-align: center;
+  }
+
+  .search-results {
+    display: grid;
+    gap: 0.5rem;
+  }
+
+  .search-result {
+    display: grid;
+    gap: 0.25rem;
+    padding: 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 0.75rem;
+    background: var(--surface);
+    text-align: left;
+    box-shadow: none;
+  }
+
+  .search-result--focused {
+    border-color: var(--accent);
+    box-shadow: var(--shadow-soft);
+  }
+
+  .search-result__title {
+    font-weight: 600;
+  }
+
+  .search-result__body {
+    color: var(--text-muted);
+    font-size: 0.88rem;
+    line-height: 1.35;
+  }
+
+  .search-result__tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin-top: 0.25rem;
+  }
+
+  .search-result__tag {
+    border-radius: 999px;
+    padding: 0.1rem 0.45rem;
+    background: var(--surface-soft);
+    color: var(--text-muted);
+    font-size: 0.72rem;
+  }
+
+  .discovery-empty,
+  .discovery-error {
+    margin: 0;
+    font-size: 0.9rem;
+    line-height: 1.4;
+  }
+
+  .discovery-empty {
+    color: var(--text-muted);
+  }
+
+  .discovery-error {
+    color: #b91c1c;
+  }
+
+  .discovery-clear-button {
+    flex: 0 0 auto;
+  }
+
+  @media (max-width: 1180px) {
+    .workspace {
+      flex-direction: column;
+    }
+
+    .discovery-panel {
+      width: auto;
+      min-width: 0;
+      border-left: 0;
+      border-top: var(--border-thin);
+      max-height: 40vh;
+    }
+  }
+</style>
