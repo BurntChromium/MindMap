@@ -14,26 +14,10 @@ Already in place:
 
 This means the next work is about making the app easier to navigate, faster to use at scale, and more durable.
 
-## Stage 1: Make the Map Easy to Read
+## Stage 1: UX Tweaks
 
-User benefit:
-
-- skim ideas quickly
-- understand what a node is without opening it
-- keep the canvas visually manageable as the graph grows
-
-Feature work:
-
-- node preview states that stay compact until explicitly expanded
-- stronger node styling using title, body, and tag chips
-- canvas-level zoom/pan feel that stays predictable with larger node cards
-- better visual hierarchy for selected, focused, and edited nodes
-
-Plumbing to support it:
-
-- keep node layout state isolated from saved content
-- define stable node sizing rules so expansion does not jitter the graph
-- tighten the custom node component so display and edit modes share the same base layout
+- Make tags visible in the compact mode (the default, unexpanded state)
+- We have 3 states: compact, view, and edit. Let's be sure that this is reflected in the code and our assumptions/documentation. 
 
 ## Stage 2: Find Things Quickly
 
@@ -45,8 +29,11 @@ User benefit:
 
 Feature work:
 
+- Tags get colors auto-assigned (e.g. all uses of `#lore` get the same color)
+    - Pastel palette
 - right-hand search and filter panel
 - tag-based filtering and highlighting
+    - Click on a tag to mark all nodes with that tag (probably apply that tag's color to the relevant nodes' background, but with a high transparency to avoid being too flashy). Click the tag again to remove the coloration.
 - keyword search across title and body
 - saved or repeatable filters later if needed
 
@@ -113,6 +100,7 @@ Feature work:
 
 - undo/redo
 - clearer save indicators when writes are in flight or failed
+    - A simple "synced" badge in the canvas could solve this (or "syncing", "synced", "failed" or whatever)
 - stronger keyboard shortcuts
 - better empty, loading, and error states
 
