@@ -2,19 +2,7 @@ import { json } from '@sveltejs/kit';
 import { db } from '$lib/server/db';
 import { createId, now } from '$lib/server/utils';
 import { normalizeTagList } from '$lib/tagUtils';
-
-function parseTags(rawTags: unknown) {
-  if (typeof rawTags !== 'string' || !rawTags) {
-    return [];
-  }
-
-  try {
-    const parsed = JSON.parse(rawTags);
-    return Array.isArray(parsed) ? normalizeTagList(parsed) : [];
-  } catch {
-    return [];
-  }
-}
+import { getNodesByCanvasId } from '$lib/server/graphData';
 
 function getOrCreateTagId(name: string) {
   const existing = db.prepare('SELECT id FROM tags WHERE name = ?').get(name) as
@@ -47,32 +35,7 @@ function replaceNodeTags(nodeId: string, tags: string[]) {
 // GET /api/nodes?canvasId=...
 export function GET({ url }) {
   const canvasId = url.searchParams.get('canvasId');
-
-  const nodes = (db
-    .prepare(`
-      SELECT
-        n.*,
-        COALESCE((
-          SELECT json_group_array(tag_name)
-          FROM (
-            SELECT t.name AS tag_name
-            FROM node_tags nt
-            JOIN tags t ON t.id = nt.tag_id
-            WHERE nt.node_id = n.id
-            ORDER BY nt.rowid
-          )
-        ), '[]') AS tags
-      FROM nodes n
-      WHERE n.canvas_id = ?
-      ORDER BY n.created_at ASC
-    `)
-    .all(canvasId) as Array<Record<string, unknown> & { tags?: unknown }>)
-    .map((node) => ({
-      ...node,
-      tags: parseTags(node.tags)
-    }));
-
-  return json(nodes);
+  return json(getNodesByCanvasId(canvasId));
 }
 
 // POST /api/nodes

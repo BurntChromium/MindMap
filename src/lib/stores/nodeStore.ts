@@ -21,6 +21,15 @@ function createNodeStore() {
   return {
     subscribe,
 
+    hydrate(nodes: Node[]) {
+      const map = new Map<string, Node>();
+      for (const node of nodes) {
+        map.set(node.id, node);
+      }
+
+      set({ nodes: map });
+    },
+
     async load(canvasId: string) {
       const res = await fetch(`/api/nodes?canvasId=${canvasId}`);
       const data: Array<Node & { tags?: unknown }> = await res.json();

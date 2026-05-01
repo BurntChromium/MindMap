@@ -1,16 +1,12 @@
 import { json } from '@sveltejs/kit';
 import { db } from '$lib/server/db';
 import { createId } from '$lib/server/utils';
+import { getEdgesByCanvasId } from '$lib/server/graphData';
 
 // GET /api/edges?canvasId=...
 export function GET({ url }) {
   const canvasId = url.searchParams.get('canvasId');
-
-  const edges = db
-    .prepare('SELECT * FROM edges WHERE canvas_id = ?')
-    .all(canvasId);
-
-  return json(edges);
+  return json(getEdgesByCanvasId(canvasId));
 }
 
 // POST /api/edges

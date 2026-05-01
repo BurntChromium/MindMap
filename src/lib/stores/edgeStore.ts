@@ -17,6 +17,15 @@ function createEdgeStore() {
   return {
     subscribe,
 
+    hydrate(edges: Edge[]) {
+      const map = new Map<string, Edge>();
+      for (const edge of edges) {
+        map.set(edge.id, edge);
+      }
+
+      set({ edges: map });
+    },
+
     async load(canvasId: string) {
       const res = await fetch(`/api/edges?canvasId=${canvasId}`);
       const data: Edge[] = await res.json();

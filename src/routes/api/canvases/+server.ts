@@ -1,14 +1,11 @@
 import { json } from '@sveltejs/kit';
 import { db } from '$lib/server/db';
 import { createId, now } from '$lib/server/utils';
+import { getCanvases } from '$lib/server/graphData';
 
 // GET /api/canvases
 export function GET() {
-  const canvases = db
-    .prepare('SELECT * FROM canvases ORDER BY updated_at DESC')
-    .all();
-
-  return json(canvases);
+  return json(getCanvases());
 }
 
 // POST /api/canvases

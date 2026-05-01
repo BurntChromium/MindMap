@@ -44,5 +44,11 @@ export function initSchema() {
       FOREIGN KEY(node_id) REFERENCES nodes(id) ON DELETE CASCADE,
       FOREIGN KEY(tag_id) REFERENCES tags(id) ON DELETE CASCADE
     );
+
+    CREATE INDEX IF NOT EXISTS idx_nodes_canvas_created_at
+      ON nodes(canvas_id, created_at);
+
+    CREATE INDEX IF NOT EXISTS idx_edges_canvas_id
+      ON edges(canvas_id);
   `);
 }

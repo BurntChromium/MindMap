@@ -19,6 +19,13 @@ function createCanvasStore() {
   return {
     subscribe,
 
+    hydrate(canvases: Canvas[], activeCanvasId: string | null) {
+      set({
+        canvases,
+        activeCanvasId
+      });
+    },
+
     async load() {
       const res = await fetch('/api/canvases');
       const canvases = await res.json();

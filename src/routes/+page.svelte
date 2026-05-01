@@ -2,6 +2,7 @@
   import { SvelteFlow, Background, Controls, type Connection } from '@xyflow/svelte';
   import { onMount } from 'svelte';
   import { Plus, Trash2 } from 'lucide-svelte';
+  import type { PageData } from './$types';
   import CustomNode from '$lib/components/CustomNode.svelte';
   import { isCreateNodeShortcut, isTextInputElement } from '$lib/shortcutUtils';
 
@@ -19,20 +20,35 @@
     handleNodeDragStop
   } from '$lib/graph/graphAdapter';
 
+  let { data }: { data: PageData } = $props();
+
   let name = $state('');
 
-  let canvases = $state<Canvas[]>([]);
-  let activeCanvasId = $state<string | null>(null);
-  let nodes = $state<Node[]>([]);
-  let edges = $state<Edge[]>([]);
+  let storeCanvases = $state<Canvas[] | null>(null);
+  let storeActiveCanvasId = $state<string | null>(null);
+  let storeNodes = $state<Node[] | null>(null);
+  let storeEdges = $state<Edge[] | null>(null);
   let editingNodeId = $state<string | null>(null);
+  let loadedCanvasId = $state<string | null>(null);
+  let initialHydrationDone = $state(false);
 
-  let flowNodes = $state<any[]>([]);
-  let flowEdges = $state<any[]>([]);
+  const initialCanvases = $derived.by(() => data.canvases);
+  const initialActiveCanvasId = $derived.by(() => data.activeCanvasId);
+  const initialNodes = $derived.by(() => data.nodes);
+  const initialEdges = $derived.by(() => data.edges);
+
+  const canvases = $derived(storeCanvases ?? initialCanvases);
+  const activeCanvasId = $derived(storeActiveCanvasId ?? initialActiveCanvasId);
+  const nodes = $derived(storeNodes ?? initialNodes);
+  const edges = $derived(storeEdges ?? initialEdges);
+  const flowNodes = $derived(toFlowNodes(nodes, editingNodeId));
+  const flowEdges = $derived(toFlowEdges(edges));
   let canvasShell: HTMLDivElement | undefined;
 
   onMount(() => {
-    void canvasStore.load();
+    canvasStore.hydrate(initialCanvases, initialActiveCanvasId);
+    nodeStore.hydrate(initialNodes);
+    edgeStore.hydrate(initialEdges);
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (!isCreateNodeShortcut(event)) {
@@ -60,51 +76,42 @@
 
     window.addEventListener('keydown', handleKeyDown);
 
+    const unsubCanvas = canvasStore.subscribe((v) => {
+      storeCanvases = v.canvases;
+      storeActiveCanvasId = v.activeCanvasId;
+    });
+
+    const unsubNodes = nodeStore.subscribe((v) => {
+      storeNodes = Array.from(v.nodes.values());
+    });
+
+    const unsubEdges = edgeStore.subscribe((v) => {
+      storeEdges = Array.from(v.edges.values());
+    });
+
+    const unsubNodeUi = nodeUiStore.subscribe((v) => {
+      editingNodeId = v.editingNodeId;
+    });
+
+    loadedCanvasId = data.activeCanvasId;
+    initialHydrationDone = true;
+
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
+      unsubCanvas();
+      unsubNodes();
+      unsubEdges();
+      unsubNodeUi();
     };
   });
 
   $effect(() => {
-    const unsub = canvasStore.subscribe((v) => {
-      canvases = v.canvases;
-      activeCanvasId = v.activeCanvasId;
-    });
-    return unsub;
-  });
+    if (!initialHydrationDone || !activeCanvasId || activeCanvasId === loadedCanvasId) return;
+    loadedCanvasId = activeCanvasId;
 
-  $effect(() => {
-    if (!activeCanvasId) return;
     nodeUiStore.clear();
-    nodeStore.load(activeCanvasId);
-    edgeStore.load(activeCanvasId);
-  });
-
-  $effect(() => {
-    const unsub = nodeStore.subscribe((v) => {
-      nodes = Array.from(v.nodes.values());
-    });
-    return unsub;
-  });
-
-  $effect(() => {
-    const unsub = edgeStore.subscribe((v) => {
-      edges = Array.from(v.edges.values());
-    });
-    return unsub;
-  });
-
-  $effect(() => {
-    const unsub = nodeUiStore.subscribe((v) => {
-      editingNodeId = v.editingNodeId;
-    });
-    return unsub;
-  });
-
-  // derive flow nodes/edges
-  $effect(() => {
-    flowNodes = toFlowNodes(nodes, editingNodeId);
-    flowEdges = toFlowEdges(edges);
+    void nodeStore.load(activeCanvasId);
+    void edgeStore.load(activeCanvasId);
   });
 
   function addNode() {
