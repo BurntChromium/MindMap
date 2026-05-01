@@ -52,7 +52,6 @@ describe('graphAdapter', () => {
           activeTag: null,
           activeTagColor: null,
           isSearchHit: false,
-          isDimmed: false,
           isFocused: false
         },
         type: 'custom',

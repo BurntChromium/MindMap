@@ -41,6 +41,16 @@ function hexToRgb(hex: string) {
   return { red, green, blue };
 }
 
+export function rgbaFromHex(hex: string, alpha: number) {
+  const rgb = hexToRgb(hex);
+
+  if (!rgb) {
+    return `rgba(242, 201, 197, ${alpha})`;
+  }
+
+  return `rgba(${rgb.red}, ${rgb.green}, ${rgb.blue}, ${alpha})`;
+}
+
 export function getTagColor(tagName: string) {
   const normalized = tagName.trim().toLowerCase();
 
@@ -52,12 +62,5 @@ export function getTagColor(tagName: string) {
 }
 
 export function getTagColorWithAlpha(tagName: string, alpha: number) {
-  const rgb = hexToRgb(getTagColor(tagName));
-
-  if (!rgb) {
-    return `rgba(242, 201, 197, ${alpha})`;
-  }
-
-  return `rgba(${rgb.red}, ${rgb.green}, ${rgb.blue}, ${alpha})`;
+  return rgbaFromHex(getTagColor(tagName), alpha);
 }
-

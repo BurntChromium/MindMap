@@ -33,7 +33,6 @@ export function toFlowNodes(nodes: AppNode[], options: FlowNodeOptions) {
       activeTag,
       activeTagColor,
       isSearchHit: hasSearchFilter ? searchHitIds.has(n.id) : false,
-      isDimmed: hasSearchFilter ? !searchHitIds.has(n.id) : false,
       isFocused: focusedNodeId === n.id
     },
     type: 'custom',

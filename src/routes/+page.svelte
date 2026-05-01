@@ -40,6 +40,7 @@
   let editingCanvasId = $state<string | null>(null);
   let editingCanvasName = $state('');
   let sidebarCollapsed = $state(false);
+  let discoveryCollapsed = $state(false);
   let loadedCanvasId = $state<string | null>(null);
   let initialHydrationDone = $state(false);
 
@@ -291,6 +292,10 @@
   function focusSearchResult(nodeId: string) {
     focusedNodeId = nodeId;
   }
+
+  function toggleDiscoveryPanel() {
+    discoveryCollapsed = !discoveryCollapsed;
+  }
 </script>
 
 <div class="app-shell" class:app-shell--sidebar-collapsed={sidebarCollapsed}>
@@ -463,101 +468,128 @@
       </SvelteFlow>
     </div>
 
-    <aside class="discovery-panel" aria-label="Search and filters">
+    <aside
+      class="discovery-panel"
+      class:discovery-panel--collapsed={discoveryCollapsed}
+      aria-label="Search and filters"
+    >
       <div class="discovery-panel__header">
         <div>
-          <h3>Find</h3>
-          <p>Search titles, bodies, and tags without leaving the canvas.</p>
+          <h3>{discoveryCollapsed ? 'F' : 'Find'}</h3>
+          {#if !discoveryCollapsed}
+            <p>Search titles, bodies, and tags without leaving the canvas.</p>
+          {/if}
         </div>
-        <button
-          class="icon-button discovery-clear-button"
-          type="button"
-          aria-label="Clear search and tag filters"
-          title="Clear search and tag filters"
-          onclick={clearDiscoveryFilters}
-          disabled={!searchQuery.trim() && !activeTag}
-        >
-          <X size={14} aria-hidden="true" />
-        </button>
+
+        <div class="discovery-panel__actions">
+          <button
+            class="icon-button discovery-panel-toggle"
+            type="button"
+            aria-label={discoveryCollapsed ? 'Expand search panel' : 'Collapse search panel'}
+            title={discoveryCollapsed ? 'Expand search panel' : 'Collapse search panel'}
+            aria-expanded={!discoveryCollapsed}
+            onclick={toggleDiscoveryPanel}
+          >
+            {#if discoveryCollapsed}
+              <ChevronLeft size={14} aria-hidden="true" />
+            {:else}
+              <ChevronRight size={14} aria-hidden="true" />
+            {/if}
+          </button>
+        </div>
       </div>
 
-      <label class="discovery-search">
-        <span>Keyword search</span>
-        <input
-          bind:value={searchQuery}
-          class="sidebar-input discovery-search-input"
-          placeholder="Search titles or body"
-          aria-label="Search nodes by keyword"
-        />
-      </label>
-
-      <section class="discovery-section">
-        <div class="discovery-section__header">
-          <h4>Tags</h4>
-          <span>{tagSummaries.length} total</span>
-        </div>
-
-        {#if tagSummaries.length}
-          <div class="tag-filter-list">
-            {#each tagSummaries as tag}
-              <button
-                type="button"
-                class="tag-filter-chip"
-                class:tag-filter-chip--active={activeTag === tag.name}
-                style={`--tag-color: ${tag.color};`}
-                onclick={() => toggleTagFilter(tag.name)}
-              >
-                <span>{formatTagLabel(tag.name)}</span>
-                <span class="tag-filter-chip__count">{tag.count}</span>
-              </button>
-            {/each}
+      {#if !discoveryCollapsed}
+        <label class="discovery-search">
+          <span>Keyword search</span>
+          <div class="discovery-search-field">
+            <input
+              bind:value={searchQuery}
+              class="sidebar-input discovery-search-input"
+              placeholder="Search titles or body"
+              aria-label="Search nodes by keyword"
+            />
+            <button
+              class="icon-button discovery-search-clear"
+              type="button"
+              aria-label="Clear search and tag filters"
+              title="Clear search and tag filters"
+              onclick={clearDiscoveryFilters}
+              disabled={!searchQuery.trim() && !activeTag}
+            >
+              <X size={14} aria-hidden="true" />
+            </button>
           </div>
-        {:else}
-          <p class="discovery-empty">No tags yet. Add tags to make them easy to find.</p>
-        {/if}
-      </section>
+        </label>
 
-      <section class="discovery-section discovery-results">
-        <div class="discovery-section__header">
-          <h4>Matches</h4>
-          <span>{activeFilterLabel}</span>
-        </div>
-
-        {#if searchLoading}
-          <p class="discovery-empty">Searching...</p>
-        {:else if searchError}
-          <p class="discovery-error">{searchError}</p>
-        {:else if !searchQuery.trim() && !activeTag}
-          <p class="discovery-empty">Type a keyword or click a tag to see matches.</p>
-        {:else if searchResults.length === 0}
-          <p class="discovery-empty">No nodes match the current filters.</p>
-        {:else}
-          <div class="search-results">
-            {#each searchResults as node}
-              <button
-                type="button"
-                class="search-result"
-                class:search-result--focused={focusedNodeId === node.id}
-                onclick={() => focusSearchResult(node.id)}
-              >
-                <span class="search-result__title">{node.title || 'Untitled'}</span>
-                {#if node.body}
-                  <span class="search-result__body">
-                    {node.body.length > 96 ? `${node.body.slice(0, 96).trim()}…` : node.body}
-                  </span>
-                {/if}
-                {#if node.tags?.length}
-                  <span class="search-result__tags">
-                    {#each node.tags.slice(0, 4) as tag}
-                      <span class="search-result__tag">{formatTagLabel(tag)}</span>
-                    {/each}
-                  </span>
-                {/if}
-              </button>
-            {/each}
+        <section class="discovery-section">
+          <div class="discovery-section__header">
+            <h4>Tags</h4>
+            <span>{tagSummaries.length} total</span>
           </div>
-        {/if}
-      </section>
+
+          {#if tagSummaries.length}
+            <div class="tag-filter-list">
+              {#each tagSummaries as tag}
+                <button
+                  type="button"
+                  class="tag-filter-chip"
+                  class:tag-filter-chip--active={activeTag === tag.name}
+                  style={`--tag-color: ${tag.color};`}
+                  onclick={() => toggleTagFilter(tag.name)}
+                >
+                  <span>{formatTagLabel(tag.name)}</span>
+                  <span class="tag-filter-chip__count">{tag.count}</span>
+                </button>
+              {/each}
+            </div>
+          {:else}
+            <p class="discovery-empty">No tags yet. Add tags to make them easy to find.</p>
+          {/if}
+        </section>
+
+        <section class="discovery-section discovery-results">
+          <div class="discovery-section__header">
+            <h4>Matches</h4>
+            <span>{activeFilterLabel}</span>
+          </div>
+
+          {#if searchLoading}
+            <p class="discovery-empty">Searching...</p>
+          {:else if searchError}
+            <p class="discovery-error">{searchError}</p>
+          {:else if !searchQuery.trim() && !activeTag}
+            <p class="discovery-empty">Type a keyword or click a tag to see matches.</p>
+          {:else if searchResults.length === 0}
+            <p class="discovery-empty">No nodes match the current filters.</p>
+          {:else}
+            <div class="search-results">
+              {#each searchResults as node}
+                <button
+                  type="button"
+                  class="search-result"
+                  class:search-result--focused={focusedNodeId === node.id}
+                  onclick={() => focusSearchResult(node.id)}
+                >
+                  <span class="search-result__title">{node.title || 'Untitled'}</span>
+                  {#if node.body}
+                    <span class="search-result__body">
+                      {node.body.length > 96 ? `${node.body.slice(0, 96).trim()}…` : node.body}
+                    </span>
+                  {/if}
+                  {#if node.tags?.length}
+                    <span class="search-result__tags">
+                      {#each node.tags.slice(0, 4) as tag}
+                        <span class="search-result__tag">{formatTagLabel(tag)}</span>
+                      {/each}
+                    </span>
+                  {/if}
+                </button>
+              {/each}
+            </div>
+          {/if}
+        </section>
+      {/if}
     </aside>
   </main>
 </div>
@@ -585,11 +617,24 @@
     overflow: auto;
   }
 
+  .discovery-panel--collapsed {
+    width: 3.5rem;
+    min-width: 3.5rem;
+    padding: 0.75rem 0.35rem;
+    align-items: center;
+  }
+
   .discovery-panel__header {
     display: flex;
     align-items: start;
     justify-content: space-between;
     gap: 0.75rem;
+  }
+
+  .discovery-panel--collapsed .discovery-panel__header {
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
   }
 
   .discovery-panel__header h3,
@@ -611,6 +656,11 @@
     line-height: 1.4;
   }
 
+  .discovery-panel__actions {
+    display: inline-flex;
+    flex: 0 0 auto;
+  }
+
   .discovery-search {
     display: grid;
     gap: 0.45rem;
@@ -625,6 +675,16 @@
 
   .discovery-search-input {
     width: 100%;
+  }
+
+  .discovery-search-field {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+
+  .discovery-search-clear {
+    flex: 0 0 auto;
   }
 
   .discovery-section {
@@ -665,7 +725,7 @@
     border-radius: 999px;
     padding: 0.35rem 0.65rem;
     background: color-mix(in srgb, var(--tag-color) 18%, white);
-    color: var(--tag-color);
+    color: var(--text-main);
     font-size: 0.8rem;
     line-height: 1;
     text-align: left;
@@ -680,7 +740,7 @@
     padding: 0.1rem 0.35rem;
     border-radius: 999px;
     background: color-mix(in srgb, var(--tag-color) 30%, white);
-    color: var(--tag-color);
+    color: var(--text-main);
     font-size: 0.72rem;
     text-align: center;
   }
@@ -727,7 +787,7 @@
     border-radius: 999px;
     padding: 0.1rem 0.45rem;
     background: var(--surface-soft);
-    color: var(--text-muted);
+    color: var(--text-main);
     font-size: 0.72rem;
   }
 
@@ -746,10 +806,6 @@
     color: #b91c1c;
   }
 
-  .discovery-clear-button {
-    flex: 0 0 auto;
-  }
-
   @media (max-width: 1180px) {
     .workspace {
       flex-direction: column;
@@ -761,6 +817,12 @@
       border-left: 0;
       border-top: var(--border-thin);
       max-height: 40vh;
+    }
+
+    .discovery-panel--collapsed {
+      width: auto;
+      min-width: 0;
+      max-height: none;
     }
   }
 </style>

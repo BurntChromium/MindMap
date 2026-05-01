@@ -14,7 +14,7 @@
     normalizeTagList,
     normalizeTagName
   } from '$lib/tagUtils';
-  import { getTagColor, getTagColorWithAlpha } from '$lib/tagColors';
+  import { getTagColor, getTagColorWithAlpha, rgbaFromHex } from '$lib/tagColors';
 
   let { id, data, selected } = $props();
 
@@ -30,8 +30,15 @@
   const bodyText = $derived(data.body ?? '');
   const nodeTags = $derived(Array.isArray(data.tags) ? data.tags : []);
   const isSearchHit = $derived(Boolean(data.isSearchHit));
-  const isDimmed = $derived(Boolean(data.isDimmed));
+  const activeTagName = $derived(normalizeTagName(data.activeTag ?? ''));
   const activeTagColor = $derived(data.activeTagColor ?? null);
+  const highlightHex = $derived(activeTagColor ?? getTagColor(activeTagName));
+  const isTagHighlighted = $derived(
+    Boolean(activeTagName) && nodeTags.includes(activeTagName)
+  );
+  const overlayColor = $derived(
+    isTagHighlighted ? rgbaFromHex(highlightHex, 0.22) : 'transparent'
+  );
 
   $effect(() => {
     const unsub = nodeUiStore.subscribe((v: NodeUiState) => {
@@ -175,8 +182,8 @@
   const borderColor = $derived(
     isEditing
       ? '1px solid var(--accent)'
-      : isSearchHit && activeTagColor
-        ? `1px solid ${getTagColorWithAlpha(data.activeTag ?? '', 0.85)}`
+      : isTagHighlighted
+        ? `1px solid ${rgbaFromHex(highlightHex, 0.55)}`
         : isSearchHit
           ? '1px solid var(--accent)'
           : selected
@@ -184,21 +191,12 @@
             : '1px solid var(--border-color)'
   );
   const boxShadow = $derived(isExpanded ? 'var(--shadow-soft)' : 'none');
-  const nodeBackground = $derived(
-    isEditing
-      ? 'var(--surface)'
-      : isSearchHit && activeTagColor
-        ? getTagColorWithAlpha(data.activeTag ?? '', 0.18)
-        : 'var(--surface)'
-  );
-  const nodeOpacity = $derived(isDimmed ? 0.45 : 1);
 
   function tagChipStyle(tag: string) {
-    const color = data.tagColors?.[tag] ?? getTagColor(tag);
     return `
       border-color: ${getTagColorWithAlpha(tag, 0.4)};
       background: ${getTagColorWithAlpha(tag, 0.18)};
-      color: ${color};
+      color: var(--text-main);
     `;
   }
 </script>
@@ -206,7 +204,7 @@
 <div class="node-shell" style={`width: ${nodeWidth};`}>
   <div
     class="node-card"
-    style={`border: ${borderColor}; box-shadow: ${boxShadow}; background: ${nodeBackground}; opacity: ${nodeOpacity};`}
+    style={`border: ${borderColor}; box-shadow: ${boxShadow}; --node-overlay-color: ${overlayColor};`}
   >
     <div class="node-header">
       {#if isEditing}
@@ -320,6 +318,8 @@
   }
 
   .node-card {
+    position: relative;
+    overflow: hidden;
     background: var(--surface);
     border-radius: 8px;
     padding: 10px 12px;
@@ -329,6 +329,19 @@
       opacity 0.2s ease,
       box-shadow 0.2s ease,
       width 0.2s ease;
+  }
+
+  .node-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: var(--node-overlay-color, transparent);
+    pointer-events: none;
+  }
+
+  .node-card > * {
+    position: relative;
+    z-index: 1;
   }
 
   .node-header {
@@ -409,7 +422,7 @@
     border-radius: 999px;
     padding: 2px 7px;
     background: #eff6ff;
-    color: #1e3a8a;
+    color: var(--text-main);
     font-size: 12px;
     line-height: 1.2;
   }
