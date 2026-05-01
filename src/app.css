@@ -217,6 +217,7 @@ ul {
 .canvas-shell .svelte-flow {
   width: 100%;
   height: 100%;
+  background: var(--bg-canvas);
   --xy-background-pattern-dot-color-default: #c4c9d1;
   --xy-background-pattern-line-color-default: #e5e8ee;
   --xy-background-pattern-cross-color-default: #d7dce3;
@@ -230,6 +231,12 @@ ul {
   --xy-controls-box-shadow-default: 0 0 2px 1px rgba(15, 23, 42, 0.06);
 }
 
+.canvas-shell .svelte-flow__renderer,
+.canvas-shell .svelte-flow__zoompane,
+.canvas-shell .svelte-flow__selectionpane {
+  background: var(--bg-canvas);
+}
+
 .canvas-toolbar {
   position: absolute;
   top: 1rem;
@@ -241,6 +248,14 @@ ul {
 
 .canvas-create-button {
   box-shadow: var(--shadow-soft);
+  background: #e1e7ef;
+  border-color: #b9c4d1;
+  color: #1f2937;
+}
+
+.canvas-create-button:hover {
+  background: #d6dee8;
+  border-color: #97a6b8;
 }
 
 .canvas-shell:focus-visible {
