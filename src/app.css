@@ -1,7 +1,8 @@
 :root {
   --bg-app: #f4f6f8;
+  --bg-canvas: #f8fafc;
   --surface: #ffffff;
-  --surface-muted: #eef1f4;
+  --surface-muted: #edf1f5;
   --surface-soft: #f8fafc;
   --text-main: #111827;
   --text-muted: #6b7280;
@@ -77,14 +78,14 @@ button:hover {
 }
 
 .button--primary {
-  border-color: var(--accent);
-  background: var(--accent);
-  color: white;
+  border-color: #cbd5e1;
+  background: #eef2f7;
+  color: #334155;
 }
 
 .button--primary:hover {
-  background: #1742b0;
-  border-color: #1742b0;
+  background: #e2e8f0;
+  border-color: #94a3b8;
 }
 
 .icon-button {
@@ -210,12 +211,23 @@ ul {
   position: relative;
   min-width: 0;
   min-height: 0;
-  background: var(--bg-app);
+  background: var(--bg-canvas);
 }
 
 .canvas-shell .svelte-flow {
   width: 100%;
   height: 100%;
+  --xy-background-pattern-dot-color-default: #c4c9d1;
+  --xy-background-pattern-line-color-default: #e5e8ee;
+  --xy-background-pattern-cross-color-default: #d7dce3;
+  --xy-node-background-color-default: var(--surface);
+  --xy-node-border-default: 1px solid var(--border-color);
+  --xy-node-boxshadow-hover-default: 0 1px 4px 1px rgba(15, 23, 42, 0.08);
+  --xy-node-boxshadow-selected-default: 0 0 0 0.5px var(--accent);
+  --xy-controls-button-background-color-default: #fafbfc;
+  --xy-controls-button-background-color-hover-default: #eef2f7;
+  --xy-controls-button-border-color-default: #d6dbe2;
+  --xy-controls-box-shadow-default: 0 0 2px 1px rgba(15, 23, 42, 0.06);
 }
 
 .canvas-toolbar {
