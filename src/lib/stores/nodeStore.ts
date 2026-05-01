@@ -5,6 +5,7 @@ export type Node = {
   canvas_id: string;
   title: string;
   body: string;
+  tags: string[];
   x: number;
   y: number;
   collapsed: number;
@@ -22,11 +23,14 @@ function createNodeStore() {
 
     async load(canvasId: string) {
       const res = await fetch(`/api/nodes?canvasId=${canvasId}`);
-      const data: Node[] = await res.json();
+      const data: Array<Node & { tags?: unknown }> = await res.json();
 
       const map = new Map<string, Node>();
       for (const node of data) {
-        map.set(node.id, node);
+        map.set(node.id, {
+          ...node,
+          tags: Array.isArray(node.tags) ? node.tags : []
+        });
       }
 
       set({ nodes: map });
@@ -46,6 +50,7 @@ function createNodeStore() {
         canvas_id: canvasId,
         title: 'New Node',
         body: '',
+        tags: [],
         x,
         y,
         collapsed: 0

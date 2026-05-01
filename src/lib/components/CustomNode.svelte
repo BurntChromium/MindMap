@@ -3,6 +3,11 @@
   import { Handle, Position } from '@xyflow/svelte';
   import { nodeStore } from '$lib/stores/nodeStore';
   import { nodeUiStore } from '$lib/stores/nodeUiStore';
+  import {
+    formatTagLabel,
+    normalizeTagList,
+    normalizeTagName
+  } from '$lib/tagUtils';
 
   let { id, data, selected } = $props();
 
@@ -11,10 +16,13 @@
   let titleInput = $state<HTMLInputElement | undefined>(undefined);
   let draftTitle = $state('');
   let draftBody = $state('');
+  let draftTags = $state<string[]>([]);
+  let draftTagInput = $state('');
 
   const isEditing = $derived(editingNodeId === id);
   const isExpanded = $derived(expanded || isEditing);
   const bodyText = $derived(data.body ?? '');
+  const nodeTags = $derived(Array.isArray(data.tags) ? data.tags : []);
 
   $effect(() => {
     const unsub = nodeUiStore.subscribe((v) => {
@@ -29,28 +37,61 @@
     if (!isEditing) {
       draftTitle = data.label || 'Untitled';
       draftBody = bodyText;
+      draftTags = normalizeTagList(nodeTags);
+      draftTagInput = '';
     }
   });
 
   async function beginEdit() {
     draftTitle = data.label || 'Untitled';
     draftBody = bodyText;
+    draftTags = normalizeTagList(nodeTags);
+    draftTagInput = '';
     nodeUiStore.beginEdit(id);
     await tick();
     titleInput?.focus();
     titleInput?.select();
   }
 
+  function tagKey(tags: string[]) {
+    return normalizeTagList(tags).slice().sort().join('\u0000');
+  }
+
+  function addDraftTag(rawTag: string) {
+    const nextTag = normalizeTagName(rawTag);
+
+    if (!nextTag) {
+      draftTagInput = '';
+      return;
+    }
+
+    draftTags = normalizeTagList([...draftTags, nextTag]);
+    draftTagInput = '';
+  }
+
+  function commitDraftTagInput() {
+    addDraftTag(draftTagInput);
+  }
+
+  function removeDraftTag(tag: string) {
+    draftTags = draftTags.filter((currentTag) => currentTag !== tag);
+  }
+
   async function saveAndLock() {
     const nextTitle = draftTitle.trim() || 'Untitled';
     const nextBody = draftBody;
-    const changed = nextTitle !== (data.label || 'Untitled') || nextBody !== bodyText;
+    const nextTags = normalizeTagList([...draftTags, draftTagInput]);
+    const changed =
+      nextTitle !== (data.label || 'Untitled') ||
+      nextBody !== bodyText ||
+      tagKey(nextTags) !== tagKey(nodeTags);
 
     if (changed) {
       await nodeStore.updateNode({
         id,
         title: nextTitle,
-        body: nextBody
+        body: nextBody,
+        tags: nextTags
       });
     }
 
@@ -67,6 +108,10 @@
   }
 
   function handleExpandToggle() {
+    if (isEditing) {
+      return;
+    }
+
     nodeUiStore.toggleExpanded(id);
   }
 
@@ -84,7 +129,41 @@
     }
   }
 
-  const nodeWidth = $derived(isExpanded ? '360px' : '180px');
+  function handleTagKeyDown(e: KeyboardEvent) {
+    if (e.key === 'Enter' || e.key === ',') {
+      e.preventDefault();
+      commitDraftTagInput();
+      return;
+    }
+
+    if (e.key === 'Backspace' && !draftTagInput && draftTags.length > 0) {
+      e.preventDefault();
+      draftTags = draftTags.slice(0, -1);
+    }
+  }
+
+  function handleTagPaste(e: ClipboardEvent) {
+    const pasted = e.clipboardData?.getData('text');
+
+    if (!pasted) {
+      return;
+    }
+
+    const nextTags = pasted
+      .split(/[\n,]+/)
+      .map((tag) => normalizeTagName(tag))
+      .filter(Boolean);
+
+    if (!nextTags.length) {
+      return;
+    }
+
+    e.preventDefault();
+    draftTags = normalizeTagList([...draftTags, ...nextTags]);
+    draftTagInput = '';
+  }
+
+  const nodeWidth = $derived(isExpanded ? '400px' : '180px');
   const borderColor = $derived(
     isEditing
       ? '1px solid var(--accent)'
@@ -114,6 +193,7 @@
         <button
           class="mode-button nodrag"
           type="button"
+          disabled={isEditing}
           aria-label={isExpanded ? 'Collapse node preview' : 'Expand node preview'}
           title={isExpanded ? 'Collapse node preview' : 'Expand node preview'}
           onclick={handleExpandToggle}
@@ -151,6 +231,41 @@
 
     {#if isExpanded}
       <div class="body-area">
+        <div class="tags-area">
+          {#if isEditing}
+            {#each draftTags as tag}
+              <span class="tag-chip">
+                <span>{formatTagLabel(tag)}</span>
+                <button
+                  class="tag-remove nodrag"
+                  type="button"
+                  aria-label={`Remove ${formatTagLabel(tag)}`}
+                  title={`Remove ${formatTagLabel(tag)}`}
+                  onclick={() => removeDraftTag(tag)}
+                >
+                  ×
+                </button>
+              </span>
+            {/each}
+
+            <span class="tag-input-shell">
+              <span class="tag-prefix">#</span>
+              <input
+                bind:value={draftTagInput}
+                class="tag-input nodrag"
+                aria-label="Add tag"
+                placeholder="Add tag"
+                onkeydown={handleTagKeyDown}
+                onpaste={handleTagPaste}
+              />
+            </span>
+          {:else if nodeTags.length}
+            {#each nodeTags as tag}
+              <span class="tag-chip tag-chip-readonly">{formatTagLabel(tag)}</span>
+            {/each}
+          {/if}
+        </div>
+
         {#if isEditing}
           <textarea
             bind:value={draftBody}
@@ -234,6 +349,11 @@
     cursor: pointer;
   }
 
+  .mode-button:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+
   .mode-button svg {
     width: 12px;
     height: 12px;
@@ -242,6 +362,76 @@
 
   .body-area {
     margin-top: 8px;
+  }
+
+  .tags-area {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+
+  .tag-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    max-width: 100%;
+    border: 1px solid #d9e3ff;
+    border-radius: 999px;
+    padding: 2px 7px;
+    background: #eef4ff;
+    color: #21406f;
+    font-size: 12px;
+    line-height: 1.2;
+  }
+
+  .tag-chip-readonly {
+    white-space: nowrap;
+  }
+
+  .tag-remove {
+    width: 14px;
+    height: 14px;
+    border: none;
+    background: transparent;
+    color: inherit;
+    padding: 0;
+    line-height: 1;
+    font-size: 14px;
+    cursor: pointer;
+  }
+
+  .tag-input-shell {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    flex: 1 1 120px;
+    min-width: 120px;
+    border: 1px solid #dcdcdc;
+    border-radius: 999px;
+    padding: 2px 8px;
+    background: #fff;
+    box-sizing: border-box;
+  }
+
+  .tag-prefix {
+    color: #888;
+    font-size: 12px;
+    line-height: 1;
+    flex: 0 0 auto;
+  }
+
+  .tag-input {
+    min-width: 0;
+    width: 100%;
+    border: none;
+    outline: none;
+    background: transparent;
+    padding: 0;
+    font: inherit;
+    font-size: 12px;
+    line-height: 1.2;
   }
 
   .body-display,
