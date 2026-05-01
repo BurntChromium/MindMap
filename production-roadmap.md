@@ -57,7 +57,7 @@ User benefit:
 
 Feature work:
 
-- multi-select
+- multi-select (shift click)
 - bulk add/remove tags
 - copy, cut, and paste nodes
 - duplicate node and subtree actions where they make sense
