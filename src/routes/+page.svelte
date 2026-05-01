@@ -78,7 +78,8 @@
       focusedNodeId,
       activeTag,
       searchHitIds,
-      tagColors: tagColorMap
+      tagColors: tagColorMap,
+      onTagClick: toggleTagFilter
     })
   );
   const flowEdges = $derived(toFlowEdges(edges));

@@ -18,6 +18,7 @@ describe('graphAdapter', () => {
   });
 
   it('maps app nodes to flow nodes and locks the active editor node', () => {
+    const onTagClick = vi.fn();
     const flowNodes = toFlowNodes(
       [
         {
@@ -35,7 +36,8 @@ describe('graphAdapter', () => {
         editingNodeId: '1',
         activeTag: null,
         searchHitIds: new Set<string>(),
-        tagColors: {}
+        tagColors: {},
+        onTagClick
       }
     );
 
@@ -51,6 +53,7 @@ describe('graphAdapter', () => {
           tagColors: {},
           activeTag: null,
           activeTagColor: null,
+          onTagClick,
           isSearchHit: false,
           isFocused: false
         },

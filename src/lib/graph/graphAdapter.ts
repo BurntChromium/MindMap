@@ -8,6 +8,7 @@ export type FlowNodeOptions = {
   activeTag?: string | null;
   searchHitIds?: Set<string>;
   tagColors?: Record<string, string>;
+  onTagClick?: (tag: string) => void;
 };
 
 export function toFlowNodes(nodes: AppNode[], options: FlowNodeOptions) {
@@ -16,7 +17,8 @@ export function toFlowNodes(nodes: AppNode[], options: FlowNodeOptions) {
     focusedNodeId = null,
     activeTag = null,
     searchHitIds = new Set<string>(),
-    tagColors = {}
+    tagColors = {},
+    onTagClick
   } = options;
   const hasSearchFilter = searchHitIds.size > 0;
   const activeTagColor = activeTag ? tagColors[activeTag] ?? getTagColor(activeTag) : null;
@@ -32,6 +34,7 @@ export function toFlowNodes(nodes: AppNode[], options: FlowNodeOptions) {
       tagColors,
       activeTag,
       activeTagColor,
+      onTagClick,
       isSearchHit: hasSearchFilter ? searchHitIds.has(n.id) : false,
       isFocused: focusedNodeId === n.id
     },

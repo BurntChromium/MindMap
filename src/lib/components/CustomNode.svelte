@@ -32,6 +32,7 @@
   const isSearchHit = $derived(Boolean(data.isSearchHit));
   const activeTagName = $derived(normalizeTagName(data.activeTag ?? ''));
   const activeTagColor = $derived(data.activeTagColor ?? null);
+  const onTagClick = $derived(data.onTagClick ?? null);
   const highlightHex = $derived(activeTagColor ?? getTagColor(activeTagName));
   const isTagHighlighted = $derived(
     Boolean(activeTagName) && nodeTags.includes(activeTagName)
@@ -199,6 +200,10 @@
       color: var(--text-main);
     `;
   }
+
+  function handleReadonlyTagClick(tag: string) {
+    onTagClick?.(tag);
+  }
 </script>
 
 <div class="node-shell" style={`width: ${nodeWidth};`}>
@@ -282,9 +287,17 @@
           </span>
         {:else}
           {#each nodeTags as tag}
-            <span class="tag-chip tag-chip-readonly" style={tagChipStyle(tag)}>
+            <button
+              type="button"
+              class="tag-chip tag-chip-readonly nodrag"
+              style={tagChipStyle(tag)}
+              aria-pressed={data.activeTag === tag}
+              aria-label={`Filter by ${formatTagLabel(tag)}`}
+              title={`Filter by ${formatTagLabel(tag)}`}
+              onclick={() => handleReadonlyTagClick(tag)}
+            >
               {formatTagLabel(tag)}
-            </span>
+            </button>
           {/each}
         {/if}
       </div>
@@ -425,6 +438,10 @@
     color: var(--text-main);
     font-size: 12px;
     line-height: 1.2;
+  }
+
+  .tag-chip.tag-chip-readonly {
+    cursor: pointer;
   }
 
   .tag-chip-readonly {
