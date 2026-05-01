@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { isCreateNodeShortcut, isTextInputElement } from '$lib/shortcutUtils';
+import {
+  isCanvasToggleShortcut,
+  isCreateNodeShortcut,
+  isDiscoveryToggleShortcut,
+  isTextInputElement
+} from '$lib/shortcutUtils';
 
 describe('shortcutUtils', () => {
   it('recognizes the create-node key', () => {
@@ -13,6 +18,32 @@ describe('shortcutUtils', () => {
     } as KeyboardEvent;
 
     expect(isCreateNodeShortcut(event)).toBe(true);
+  });
+
+  it('recognizes the canvas toggle key', () => {
+    const event = {
+      key: 'c',
+      metaKey: false,
+      ctrlKey: false,
+      altKey: false,
+      shiftKey: false,
+      defaultPrevented: false
+    } as KeyboardEvent;
+
+    expect(isCanvasToggleShortcut(event)).toBe(true);
+  });
+
+  it('recognizes the discovery toggle key', () => {
+    const event = {
+      key: 'f',
+      metaKey: false,
+      ctrlKey: false,
+      altKey: false,
+      shiftKey: false,
+      defaultPrevented: false
+    } as KeyboardEvent;
+
+    expect(isDiscoveryToggleShortcut(event)).toBe(true);
   });
 
   it('ignores modifier combinations', () => {

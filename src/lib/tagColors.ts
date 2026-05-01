@@ -1,16 +1,20 @@
 const TAG_PALETTE = [
-  '#f2c9c5',
-  '#f7d7a8',
-  '#f3e3a6',
-  '#cde4b4',
-  '#bfe3da',
-  '#bfd7ea',
-  '#d8c9f3',
-  '#f0c9e1',
-  '#f5d0b6',
-  '#d6e8f5',
-  '#e3d8f0',
-  '#dfe7c7'
+  '#f6c4c4',
+  '#f9d2b6',
+  '#f7e19a',
+  '#dbe89e',
+  '#c2e5b8',
+  '#aee0d7',
+  '#b9dcf5',
+  '#c6d0f7',
+  '#d9c3f3',
+  '#efc5e2',
+  '#f4b8c1',
+  '#f6c4a3',
+  '#f2ddb1',
+  '#d8e8c2',
+  '#d0eef1',
+  '#e3d5f6'
 ];
 
 function hashTagName(value: string) {

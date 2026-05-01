@@ -1,12 +1,26 @@
 <script lang="ts">
   import { SvelteFlow, Background, Controls, type Connection } from '@xyflow/svelte';
   import { onMount } from 'svelte';
-  import { Check, ChevronLeft, ChevronRight, PencilLine, Plus, Trash2, X } from 'lucide-svelte';
+  import {
+    Check,
+    ChevronLeft,
+    ChevronRight,
+    PencilLine,
+    Plus,
+    Search,
+    Trash2,
+    X
+  } from 'lucide-svelte';
   import type { PageData } from './$types';
   import CustomNode from '$lib/components/CustomNode.svelte';
   import { collectTagSummaries } from '$lib/discovery';
   import { formatTagLabel, normalizeTagName } from '$lib/tagUtils';
-  import { isCreateNodeShortcut, isTextInputElement } from '$lib/shortcutUtils';
+  import {
+    isCanvasToggleShortcut,
+    isCreateNodeShortcut,
+    isDiscoveryToggleShortcut,
+    isTextInputElement
+  } from '$lib/shortcutUtils';
 
   const nodeTypes = {
     custom: CustomNode
@@ -89,27 +103,37 @@
     edgeStore.hydrate(initialEdges);
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (!isCreateNodeShortcut(event)) {
+      if (isTextInputElement(document.activeElement)) {
         return;
       }
 
-      const activeElement = document.activeElement;
+      if (isCreateNodeShortcut(event)) {
+        const activeElement = document.activeElement;
 
-      if (isTextInputElement(activeElement)) {
+        if (
+          activeElement instanceof HTMLElement &&
+          canvasShell &&
+          !canvasShell.contains(activeElement) &&
+          activeElement !== document.body
+        ) {
+          return;
+        }
+
+        event.preventDefault();
+        addNode();
         return;
       }
 
-      if (
-        activeElement instanceof HTMLElement &&
-        canvasShell &&
-        !canvasShell.contains(activeElement) &&
-        activeElement !== document.body
-      ) {
+      if (isCanvasToggleShortcut(event)) {
+        event.preventDefault();
+        sidebarCollapsed = !sidebarCollapsed;
         return;
       }
 
-      event.preventDefault();
-      addNode();
+      if (isDiscoveryToggleShortcut(event)) {
+        event.preventDefault();
+        toggleDiscoveryPanel();
+      }
     };
 
     window.addEventListener('keydown', handleKeyDown);
@@ -306,7 +330,7 @@
         class="icon-button sidebar-toggle"
         type="button"
         aria-label={sidebarCollapsed ? 'Expand left panel' : 'Collapse left panel'}
-        title={sidebarCollapsed ? 'Expand left panel' : 'Collapse left panel'}
+        title={sidebarCollapsed ? 'Expand left panel (C)' : 'Collapse left panel (C)'}
         aria-expanded={!sidebarCollapsed}
         onclick={() => (sidebarCollapsed = !sidebarCollapsed)}
       >
@@ -475,7 +499,13 @@
     >
       <div class="discovery-panel__header">
         <div>
-          <h3>{discoveryCollapsed ? 'F' : 'Find'}</h3>
+          <h3>
+            {#if discoveryCollapsed}
+              <Search size={14} aria-hidden="true" />
+            {:else}
+              Find
+            {/if}
+          </h3>
           {#if !discoveryCollapsed}
             <p>Search titles, bodies, and tags without leaving the canvas.</p>
           {/if}
@@ -486,7 +516,7 @@
             class="icon-button discovery-panel-toggle"
             type="button"
             aria-label={discoveryCollapsed ? 'Expand search panel' : 'Collapse search panel'}
-            title={discoveryCollapsed ? 'Expand search panel' : 'Collapse search panel'}
+            title={discoveryCollapsed ? 'Expand search panel (F)' : 'Collapse search panel (F)'}
             aria-expanded={!discoveryCollapsed}
             onclick={toggleDiscoveryPanel}
           >
@@ -647,6 +677,15 @@
     letter-spacing: 0.08em;
     text-transform: uppercase;
     color: var(--text-muted);
+  }
+
+  .discovery-panel--collapsed .discovery-panel__header h3 {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    letter-spacing: 0;
+    text-transform: none;
+    line-height: 1;
   }
 
   .discovery-panel__header p {

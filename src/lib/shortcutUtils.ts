@@ -19,6 +19,18 @@ export function isTextInputElement(target: EventTarget | null) {
 }
 
 export function isCreateNodeShortcut(event: KeyboardEvent) {
+  return isKeyShortcut(event, 'n');
+}
+
+export function isCanvasToggleShortcut(event: KeyboardEvent) {
+  return isKeyShortcut(event, 'c');
+}
+
+export function isDiscoveryToggleShortcut(event: KeyboardEvent) {
+  return isKeyShortcut(event, 'f');
+}
+
+function isKeyShortcut(event: KeyboardEvent, key: string) {
   if (event.defaultPrevented) {
     return false;
   }
@@ -27,5 +39,5 @@ export function isCreateNodeShortcut(event: KeyboardEvent) {
     return false;
   }
 
-  return event.key.toLowerCase() === 'n';
+  return event.key.toLowerCase() === key;
 }
