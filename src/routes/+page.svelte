@@ -1,6 +1,6 @@
 <script lang="ts">
-import { onMount } from 'svelte';
-import type { Connection } from '@xyflow/svelte';
+  import { onMount } from 'svelte';
+  import type { Connection } from '@xyflow/svelte';
   import type { PageData } from './$types';
   import CanvasSidebar from '$lib/components/CanvasSidebar.svelte';
   import CanvasStage from '$lib/components/CanvasStage.svelte';
@@ -15,6 +15,7 @@ import type { Connection } from '@xyflow/svelte';
   import { canvasStore, type Canvas } from '$lib/stores/canvasStore';
   import { edgeStore, type Edge } from '$lib/stores/edgeStore';
   import {
+    buildBulkTagMutations,
     buildTagColorMap,
     getActiveFilterLabel,
     getSearchHitIds,
@@ -28,6 +29,7 @@ import type { Connection } from '@xyflow/svelte';
   } from '$lib/stores/nodeStore';
   import { nodeUiStore } from '$lib/stores/nodeUiStore';
   import { toFlowEdges, toFlowNodes } from '$lib/graph/graphAdapter';
+  import { selectionStore } from '$lib/stores/selectionStore';
 
   let { data }: { data: PageData } = $props();
 
@@ -35,6 +37,7 @@ import type { Connection } from '@xyflow/svelte';
   let storeActiveCanvasId = $state<string | null>(null);
   let storeNodes = $state.raw<Node[] | null>(null);
   let storeEdges = $state<Edge[] | null>(null);
+  let storeSelectedNodeIds = $state<string[] | null>(null);
   let searchQuery = $state('');
   let activeTag = $state<string | null>(null);
   let focusedNodeId = $state<string | null>(null);
@@ -54,14 +57,19 @@ import type { Connection } from '@xyflow/svelte';
   const activeCanvasId = $derived(storeActiveCanvasId ?? initialActiveCanvasId);
   const nodes = $derived(storeNodes ?? initialNodes);
   const edges = $derived(storeEdges ?? initialEdges);
+  const selectedNodeIds = $derived(storeSelectedNodeIds ?? []);
+  const selectedNodeIdSet = $derived(new Set(selectedNodeIds));
+  const selectedNodes = $derived(nodes.filter((node) => selectedNodeIdSet.has(node.id)));
   const tagSummaries = $derived(collectTagSummaries(nodes));
   const tagColorMap = $derived(buildTagColorMap(tagSummaries));
+  const selectedTagSummaries = $derived(collectTagSummaries(selectedNodes));
   const searchResults = $derived(filterDiscoveryNodes(nodes, searchQuery, activeTag));
   const searchHitIds = $derived(getSearchHitIds(nodes, searchQuery, activeTag));
   const flowNodes = $derived(
     toFlowNodes(nodes, {
       editingNodeId,
       focusedNodeId,
+      selectedNodeIds,
       activeTag,
       searchHitIds,
       tagColors: tagColorMap,
@@ -88,6 +96,12 @@ import type { Connection } from '@xyflow/svelte';
 
         event.preventDefault();
         addNode();
+        return;
+      }
+
+      if (event.key.toLowerCase() === 'a' && (event.metaKey || event.ctrlKey) && !event.altKey) {
+        event.preventDefault();
+        selectAllNodes();
         return;
       }
 
@@ -122,6 +136,10 @@ import type { Connection } from '@xyflow/svelte';
       editingNodeId = v.editingNodeId;
     });
 
+    const unsubSelection = selectionStore.subscribe((value) => {
+      storeSelectedNodeIds = value;
+    });
+
     loadedCanvasId = data.activeCanvasId;
     initialHydrationDone = true;
 
@@ -131,6 +149,7 @@ import type { Connection } from '@xyflow/svelte';
       unsubNodes();
       unsubEdges();
       unsubNodeUi();
+      unsubSelection();
     };
   });
 
@@ -139,6 +158,7 @@ import type { Connection } from '@xyflow/svelte';
     loadedCanvasId = activeCanvasId;
 
     nodeUiStore.clear();
+    selectionStore.clear();
     searchQuery = '';
     activeTag = null;
     focusedNodeId = null;
@@ -152,10 +172,27 @@ import type { Connection } from '@xyflow/svelte';
     }
   });
 
+  $effect(() => {
+    if (selectedNodeIds.length === 0) {
+      focusedNodeId = null;
+      return;
+    }
+
+    if (!(searchQuery.trim() || activeTag) && (!focusedNodeId || !selectedNodeIds.includes(focusedNodeId))) {
+      focusedNodeId = selectedNodeIds[0] ?? null;
+    }
+  });
+
   function addNode() {
     if (!activeCanvasId) return;
 
     nodeStore.create(activeCanvasId, 100, 100);
+  }
+
+  function selectAllNodes() {
+    selectionStore.selectAll(nodes.map((node) => node.id));
+
+    focusedNodeId = nodes[0]?.id ?? null;
   }
 
   function toggleTagFilter(tag: string) {
@@ -180,6 +217,7 @@ import type { Connection } from '@xyflow/svelte';
 
   function focusSearchResult(nodeId: string) {
     focusedNodeId = nodeId;
+    selectionStore.selectNode(nodeId);
   }
 
   function toggleDiscoveryPanel() {
@@ -187,6 +225,9 @@ import type { Connection } from '@xyflow/svelte';
   }
 
   function handleDeleteNodes(nodeIds: string[]) {
+    const deletedIds = new Set(nodeIds);
+    selectionStore.setSelection(selectedNodeIds.filter((id) => !deletedIds.has(id)));
+
     for (const nodeId of nodeIds) {
       nodeStore.remove(nodeId);
     }
@@ -196,6 +237,38 @@ import type { Connection } from '@xyflow/svelte';
     for (const edgeId of edgeIds) {
       edgeStore.remove(edgeId);
     }
+  }
+
+  function handleSelectionChange(nodeIds: string[]) {
+    selectionStore.setSelection(nodeIds);
+  }
+
+  function handlePaneClick() {
+    selectionStore.clear();
+  }
+
+  function addTagToSelection(tag: string) {
+    const mutations = buildBulkTagMutations(selectedNodes, selectedNodeIds, tag, 'add');
+
+    if (!mutations.length) {
+      return;
+    }
+
+    void nodeStore.updateNodeTags(mutations);
+  }
+
+  function removeTagFromSelection(tag: string) {
+    const mutations = buildBulkTagMutations(selectedNodes, selectedNodeIds, tag, 'remove');
+
+    if (!mutations.length) {
+      return;
+    }
+
+    void nodeStore.updateNodeTags(mutations);
+  }
+
+  function clearSelection() {
+    selectionStore.clear();
   }
 </script>
 
@@ -216,9 +289,18 @@ import type { Connection } from '@xyflow/svelte';
         flowEdges={flowEdges}
         onAddNode={addNode}
         onConnect={onConnect}
-        onNodeClick={(nodeId) => {
+        onNodeClick={(nodeId, shiftKey) => {
           focusedNodeId = nodeId;
+
+          if (shiftKey) {
+            selectionStore.toggleNode(nodeId);
+            return;
+          }
+
+          selectionStore.selectNode(nodeId);
         }}
+        onSelectionChange={handleSelectionChange}
+        onPaneClick={handlePaneClick}
         onDeleteNodes={handleDeleteNodes}
         onDeleteEdges={handleDeleteEdges}
       />
@@ -229,12 +311,17 @@ import type { Connection } from '@xyflow/svelte';
       bind:searchQuery={searchQuery}
       activeTag={activeTag}
       focusedNodeId={focusedNodeId}
+      selectedNodeCount={selectedNodeIds.length}
+      selectedTagSummaries={selectedTagSummaries}
       tagSummaries={tagSummaries}
       searchResults={searchResults}
       activeFilterLabel={activeFilterLabel}
       onToggleTagFilter={toggleTagFilter}
       onClearFilters={clearDiscoveryFilters}
       onFocusSearchResult={focusSearchResult}
+      onAddSelectedTag={addTagToSelection}
+      onRemoveSelectedTag={removeTagFromSelection}
+      onClearSelection={clearSelection}
     />
   </main>
 </div>

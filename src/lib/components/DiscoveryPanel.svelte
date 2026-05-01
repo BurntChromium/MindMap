@@ -7,6 +7,8 @@
     searchQuery: string;
     activeTag: string | null;
     focusedNodeId: string | null;
+    selectedNodeCount: number;
+    selectedTagSummaries: TagSummary[];
     collapsed: boolean;
     tagSummaries: TagSummary[];
     searchResults: DiscoveryNode[];
@@ -14,20 +16,47 @@
     onToggleTagFilter: (tag: string) => void;
     onClearFilters: () => void;
     onFocusSearchResult: (nodeId: string) => void;
+    onAddSelectedTag: (tag: string) => void;
+    onRemoveSelectedTag: (tag: string) => void;
+    onClearSelection: () => void;
   }
 
   let {
     searchQuery = $bindable(''),
     activeTag,
     focusedNodeId,
+    selectedNodeCount,
+    selectedTagSummaries,
     collapsed = $bindable(false),
     tagSummaries,
     searchResults,
     activeFilterLabel,
     onToggleTagFilter,
     onClearFilters,
-    onFocusSearchResult
+    onFocusSearchResult,
+    onAddSelectedTag,
+    onRemoveSelectedTag,
+    onClearSelection
   }: Props = $props();
+
+  let selectedTagInput = $state('');
+
+  $effect(() => {
+    if (!selectedNodeCount) {
+      selectedTagInput = '';
+    }
+  });
+
+  function handleAddSelectedTag() {
+    const nextTag = selectedTagInput.trim();
+
+    if (!nextTag) {
+      return;
+    }
+
+    onAddSelectedTag(nextTag);
+    selectedTagInput = '';
+  }
 </script>
 
 <aside
@@ -113,6 +142,67 @@
         </div>
       {:else}
         <p class="discovery-empty">No tags yet. Add tags to make them easy to find.</p>
+      {/if}
+    </section>
+
+    <section class="discovery-section">
+      <div class="discovery-section__header">
+        <h4>Selection</h4>
+        <span>{selectedNodeCount} selected</span>
+      </div>
+
+      {#if selectedNodeCount}
+        <label class="discovery-search">
+          <span>Bulk tag</span>
+          <div class="discovery-search-field">
+            <input
+              bind:value={selectedTagInput}
+              class="sidebar-input discovery-search-input"
+              placeholder="Add tag to selected nodes"
+              aria-label="Add tag to selected nodes"
+              onkeydown={(event) => {
+                if (event.key === 'Enter') {
+                  event.preventDefault();
+                  handleAddSelectedTag();
+                }
+              }}
+            />
+            <button
+              class="button discovery-bulk-add"
+              type="button"
+              onclick={handleAddSelectedTag}
+              disabled={!selectedTagInput.trim()}
+            >
+              Add
+            </button>
+          </div>
+        </label>
+
+        {#if selectedTagSummaries.length}
+          <div class="tag-filter-list">
+            {#each selectedTagSummaries as tag}
+              <button
+                type="button"
+                class="tag-filter-chip tag-filter-chip--selected"
+                style={`--tag-color: ${tag.color};`}
+                onclick={() => onRemoveSelectedTag(tag.name)}
+                title={`Remove ${formatTagLabel(tag.name)} from selected nodes`}
+              >
+                <span>{formatTagLabel(tag.name)}</span>
+                <span class="tag-filter-chip__count">{tag.count}</span>
+                <X size={12} aria-hidden="true" />
+              </button>
+            {/each}
+          </div>
+        {:else}
+          <p class="discovery-empty">Selected nodes have no tags yet.</p>
+        {/if}
+
+        <button class="button" type="button" onclick={onClearSelection}>
+          Clear selection
+        </button>
+      {:else}
+        <p class="discovery-empty">Select one or more nodes to add or remove tags in bulk.</p>
       {/if}
     </section>
 
@@ -296,6 +386,10 @@
 
   .tag-filter-chip--active {
     box-shadow: 0 0 0 2px color-mix(in srgb, var(--tag-color) 20%, transparent);
+  }
+
+  .tag-filter-chip--selected {
+    align-items: center;
   }
 
   .tag-filter-chip__count {

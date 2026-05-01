@@ -184,4 +184,58 @@ describe('nodeStore', () => {
       })
     );
   });
+
+  it('bulk-updates node tags through the batch endpoint', async () => {
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(
+        jsonResponse([
+          {
+            id: 'node-4',
+            canvas_id: 'canvas-1',
+            title: 'Old',
+            body: '',
+            tags: ['lore'],
+            x: 0,
+            y: 0,
+            collapsed: 0
+          },
+          {
+            id: 'node-5',
+            canvas_id: 'canvas-1',
+            title: 'Other',
+            body: '',
+            tags: ['npc'],
+            x: 10,
+            y: 20,
+            collapsed: 0
+          }
+        ])
+      )
+      .mockResolvedValueOnce(jsonResponse({ success: true }));
+
+    await nodeStore.load('canvas-1');
+    await nodeStore.updateNodeTags([
+      { id: 'node-4', tags: ['lore', 'npc'] },
+      { id: 'node-5', tags: ['npc'] }
+    ]);
+
+    expect(snapshot().get('node-4')).toMatchObject({
+      tags: ['lore', 'npc']
+    });
+    expect(snapshot().get('node-5')).toMatchObject({
+      tags: ['npc']
+    });
+    expect(fetch).toHaveBeenLastCalledWith(
+      '/api/nodes/bulk-tags',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({
+          nodes: [
+            { id: 'node-4', tags: ['lore', 'npc'] },
+            { id: 'node-5', tags: ['npc'] }
+          ]
+        })
+      })
+    );
+  });
 });

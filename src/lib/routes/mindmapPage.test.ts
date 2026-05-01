@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
+  buildBulkTagMutations,
   buildTagColorMap,
   getActiveFilterLabel,
   getSearchHitIds,
@@ -81,6 +82,32 @@ describe('mindmapPage helpers', () => {
         'npc'
       )
     ).toEqual(new Set(['2']));
+  });
+
+  it('builds bulk tag mutations for selected nodes', () => {
+    expect(
+      buildBulkTagMutations(
+        [
+          { id: '1', tags: ['lore'] },
+          { id: '2', tags: ['npc', 'Guide'] }
+        ],
+        ['1', '2'],
+        ' NPC ',
+        'add'
+      )
+    ).toEqual([{ id: '1', tags: ['lore', 'npc'] }]);
+
+    expect(
+      buildBulkTagMutations(
+        [
+          { id: '1', tags: ['lore', 'npc'] },
+          { id: '2', tags: ['guide'] }
+        ],
+        ['1', '2'],
+        'npc',
+        'remove'
+      )
+    ).toEqual([{ id: '1', tags: ['lore'] }]);
   });
 
   it('clears focused node only when the current filters exclude it', () => {

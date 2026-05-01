@@ -10,6 +10,7 @@ vi.stubEnv('MINDMAP_DB_PATH', dbPath);
 
 let canvasesApi: typeof import('./api/canvases/+server');
 let nodesApi: typeof import('./api/nodes/+server');
+let bulkTagsApi: typeof import('./api/nodes/bulk-tags/+server');
 let edgesApi: typeof import('./api/edges/+server');
 let searchApi: typeof import('./api/search/+server');
 let db: any;
@@ -20,6 +21,7 @@ beforeAll(async () => {
 
   canvasesApi = await import('./api/canvases/+server');
   nodesApi = await import('./api/nodes/+server');
+  bulkTagsApi = await import('./api/nodes/bulk-tags/+server');
   edgesApi = await import('./api/edges/+server');
   searchApi = await import('./api/search/+server');
   db = (await import('$lib/server/db')).db;
@@ -132,6 +134,67 @@ describe('API integration', () => {
       expect.objectContaining({ name: 'lore', color: expect.stringMatching(/^#[0-9a-f]{6}$/i) }),
       expect.objectContaining({ name: 'npc', color: expect.stringMatching(/^#[0-9a-f]{6}$/i) })
     ]);
+  });
+
+  it('bulk-updates tags transactionally across selected nodes', async () => {
+    const canvas = await canvasesApi.POST({
+      request: request({ id: 'canvas-1', name: 'Bulk Tags' })
+    } as any);
+    const { id: canvasId } = await canvas.json();
+
+    const firstNode = await nodesApi.POST({
+      request: request({ id: 'node-1', canvasId, x: 0, y: 0 })
+    } as any);
+    const secondNode = await nodesApi.POST({
+      request: request({ id: 'node-2', canvasId, x: 120, y: 120 })
+    } as any);
+
+    const { id: firstNodeId } = await firstNode.json();
+    const { id: secondNodeId } = await secondNode.json();
+
+    await nodesApi.PATCH({
+      request: request({
+        id: firstNodeId,
+        title: 'Alpha',
+        tags: ['lore']
+      })
+    } as any);
+
+    await nodesApi.PATCH({
+      request: request({
+        id: secondNodeId,
+        title: 'Beta',
+        tags: ['npc']
+      })
+    } as any);
+
+    await bulkTagsApi.POST({
+      request: request({
+        nodes: [
+          { id: firstNodeId, tags: ['lore', 'npc'] },
+          { id: secondNodeId, tags: ['npc'] }
+        ]
+      })
+    } as any);
+
+    const listed = await nodesApi.GET({
+      url: new URL(`http://localhost/api/nodes?canvasId=${canvasId}`)
+    } as any);
+    const nodes = await listed.json();
+
+    expect(nodes).toEqual([
+      expect.objectContaining({
+        id: firstNodeId,
+        tags: ['lore', 'npc']
+      }),
+      expect.objectContaining({
+        id: secondNodeId,
+        tags: ['npc']
+      })
+    ]);
+
+    const tagRows = db.prepare('SELECT name FROM tags ORDER BY name').all();
+    expect(tagRows.map((row: { name: string }) => row.name)).toEqual(['lore', 'npc']);
   });
 
   it('searches nodes by keyword and tag', async () => {

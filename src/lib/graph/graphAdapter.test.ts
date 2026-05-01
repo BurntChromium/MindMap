@@ -34,6 +34,7 @@ describe('graphAdapter', () => {
       ],
       {
         editingNodeId: '1',
+        selectedNodeIds: ['1'],
         activeTag: null,
         searchHitIds: new Set<string>(),
         tagColors: {},
@@ -45,7 +46,7 @@ describe('graphAdapter', () => {
       {
         id: '1',
         position: { x: 1, y: 2 },
-        selected: false,
+        selected: true,
         data: {
           label: 'First',
           body: 'Body',

@@ -1,5 +1,10 @@
 import type { DiscoveryNode, TagSummary } from '$lib/discovery';
-import { formatTagLabel, normalizeTagName } from '$lib/tagUtils';
+import { formatTagLabel, normalizeTagList, normalizeTagName } from '$lib/tagUtils';
+
+export type BulkTagMutation = {
+  id: string;
+  tags: string[];
+};
 
 export function buildTagColorMap(tagSummaries: TagSummary[]): Record<string, string> {
   return Object.fromEntries(tagSummaries.map((tag) => [tag.name, tag.color])) as Record<
@@ -96,4 +101,41 @@ export function getSearchHitIds(
   }
 
   return result;
+}
+
+export function buildBulkTagMutations(
+  nodes: Pick<DiscoveryNode, 'id' | 'tags'>[],
+  selectedNodeIds: string[],
+  tag: string,
+  mode: 'add' | 'remove'
+) {
+  const normalizedTag = normalizeTagName(tag);
+
+  if (!normalizedTag || selectedNodeIds.length === 0) {
+    return [];
+  }
+
+  const selectedIds = new Set(selectedNodeIds);
+  const mutations: BulkTagMutation[] = [];
+
+  for (const node of nodes) {
+    if (!selectedIds.has(node.id)) {
+      continue;
+    }
+
+    const currentTags = normalizeTagList(node.tags);
+    const nextTags =
+      mode === 'add'
+        ? normalizeTagList([...currentTags, normalizedTag])
+        : currentTags.filter((currentTag) => currentTag !== normalizedTag);
+
+    if (currentTags.join('\u0000') !== nextTags.join('\u0000')) {
+      mutations.push({
+        id: node.id,
+        tags: nextTags
+      });
+    }
+  }
+
+  return mutations;
 }

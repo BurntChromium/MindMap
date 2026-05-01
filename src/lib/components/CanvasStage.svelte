@@ -13,7 +13,9 @@
     flowEdges: any[];
     onAddNode: () => void;
     onConnect: (connection: Connection) => void;
-    onNodeClick: (nodeId: string) => void;
+    onNodeClick: (nodeId: string, shiftKey: boolean) => void;
+    onSelectionChange: (nodeIds: string[]) => void;
+    onPaneClick: () => void;
     onDeleteNodes: (nodeIds: string[]) => void;
     onDeleteEdges: (edgeIds: string[]) => void;
   }
@@ -24,6 +26,8 @@
     onAddNode,
     onConnect,
     onNodeClick,
+    onSelectionChange,
+    onPaneClick,
     onDeleteNodes,
     onDeleteEdges
   }: Props = $props();
@@ -48,9 +52,12 @@
     nodes={flowNodes}
     edges={flowEdges}
     nodeTypes={nodeTypes}
+    multiSelectionKey="Shift"
     onconnect={onConnect}
     onnodedragstop={handleNodeDragStop}
-    onnodeclick={(event) => onNodeClick(event.node.id)}
+    onnodeclick={(event) => onNodeClick(event.node.id, event.event.shiftKey)}
+    onselectionchange={({ nodes }) => onSelectionChange(nodes.map((node) => node.id))}
+    onpaneclick={onPaneClick}
     ondelete={(event) => {
       onDeleteNodes(event.nodes.map((node) => node.id));
       onDeleteEdges(event.edges.map((edge) => edge.id));

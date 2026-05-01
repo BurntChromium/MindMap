@@ -12,6 +12,11 @@ export type Node = {
   collapsed: number;
 };
 
+export type NodeTagUpdate = {
+  id: string;
+  tags: string[];
+};
+
 function createNodeStore() {
   const store = writable<{
     nodes: Map<string, Node>;
@@ -189,6 +194,55 @@ function createNodeStore() {
 
         if (!response.ok) {
           throw new Error(`Update node failed with ${response.status}`);
+        }
+      } catch (error) {
+        set(previous);
+        syncCache(previous);
+        console.error(error);
+        return;
+      }
+
+      syncCache();
+    },
+
+    async updateNodeTags(updates: NodeTagUpdate[]) {
+      if (!updates.length) {
+        return;
+      }
+
+      const previous = snapshotState();
+      const nextTagsById = new Map(updates.map((update) => [update.id, [...update.tags]]));
+
+      update((state) => {
+        for (const [id, tags] of nextTagsById) {
+          const existing = state.nodes.get(id);
+
+          if (existing) {
+            state.nodes.set(id, {
+              ...existing,
+              tags: [...tags]
+            });
+          }
+        }
+
+        return state;
+      });
+      syncCache();
+
+      try {
+        const response = await fetch('/api/nodes/bulk-tags', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            nodes: updates.map((update) => ({
+              id: update.id,
+              tags: update.tags
+            }))
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error(`Bulk tag update failed with ${response.status}`);
         }
       } catch (error) {
         set(previous);
