@@ -13,7 +13,7 @@
   } from 'lucide-svelte';
   import type { PageData } from './$types';
   import CustomNode from '$lib/components/CustomNode.svelte';
-  import { collectTagSummaries } from '$lib/discovery';
+  import { collectTagSummaries, filterDiscoveryNodes } from '$lib/discovery';
   import { formatTagLabel, normalizeTagName } from '$lib/tagUtils';
   import {
     isCanvasToggleShortcut,
@@ -45,9 +45,6 @@
   let storeNodes = $state<Node[] | null>(null);
   let storeEdges = $state<Edge[] | null>(null);
   let searchQuery = $state('');
-  let searchResults = $state<Node[]>([]);
-  let searchLoading = $state(false);
-  let searchError = $state<string | null>(null);
   let activeTag = $state<string | null>(null);
   let focusedNodeId = $state<string | null>(null);
   let editingNodeId = $state<string | null>(null);
@@ -71,6 +68,7 @@
   const tagColorMap = $derived(
     Object.fromEntries(tagSummaries.map((tag) => [tag.name, tag.color]))
   );
+  const searchResults = $derived(filterDiscoveryNodes(nodes, searchQuery, activeTag));
   const searchHitIds = $derived(new Set(searchResults.map((node) => node.id)));
   const flowNodes = $derived(
     toFlowNodes(nodes, {
@@ -100,8 +98,8 @@
 
   onMount(() => {
     canvasStore.hydrate(initialCanvases, initialActiveCanvasId);
-    nodeStore.hydrate(initialNodes);
-    edgeStore.hydrate(initialEdges);
+    nodeStore.hydrate(initialNodes, initialActiveCanvasId);
+    edgeStore.hydrate(initialEdges, initialActiveCanvasId);
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (isTextInputElement(document.activeElement)) {
@@ -174,9 +172,6 @@
 
     nodeUiStore.clear();
     searchQuery = '';
-    searchResults = [];
-    searchLoading = false;
-    searchError = null;
     activeTag = null;
     focusedNodeId = null;
     void nodeStore.load(activeCanvasId);
@@ -184,75 +179,11 @@
   });
 
   $effect(() => {
-    const canvasId = activeCanvasId;
-    const query = searchQuery.trim();
-    const tag = activeTag;
-
-    if (!canvasId || (!query && !tag)) {
-      searchResults = [];
-      searchLoading = false;
-      searchError = null;
-      return;
-    }
-
-    searchLoading = true;
-    searchError = null;
-    searchResults = [];
-
-    const controller = new AbortController();
-    const timeout = window.setTimeout(async () => {
-      try {
-        const url = new URL('/api/search', window.location.origin);
-        url.searchParams.set('canvasId', canvasId);
-
-        if (query) {
-          url.searchParams.set('query', query);
-        }
-
-        if (tag) {
-          url.searchParams.set('tag', tag);
-        }
-
-        const res = await fetch(url, { signal: controller.signal });
-
-        if (!res.ok) {
-          throw new Error(`Search request failed with ${res.status}`);
-        }
-
-        const data = (await res.json()) as Node[];
-        searchResults = data;
-      } catch (error) {
-        if (controller.signal.aborted) {
-          return;
-        }
-
-        searchResults = [];
-        searchError = error instanceof Error ? error.message : 'Search failed';
-      } finally {
-        if (!controller.signal.aborted) {
-          searchLoading = false;
-        }
-      }
-    }, 160);
-
-    return () => {
-      controller.abort();
-      window.clearTimeout(timeout);
-    };
-  });
-
-  $effect(() => {
     if (!focusedNodeId) {
       return;
     }
 
-    const filteredIds = searchHitIds;
-
-    if (
-      !searchLoading &&
-      (searchQuery.trim() || activeTag) &&
-      (!filteredIds.size || !filteredIds.has(focusedNodeId))
-    ) {
+    if ((searchQuery.trim() || activeTag) && !searchHitIds.has(focusedNodeId)) {
       focusedNodeId = null;
     }
   });
@@ -275,9 +206,6 @@
     searchQuery = '';
     activeTag = null;
     focusedNodeId = null;
-    searchResults = [];
-    searchLoading = false;
-    searchError = null;
   }
 
   function startRenameCanvas(canvas: Canvas) {
@@ -585,11 +513,7 @@
             <span>{activeFilterLabel}</span>
           </div>
 
-          {#if searchLoading}
-            <p class="discovery-empty">Searching...</p>
-          {:else if searchError}
-            <p class="discovery-error">{searchError}</p>
-          {:else if !searchQuery.trim() && !activeTag}
+          {#if !searchQuery.trim() && !activeTag}
             <p class="discovery-empty">Type a keyword or click a tag to see matches.</p>
           {:else if searchResults.length === 0}
             <p class="discovery-empty">No nodes match the current filters.</p>
@@ -831,8 +755,7 @@
     font-size: 0.72rem;
   }
 
-  .discovery-empty,
-  .discovery-error {
+  .discovery-empty {
     margin: 0;
     font-size: 0.9rem;
     line-height: 1.4;
@@ -840,10 +763,6 @@
 
   .discovery-empty {
     color: var(--text-muted);
-  }
-
-  .discovery-error {
-    color: #b91c1c;
   }
 
   @media (max-width: 1180px) {

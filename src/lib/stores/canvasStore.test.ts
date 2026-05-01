@@ -86,4 +86,22 @@ describe('canvasStore', () => {
       })
     );
   });
+
+  it('optimistically creates a canvas before POST completes', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({ id: 'canvas-2', name: 'New Canvas' }));
+
+    await canvasStore.create('New Canvas');
+
+    const call = vi.mocked(fetch).mock.calls[0];
+    const body = JSON.parse(String((call[1] as RequestInit).body));
+
+    expect(snapshot()).toMatchObject({
+      canvases: [expect.objectContaining({ id: body.id, name: 'New Canvas' })],
+      activeCanvasId: body.id
+    });
+    expect(body).toMatchObject({
+      id: expect.any(String),
+      name: 'New Canvas'
+    });
+  });
 });

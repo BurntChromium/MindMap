@@ -11,9 +11,9 @@ export function GET({ url }) {
 
 // POST /api/edges
 export async function POST({ request }) {
-  const { canvasId, source, target } = await request.json();
+  const { id: providedId, canvasId, source, target } = await request.json();
 
-  const id = `e-${source}-${target}`;
+  const id = typeof providedId === 'string' && providedId ? providedId : `e-${source}-${target}`;
 
   db.prepare(`
     INSERT INTO edges (id, canvas_id, source_node_id, target_node_id)

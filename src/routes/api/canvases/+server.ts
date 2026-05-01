@@ -10,9 +10,9 @@ export function GET() {
 
 // POST /api/canvases
 export async function POST({ request }) {
-  const { name } = await request.json();
+  const { id: providedId, name } = await request.json();
 
-  const id = createId();
+  const id = typeof providedId === 'string' && providedId ? providedId : createId();
   const timestamp = now();
 
   db.prepare(`

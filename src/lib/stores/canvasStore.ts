@@ -1,4 +1,5 @@
-import { writable } from 'svelte/store';
+import { get, writable } from 'svelte/store';
+import { createClientId } from '$lib/clientId';
 
 export type Canvas = {
   id: string;
@@ -8,13 +9,21 @@ export type Canvas = {
 };
 
 function createCanvasStore() {
-  const { subscribe, set, update } = writable<{
+  const store = writable<{
     canvases: Canvas[];
     activeCanvasId: string | null;
   }>({
     canvases: [],
     activeCanvasId: null
   });
+  const { subscribe, set, update } = store;
+
+  function snapshotState(state = get(store)) {
+    return {
+      canvases: state.canvases.map((canvas) => ({ ...canvas })),
+      activeCanvasId: state.activeCanvasId
+    };
+  }
 
   return {
     subscribe,
@@ -37,18 +46,36 @@ function createCanvasStore() {
     },
 
     async create(name: string) {
-      const res = await fetch('/api/canvases', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name })
-      });
-
-      const canvas = await res.json();
+      const id = createClientId('canvas');
+      const timestamp = Date.now();
+      const previous = snapshotState();
+      const newCanvas: Canvas = {
+        id,
+        name,
+        created_at: timestamp,
+        updated_at: timestamp
+      };
 
       update((state) => ({
-        canvases: [canvas, ...state.canvases],
-        activeCanvasId: canvas.id
+        canvases: [newCanvas, ...state.canvases],
+        activeCanvasId: id
       }));
+
+      try {
+        const res = await fetch('/api/canvases', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id, name })
+        });
+
+        if (!res.ok) {
+          throw new Error(`Create canvas failed with ${res.status}`);
+        }
+      } catch (error) {
+        set(previous);
+        console.error(error);
+        return;
+      }
     },
 
     async rename(id: string, name: string) {
@@ -57,11 +84,7 @@ function createCanvasStore() {
         return;
       }
 
-      await fetch('/api/canvases', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, name: trimmed })
-      });
+      const previous = snapshotState();
 
       update((state) => ({
         ...state,
@@ -74,19 +97,44 @@ function createCanvasStore() {
             : canvas
         )
       }));
+
+      try {
+        const res = await fetch('/api/canvases', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id, name: trimmed })
+        });
+
+        if (!res.ok) {
+          throw new Error(`Rename canvas failed with ${res.status}`);
+        }
+      } catch (error) {
+        set(previous);
+        console.error(error);
+      }
     },
 
     async remove(id: string) {
-      await fetch(`/api/canvases?id=${id}`, { method: 'DELETE' });
+      const previous = snapshotState();
+      const filtered = previous.canvases.filter((c) => c.id !== id);
+      const activeCanvasId =
+        previous.activeCanvasId === id ? filtered[0]?.id ?? null : previous.activeCanvasId;
 
-      update((state) => {
-        const filtered = state.canvases.filter((c) => c.id !== id);
-
-        return {
-          canvases: filtered,
-          activeCanvasId: filtered[0]?.id ?? null
-        };
+      set({
+        canvases: filtered,
+        activeCanvasId
       });
+
+      try {
+        const res = await fetch(`/api/canvases?id=${id}`, { method: 'DELETE' });
+
+        if (!res.ok) {
+          throw new Error(`Delete canvas failed with ${res.status}`);
+        }
+      } catch (error) {
+        set(previous);
+        console.error(error);
+      }
     },
 
     setActive(id: string) {

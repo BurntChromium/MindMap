@@ -53,10 +53,81 @@ describe('nodeStore', () => {
     });
   });
 
+  it('restores a cached canvas snapshot before the fetch resolves', async () => {
+    nodeStore.hydrate(
+      [
+        {
+          id: 'node-a',
+          canvas_id: 'canvas-1',
+          title: 'Cached',
+          body: '',
+          tags: ['lore'],
+          x: 1,
+          y: 2,
+          collapsed: 0
+        }
+      ],
+      'canvas-1'
+    );
+
+    vi.mocked(fetch).mockResolvedValueOnce(
+      jsonResponse([
+        {
+          id: 'node-b',
+          canvas_id: 'canvas-2',
+          title: 'Fresh',
+          body: '',
+          tags: [],
+          x: 10,
+          y: 20,
+          collapsed: 0
+        }
+      ])
+    );
+
+    await nodeStore.load('canvas-2');
+
+    let resolveFetch: (value: Response) => void = () => undefined;
+    vi.mocked(fetch).mockImplementationOnce(
+      () =>
+        new Promise<Response>((resolve) => {
+          resolveFetch = resolve;
+        })
+    );
+
+    const pending = nodeStore.load('canvas-1');
+
+    expect(snapshot().get('node-a')).toMatchObject({
+      id: 'node-a',
+      title: 'Cached',
+      tags: ['lore']
+    });
+
+    resolveFetch(
+      jsonResponse([
+        {
+          id: 'node-a',
+          canvas_id: 'canvas-1',
+          title: 'Cached',
+          body: '',
+          tags: ['lore'],
+          x: 1,
+          y: 2,
+          collapsed: 0
+        }
+      ])
+    );
+
+    await pending;
+  });
+
   it('creates a node optimistically after POST', async () => {
     vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({ id: 'node-2' }));
 
     await nodeStore.create('canvas-1', 50, 75);
+
+    const call = vi.mocked(fetch).mock.calls[0];
+    const body = JSON.parse(String((call[1] as RequestInit).body));
 
     expect(fetch).toHaveBeenCalledWith(
       '/api/nodes',
@@ -64,11 +135,17 @@ describe('nodeStore', () => {
         method: 'POST'
       })
     );
-    expect(snapshot().get('node-2')).toMatchObject({
-      id: 'node-2',
+    expect(snapshot().get(body.id)).toMatchObject({
+      id: body.id,
       canvas_id: 'canvas-1',
       title: 'New Node',
       tags: [],
+      x: 50,
+      y: 75
+    });
+    expect(body).toMatchObject({
+      id: expect.any(String),
+      canvasId: 'canvas-1',
       x: 50,
       y: 75
     });

@@ -49,9 +49,9 @@ export function GET({ url }) {
 
 // POST /api/nodes
 export async function POST({ request }) {
-  const { canvasId, title, x, y } = await request.json();
+  const { id: providedId, canvasId, title, x, y } = await request.json();
 
-  const id = createId();
+  const id = typeof providedId === 'string' && providedId ? providedId : createId();
   const timestamp = now();
 
   db.prepare(`

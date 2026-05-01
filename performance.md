@@ -2,18 +2,21 @@
 
 This checklist tracks the practical work needed to make the app feel faster under normal use.
 
+## Done So Far
+
+- [x] Cache the active canvas state in the client so switching back to a canvas restores nodes and edges immediately.
+- [x] Keep per-canvas snapshots in memory for the current session.
+- [x] Revalidate cached canvas data in the background after rendering from cache.
+- [x] Use optimistic UI updates for writes where the local state already knows the intended result.
+- [x] Filter search results against the active canvas nodes already in memory.
+- [x] Remove the `/api/search` round-trip for normal keyword and tag filtering on the current canvas.
+
 ## 1. Avoid Unnecessary DB Trips
 
-- [ ] Cache the active canvas state in the client so switching back to a canvas restores nodes and edges immediately.
-- [ ] Keep per-canvas snapshots in memory for the current session.
-- [ ] Revalidate cached canvas data in the background after rendering from cache.
-- [ ] Use optimistic UI updates for writes where the local state already knows the intended result.
+- [ ] Keep the server search route only if it is needed later for global or cross-canvas search.
 
 ## 2. Make Discovery Local First
 
-- [ ] Filter search results against the active canvas nodes already in memory.
-- [ ] Remove the `/api/search` round-trip for normal keyword and tag filtering on the current canvas.
-- [ ] Keep the server search route only if it is needed later for global or cross-canvas search.
 - [ ] Measure search latency after the client-side filter lands.
 
 ## 3. Add the Right Database Indexes
@@ -32,10 +35,7 @@ This checklist tracks the practical work needed to make the app feel faster unde
 
 ## 5. Keep Mutations Feeling Instant
 
-- [ ] Make canvas rename optimistic in the store.
-- [ ] Make edge create and delete optimistic in the store.
-- [ ] Keep node create, update, and tag edits optimistic.
-- [ ] Add rollback behavior only where a failed write would leave the UI inconsistent.
+- [ ] Verify rollback behavior only where a failed write would leave the UI inconsistent.
 
 ## 6. Verify With Measurements
 
@@ -47,5 +47,5 @@ This checklist tracks the practical work needed to make the app feel faster unde
 ## Notes
 
 - Generic backend caching is not the first thing to reach for here.
-- The biggest gains are likely to come from client-side caching, local filtering, optimistic updates, and a few well-placed indexes.
+- The biggest gains so far have come from client-side caching, local filtering, optimistic updates, and a few well-placed indexes.
 - If the app grows beyond the current single-user workflow, search and cache strategy should be revisited with that shape in mind.
