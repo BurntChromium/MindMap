@@ -1,0 +1,41 @@
+import { describe, expect, it } from 'vitest';
+import { isCreateNodeShortcut, isTextInputElement } from '$lib/shortcutUtils';
+
+describe('shortcutUtils', () => {
+  it('recognizes the create-node key', () => {
+    const event = {
+      key: 'n',
+      metaKey: false,
+      ctrlKey: false,
+      altKey: false,
+      shiftKey: false,
+      defaultPrevented: false
+    } as KeyboardEvent;
+
+    expect(isCreateNodeShortcut(event)).toBe(true);
+  });
+
+  it('ignores modifier combinations', () => {
+    const event = {
+      key: 'n',
+      metaKey: false,
+      ctrlKey: true,
+      altKey: false,
+      shiftKey: false,
+      defaultPrevented: false
+    } as KeyboardEvent;
+
+    expect(isCreateNodeShortcut(event)).toBe(false);
+  });
+
+  it('recognizes text entry targets', () => {
+    const input = { tagName: 'input' };
+    const textarea = { tagName: 'textarea' };
+    const editable = { isContentEditable: true };
+
+    expect(isTextInputElement(input as unknown as EventTarget)).toBe(true);
+    expect(isTextInputElement(textarea as unknown as EventTarget)).toBe(true);
+    expect(isTextInputElement(editable as unknown as EventTarget)).toBe(true);
+    expect(isTextInputElement({ tagName: 'div' } as unknown as EventTarget)).toBe(false);
+  });
+});

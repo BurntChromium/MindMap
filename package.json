@@ -27,6 +27,7 @@
 	"dependencies": {
 		"@xyflow/svelte": "^1.5.2",
 		"better-sqlite3": "^12.9.0",
+		"lucide-svelte": "^1.0.1",
 		"uuid": "^14.0.0"
 	}
 }

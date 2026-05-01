@@ -1,6 +1,7 @@
 <script lang="ts">
   import { tick } from 'svelte';
   import { Handle, Position } from '@xyflow/svelte';
+  import { Check, ChevronDown, ChevronUp, Pencil } from 'lucide-svelte';
   import { nodeStore } from '$lib/stores/nodeStore';
   import { nodeUiStore } from '$lib/stores/nodeUiStore';
   import {
@@ -169,9 +170,9 @@
       ? '1px solid var(--accent)'
       : selected
         ? '1px solid var(--text-main)'
-        : '1px solid #dcdcdc'
+        : '1px solid var(--border-color)'
   );
-  const boxShadow = $derived(isExpanded ? '0 4px 10px rgba(0,0,0,0.12)' : 'none');
+  const boxShadow = $derived(isExpanded ? 'var(--shadow-soft)' : 'none');
 </script>
 
 <div class="node-shell" style={`width: ${nodeWidth};`}>
@@ -199,13 +200,9 @@
           onclick={handleExpandToggle}
         >
           {#if isExpanded}
-            <svg viewBox="0 0 16 16" aria-hidden="true">
-              <path d="M8 5.2 3.2 10l1.1 1.1L8 7.4l3.7 3.7L12.8 10 8 5.2z" />
-            </svg>
+            <ChevronUp size={12} aria-hidden="true" />
           {:else}
-            <svg viewBox="0 0 16 16" aria-hidden="true">
-              <path d="M8 10.8 12.8 6l-1.1-1.1L8 8.6 4.3 4.9 3.2 6 8 10.8z" />
-            </svg>
+            <ChevronDown size={12} aria-hidden="true" />
           {/if}
         </button>
 
@@ -217,13 +214,9 @@
           onclick={handleEditToggle}
         >
           {#if isEditing}
-            <svg viewBox="0 0 16 16" aria-hidden="true">
-              <path d="M6.5 11.2 3.3 8l1.1-1.1 2.1 2.1 5-5 1.1 1.1-6.1 6.1z" />
-            </svg>
+            <Check size={12} aria-hidden="true" />
           {:else}
-            <svg viewBox="0 0 16 16" aria-hidden="true">
-              <path d="M11.7 2.3a1 1 0 0 1 1.4 0l.6.6a1 1 0 0 1 0 1.4l-7.8 7.8-2.9.6.6-2.9 8.1-7.5zM3.2 12.8h9.6v1.4H3.2z" />
-            </svg>
+            <Pencil size={12} aria-hidden="true" />
           {/if}
         </button>
       </div>
@@ -292,8 +285,8 @@
   }
 
   .node-card {
-    background: white;
-    border-radius: 6px;
+    background: var(--surface);
+    border-radius: 8px;
     padding: 10px 12px;
     transition:
       border 0.2s ease,
@@ -303,7 +296,7 @@
 
   .node-header {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     gap: 8px;
     justify-content: space-between;
   }
@@ -319,7 +312,7 @@
   .title-input {
     min-width: 0;
     flex: 1;
-    border: 1px solid #dcdcdc;
+    border: 1px solid var(--border-color);
     border-radius: 4px;
     padding: 4px 6px;
     font: inherit;
@@ -338,9 +331,9 @@
   .mode-button {
     width: 22px;
     height: 22px;
-    border: 1px solid #dcdcdc;
-    background: #f7f7f7;
-    color: #333;
+    border: 1px solid var(--border-color);
+    background: var(--surface-soft);
+    color: var(--text-main);
     border-radius: 4px;
     padding: 0;
     display: inline-flex;
@@ -352,12 +345,6 @@
   .mode-button:disabled {
     cursor: not-allowed;
     opacity: 0.55;
-  }
-
-  .mode-button svg {
-    width: 12px;
-    height: 12px;
-    fill: currentColor;
   }
 
   .body-area {
@@ -377,11 +364,11 @@
     align-items: center;
     gap: 4px;
     max-width: 100%;
-    border: 1px solid #d9e3ff;
+    border: 1px solid #cfe0ff;
     border-radius: 999px;
     padding: 2px 7px;
-    background: #eef4ff;
-    color: #21406f;
+    background: #eff6ff;
+    color: #1e3a8a;
     font-size: 12px;
     line-height: 1.2;
   }
@@ -408,10 +395,10 @@
     gap: 4px;
     flex: 1 1 120px;
     min-width: 120px;
-    border: 1px solid #dcdcdc;
+    border: 1px solid var(--border-color);
     border-radius: 999px;
     padding: 2px 8px;
-    background: #fff;
+    background: var(--surface);
     box-sizing: border-box;
   }
 
@@ -446,21 +433,22 @@
   .body-display {
     white-space: pre-wrap;
     word-break: break-word;
-    color: #333;
+    color: var(--text-main);
   }
 
   .body-placeholder {
-    color: #8a8a8a;
+    color: var(--text-muted);
   }
 
   .body-editor {
     min-height: 96px;
     resize: vertical;
-    border: 1px solid #dcdcdc;
+    border: 1px solid var(--border-color);
     border-radius: 4px;
     padding: 8px;
     outline: none;
     font: inherit;
-    color: #222;
+    color: var(--text-main);
+    background: var(--surface);
   }
 </style>

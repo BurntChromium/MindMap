@@ -1,8 +1,9 @@
 <script lang="ts">
   import { SvelteFlow, Background, Controls, type Connection } from '@xyflow/svelte';
   import { onMount } from 'svelte';
+  import { Plus, Trash2 } from 'lucide-svelte';
   import CustomNode from '$lib/components/CustomNode.svelte';
-  import trash from '$lib/assets/trash-icon.svg';
+  import { isCreateNodeShortcut, isTextInputElement } from '$lib/shortcutUtils';
 
   const nodeTypes = {
     custom: CustomNode
@@ -28,9 +29,40 @@
 
   let flowNodes = $state<any[]>([]);
   let flowEdges = $state<any[]>([]);
+  let canvasShell: HTMLDivElement | undefined;
 
-  onMount(async () => {
-    await canvasStore.load();
+  onMount(() => {
+    void canvasStore.load();
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (!isCreateNodeShortcut(event)) {
+        return;
+      }
+
+      const activeElement = document.activeElement;
+
+      if (isTextInputElement(activeElement)) {
+        return;
+      }
+
+      if (
+        activeElement instanceof HTMLElement &&
+        canvasShell &&
+        !canvasShell.contains(activeElement) &&
+        activeElement !== document.body
+      ) {
+        return;
+      }
+
+      event.preventDefault();
+      addNode();
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
   });
 
   $effect(() => {
@@ -82,41 +114,86 @@
     nodeStore.create(activeCanvasId, 100, 100);
   }
 
+  function focusCanvasShell() {
+    canvasShell?.focus();
+  }
+
   function onConnect(connection: Connection) {
     if (!activeCanvasId || !connection.source || !connection.target) return;
     edgeStore.create(activeCanvasId, connection.source, connection.target);
   }
 </script>
 
-<div style="display: flex; height: 100vh; overflow: hidden;">
-  <!-- LEFT PANEL -->
+<div class="app-shell">
   <div class="sidebar">
-    <h3>Canvas List</h3>
+    <div class="sidebar-section">
+      <h3>Canvases</h3>
+      <div class="sidebar-row">
+        <input
+          bind:value={name}
+          class="sidebar-input"
+          placeholder="New canvas"
+          aria-label="New canvas name"
+        />
+        <button
+          class="button button--primary"
+          type="button"
+          onclick={() => canvasStore.create(name)}
+        >
+          Create
+        </button>
+      </div>
+    </div>
 
-    <input bind:value={name} placeholder="New canvas name" />
-    <button class="primary-button" onclick={() => canvasStore.create(name)}>Create</button>
-
-    <ul>
-      {#each canvases as canvas}
-        <li>
-          <button 
-            class="implied-button"
-            onclick={() => canvasStore.setActive(canvas.id)}>
-            {canvas.name}
-          </button>
-          <button class="icon-button" onclick={() => canvasStore.remove(canvas.id)}>
-            <img src={trash} alt="trashcan icon" height="15px"/>
-          </button>
-        </li>
-      {/each}
-    </ul>
-
-    <button class="primary-button" onclick={addNode}>Add Node</button>
+    <div class="sidebar-section">
+      <ul class="sidebar-list">
+        {#each canvases as canvas}
+          <li class="sidebar-row">
+            <button
+              class="ghost-button"
+              type="button"
+              onclick={() => canvasStore.setActive(canvas.id)}
+            >
+              <span>{canvas.name}</span>
+            </button>
+            <button
+              class="icon-button"
+              type="button"
+              aria-label={`Delete canvas ${canvas.name}`}
+              title={`Delete canvas ${canvas.name}`}
+              onclick={() => canvasStore.remove(canvas.id)}
+            >
+              <Trash2 size={14} aria-hidden="true" />
+            </button>
+          </li>
+        {/each}
+      </ul>
+    </div>
   </div>
 
-  <!-- CANVAS -->
-  <div style="flex: 1; position: relative;">
+  <div
+    bind:this={canvasShell}
+    class="canvas-shell"
+    tabindex="-1"
+    role="region"
+    aria-label="Mind map canvas"
+    onpointerdown={focusCanvasShell}
+  >
+    <div class="canvas-toolbar">
+      <button
+        class="button button--primary canvas-create-button"
+        type="button"
+        aria-label="Add node"
+        title="Add node (N)"
+        onclick={addNode}
+      >
+        <Plus size={16} aria-hidden="true" />
+        <span>Node</span>
+      </button>
+    </div>
+
     <SvelteFlow
+      style="width: 100%; height: 100%;"
       nodes={flowNodes}
       edges={flowEdges}
       nodeTypes={nodeTypes}
@@ -131,7 +208,7 @@
         }
       }}
       fitView
-    >
+      >
       <Background />
       <Controls />
     </SvelteFlow>
