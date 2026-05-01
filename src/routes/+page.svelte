@@ -42,7 +42,7 @@
 
   let storeCanvases = $state<Canvas[] | null>(null);
   let storeActiveCanvasId = $state<string | null>(null);
-  let storeNodes = $state<Node[] | null>(null);
+  let storeNodes = $state.raw<Node[] | null>(null);
   let storeEdges = $state<Edge[] | null>(null);
   let searchQuery = $state('');
   let activeTag = $state<string | null>(null);
