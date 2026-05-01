@@ -14,10 +14,13 @@ Already in place:
 
 This means the next work is about making the app easier to navigate, faster to use at scale, and more durable.
 
-## Stage 1: UX Tweaks
+## Stage 1: UX Tweaks (Done)
 
 - Make tags visible in the compact mode (the default, unexpanded state)
 - We have 3 states: compact, view, and edit. Let's be sure that this is reflected in the code and our assumptions/documentation. 
+- Compact means the default node card with title plus tags.
+- View means the expanded read-only node card.
+- Edit means the expanded editor state with mutable title, body, and tags.
 
 ## Stage 2: Find Things Quickly
 

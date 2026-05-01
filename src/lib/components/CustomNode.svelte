@@ -3,7 +3,12 @@
   import { Handle, Position } from '@xyflow/svelte';
   import { Check, ChevronDown, ChevronUp, Pencil } from 'lucide-svelte';
   import { nodeStore } from '$lib/stores/nodeStore';
-  import { nodeUiStore } from '$lib/stores/nodeUiStore';
+  import {
+    getNodeMode,
+    nodeUiStore,
+    type NodeMode,
+    type NodeUiState
+  } from '$lib/stores/nodeUiStore';
   import {
     formatTagLabel,
     normalizeTagList,
@@ -12,23 +17,21 @@
 
   let { id, data, selected } = $props();
 
-  let editingNodeId = $state<string | null>(null);
-  let expanded = $state(false);
+  let nodeMode = $state<NodeMode>('compact');
   let titleInput = $state<HTMLInputElement | undefined>(undefined);
   let draftTitle = $state('');
   let draftBody = $state('');
   let draftTags = $state<string[]>([]);
   let draftTagInput = $state('');
 
-  const isEditing = $derived(editingNodeId === id);
-  const isExpanded = $derived(expanded || isEditing);
+  const isEditing = $derived(nodeMode === 'edit');
+  const isExpanded = $derived(nodeMode !== 'compact');
   const bodyText = $derived(data.body ?? '');
   const nodeTags = $derived(Array.isArray(data.tags) ? data.tags : []);
 
   $effect(() => {
-    const unsub = nodeUiStore.subscribe((v) => {
-      editingNodeId = v.editingNodeId;
-      expanded = Boolean(v.expandedNodeIds[id]);
+    const unsub = nodeUiStore.subscribe((v: NodeUiState) => {
+      nodeMode = getNodeMode(v, id);
     });
 
     return unsub;
@@ -222,43 +225,45 @@
       </div>
     </div>
 
+    {#if isEditing || nodeTags.length}
+      <div class="tags-area" class:tags-area--compact={nodeMode === 'compact'}>
+        {#if isEditing}
+          {#each draftTags as tag}
+            <span class="tag-chip">
+              <span>{formatTagLabel(tag)}</span>
+              <button
+                class="tag-remove nodrag"
+                type="button"
+                aria-label={`Remove ${formatTagLabel(tag)}`}
+                title={`Remove ${formatTagLabel(tag)}`}
+                onclick={() => removeDraftTag(tag)}
+              >
+                ×
+              </button>
+            </span>
+          {/each}
+
+          <span class="tag-input-shell">
+            <span class="tag-prefix">#</span>
+            <input
+              bind:value={draftTagInput}
+              class="tag-input nodrag"
+              aria-label="Add tag"
+              placeholder="Add tag"
+              onkeydown={handleTagKeyDown}
+              onpaste={handleTagPaste}
+            />
+          </span>
+        {:else}
+          {#each nodeTags as tag}
+            <span class="tag-chip tag-chip-readonly">{formatTagLabel(tag)}</span>
+          {/each}
+        {/if}
+      </div>
+    {/if}
+
     {#if isExpanded}
       <div class="body-area">
-        <div class="tags-area">
-          {#if isEditing}
-            {#each draftTags as tag}
-              <span class="tag-chip">
-                <span>{formatTagLabel(tag)}</span>
-                <button
-                  class="tag-remove nodrag"
-                  type="button"
-                  aria-label={`Remove ${formatTagLabel(tag)}`}
-                  title={`Remove ${formatTagLabel(tag)}`}
-                  onclick={() => removeDraftTag(tag)}
-                >
-                  ×
-                </button>
-              </span>
-            {/each}
-
-            <span class="tag-input-shell">
-              <span class="tag-prefix">#</span>
-              <input
-                bind:value={draftTagInput}
-                class="tag-input nodrag"
-                aria-label="Add tag"
-                placeholder="Add tag"
-                onkeydown={handleTagKeyDown}
-                onpaste={handleTagPaste}
-              />
-            </span>
-          {:else if nodeTags.length}
-            {#each nodeTags as tag}
-              <span class="tag-chip tag-chip-readonly">{formatTagLabel(tag)}</span>
-            {/each}
-          {/if}
-        </div>
-
         {#if isEditing}
           <textarea
             bind:value={draftBody}
@@ -357,6 +362,10 @@
     align-items: center;
     gap: 6px;
     margin-bottom: 8px;
+  }
+
+  .tags-area--compact {
+    margin-bottom: 0;
   }
 
   .tag-chip {

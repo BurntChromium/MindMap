@@ -1,10 +1,23 @@
 import { writable } from 'svelte/store';
 
+export type NodeUiState = {
+  editingNodeId: string | null;
+  expandedNodeIds: Record<string, true>;
+};
+
+export type NodeMode = 'compact' | 'view' | 'edit';
+
+// Compact = default summary state, view = expanded read-only, edit = expanded editor.
+export function getNodeMode(state: NodeUiState, id: string): NodeMode {
+  if (state.editingNodeId === id) {
+    return 'edit';
+  }
+
+  return state.expandedNodeIds[id] ? 'view' : 'compact';
+}
+
 function createNodeUiStore() {
-  const { subscribe, set, update } = writable<{
-    editingNodeId: string | null;
-    expandedNodeIds: Record<string, true>;
-  }>({
+  const { subscribe, set, update } = writable<NodeUiState>({
     editingNodeId: null,
     expandedNodeIds: {}
   });

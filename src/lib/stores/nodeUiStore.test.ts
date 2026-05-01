@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { nodeUiStore } from './nodeUiStore';
+import { getNodeMode, nodeUiStore } from './nodeUiStore';
 
 function snapshot() {
   let current: { editingNodeId: string | null; expandedNodeIds: Record<string, true> } = {
@@ -26,6 +26,14 @@ describe('nodeUiStore', () => {
     const state = snapshot();
     expect(state.editingNodeId).toBe('node-1');
     expect(state.expandedNodeIds['node-1']).toBe(true);
+    expect(getNodeMode(state, 'node-1')).toBe('edit');
+  });
+
+  it('derives compact and view modes from expansion state', () => {
+    expect(getNodeMode(snapshot(), 'node-2')).toBe('compact');
+
+    nodeUiStore.toggleExpanded('node-2');
+    expect(getNodeMode(snapshot(), 'node-2')).toBe('view');
   });
 
   it('toggles expansion independently of editing', () => {
