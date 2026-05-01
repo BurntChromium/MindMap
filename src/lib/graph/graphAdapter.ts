@@ -6,7 +6,8 @@ export function toFlowNodes(nodes: AppNode[]) {
     id: n.id,
     position: { x: n.x, y: n.y },
     data: {
-      label: n.title || 'Untitled'
+      label: n.title || 'Untitled',
+      body: n.body ?? ''
     },
     type: 'custom',
     draggable: true

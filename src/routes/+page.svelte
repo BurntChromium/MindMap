@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { SvelteFlow, Background, Controls, type Connection, addEdge } from '@xyflow/svelte';
+  import { SvelteFlow, Background, Controls, type Connection } from '@xyflow/svelte';
   import { onMount } from 'svelte';
   import CustomNode from '$lib/components/CustomNode.svelte';
   import trash from '$lib/assets/trash-icon.svg';
@@ -107,24 +107,23 @@
   <!-- CANVAS -->
   <div style="flex: 1; position: relative;">
     <SvelteFlow
-        <SvelteFlow
-            nodes={flowNodes}
-            edges={flowEdges}
-            nodeTypes={nodeTypes}
-            onconnect={onConnect}
-            onnodedragstop={handleNodeDragStop}
-            ondelete={(event) => {
-              for (const node of event.nodes) {
-                nodeStore.remove(node.id);
-              }
-              for (const edge of event.edges) {
-                edgeStore.remove(edge.id);
-              }
-            }}
-            fitView
-        >
-          <Background />
-          <Controls />
-        </SvelteFlow>
+      nodes={flowNodes}
+      edges={flowEdges}
+      nodeTypes={nodeTypes}
+      onconnect={onConnect}
+      onnodedragstop={handleNodeDragStop}
+      ondelete={(event) => {
+        for (const node of event.nodes) {
+          nodeStore.remove(node.id);
+        }
+        for (const edge of event.edges) {
+          edgeStore.remove(edge.id);
+        }
+      }}
+      fitView
+    >
+      <Background />
+      <Controls />
+    </SvelteFlow>
   </div>
 </div>
