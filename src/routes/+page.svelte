@@ -2,9 +2,16 @@
   import { onMount } from 'svelte';
   import type { Connection } from '@xyflow/svelte';
   import type { PageData } from './$types';
+  import { createClientId } from '$lib/clientId';
   import CanvasSidebar from '$lib/components/CanvasSidebar.svelte';
   import CanvasStage from '$lib/components/CanvasStage.svelte';
   import DiscoveryPanel from '$lib/components/DiscoveryPanel.svelte';
+  import {
+    buildClipboardFragment,
+    buildPastedGraph,
+    getConnectedEdgeIds,
+    type ClipboardFragmentV1
+  } from '$lib/graph/clipboard';
   import { collectTagSummaries, filterDiscoveryNodes } from '$lib/discovery';
   import {
     isCanvasToggleShortcut,
@@ -28,6 +35,7 @@
     type Node
   } from '$lib/stores/nodeStore';
   import { nodeUiStore } from '$lib/stores/nodeUiStore';
+  import { clipboardStore } from '$lib/stores/clipboardStore';
   import { toFlowEdges, toFlowNodes } from '$lib/graph/graphAdapter';
   import { selectionStore } from '$lib/stores/selectionStore';
 
@@ -38,6 +46,8 @@
   let storeNodes = $state.raw<Node[] | null>(null);
   let storeEdges = $state<Edge[] | null>(null);
   let storeSelectedNodeIds = $state<string[] | null>(null);
+  let storeClipboardFragment = $state<ClipboardFragmentV1 | null>(null);
+  let storeClipboardPasteCount = $state(0);
   let searchQuery = $state('');
   let activeTag = $state<string | null>(null);
   let focusedNodeId = $state<string | null>(null);
@@ -58,6 +68,8 @@
   const nodes = $derived(storeNodes ?? initialNodes);
   const edges = $derived(storeEdges ?? initialEdges);
   const selectedNodeIds = $derived(storeSelectedNodeIds ?? []);
+  const clipboardFragment = $derived(storeClipboardFragment);
+  const clipboardPasteCount = $derived(storeClipboardPasteCount);
   const selectedNodeIdSet = $derived(new Set(selectedNodeIds));
   const selectedNodes = $derived(nodes.filter((node) => selectedNodeIdSet.has(node.id)));
   const tagSummaries = $derived(collectTagSummaries(nodes));
@@ -87,6 +99,28 @@
     const handleKeyDown = (event: KeyboardEvent) => {
       if (isTextInputElement(document.activeElement)) {
         return;
+      }
+
+      if ((event.metaKey || event.ctrlKey) && !event.altKey) {
+        const key = event.key.toLowerCase();
+
+        if (key === 'c' && selectedNodeIds.length > 0) {
+          event.preventDefault();
+          void copySelection();
+          return;
+        }
+
+        if (key === 'x' && selectedNodeIds.length > 0) {
+          event.preventDefault();
+          void cutSelection();
+          return;
+        }
+
+        if (key === 'v' && clipboardFragment) {
+          event.preventDefault();
+          void pasteClipboardFragment();
+          return;
+        }
       }
 
       if (isCreateNodeShortcut(event)) {
@@ -140,6 +174,11 @@
       storeSelectedNodeIds = value;
     });
 
+    const unsubClipboard = clipboardStore.subscribe((value) => {
+      storeClipboardFragment = value.fragment;
+      storeClipboardPasteCount = value.pasteCount;
+    });
+
     loadedCanvasId = data.activeCanvasId;
     initialHydrationDone = true;
 
@@ -150,6 +189,7 @@
       unsubEdges();
       unsubNodeUi();
       unsubSelection();
+      unsubClipboard();
     };
   });
 
@@ -224,18 +264,87 @@
     discoveryCollapsed = !discoveryCollapsed;
   }
 
-  function handleDeleteNodes(nodeIds: string[]) {
-    const deletedIds = new Set(nodeIds);
-    selectionStore.setSelection(selectedNodeIds.filter((id) => !deletedIds.has(id)));
+  function copySelection() {
+    const fragment = buildClipboardFragment(nodes, edges, selectedNodeIds, activeCanvasId);
 
-    for (const nodeId of nodeIds) {
-      nodeStore.remove(nodeId);
+    if (!fragment) {
+      return;
+    }
+
+    clipboardStore.setFragment(fragment);
+
+    if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+      const copyPromise = navigator.clipboard.writeText(JSON.stringify(fragment));
+      void copyPromise.catch(() => undefined);
     }
   }
 
-  function handleDeleteEdges(edgeIds: string[]) {
-    for (const edgeId of edgeIds) {
-      edgeStore.remove(edgeId);
+  async function cutSelection() {
+    const fragment = buildClipboardFragment(nodes, edges, selectedNodeIds, activeCanvasId);
+
+    if (!fragment) {
+      return;
+    }
+
+    copySelection();
+    await deleteGraphSelection(
+      fragment.nodes.map((node) => node.id),
+      getConnectedEdgeIds(edges, fragment.nodes.map((node) => node.id))
+    );
+  }
+
+  async function deleteGraphSelection(nodeIds: string[], edgeIds: string[]) {
+    if (!activeCanvasId) {
+      return;
+    }
+
+    const uniqueNodeIds = Array.from(new Set(nodeIds));
+    const uniqueEdgeIds = Array.from(new Set(edgeIds));
+    const previousNodes = [...nodes];
+    const previousEdges = [...edges];
+    const previousSelection = [...selectedNodeIds];
+    const previousFocusedNodeId = focusedNodeId;
+    const nextSelection = previousSelection.filter((id) => !uniqueNodeIds.includes(id));
+    const deletedNodeIdSet = new Set(uniqueNodeIds);
+    const autoEdgeIds = getConnectedEdgeIds(edges, uniqueNodeIds);
+    const deletedEdgeIds = Array.from(new Set([...uniqueEdgeIds, ...autoEdgeIds]));
+
+    nodeStore.hydrate(
+      previousNodes.filter((node) => !deletedNodeIdSet.has(node.id)),
+      activeCanvasId
+    );
+    edgeStore.hydrate(
+      previousEdges.filter((edge) => !deletedEdgeIds.includes(edge.id)),
+      activeCanvasId
+    );
+    selectionStore.setSelection(nextSelection);
+
+    if (previousFocusedNodeId && deletedNodeIdSet.has(previousFocusedNodeId)) {
+      focusedNodeId = nextSelection[0] ?? null;
+    }
+
+    nodeUiStore.clear();
+
+    try {
+      const response = await fetch('/api/graph-fragments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'delete',
+          nodeIds: uniqueNodeIds,
+          edgeIds: uniqueEdgeIds
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Delete graph fragment failed with ${response.status}`);
+      }
+    } catch (error) {
+      nodeStore.hydrate(previousNodes, activeCanvasId);
+      edgeStore.hydrate(previousEdges, activeCanvasId);
+      selectionStore.setSelection(previousSelection);
+      focusedNodeId = previousFocusedNodeId;
+      console.error(error);
     }
   }
 
@@ -270,6 +379,62 @@
   function clearSelection() {
     selectionStore.clear();
   }
+
+  async function pasteClipboardFragment() {
+    if (!activeCanvasId || !clipboardFragment || clipboardFragment.nodes.length === 0) {
+      return;
+    }
+
+    const pastedGraph = buildPastedGraph(
+      clipboardFragment,
+      activeCanvasId,
+      clipboardPasteCount,
+      () => createClientId('node'),
+      () => createClientId('edge')
+    );
+
+    if (pastedGraph.nodes.length === 0) {
+      return;
+    }
+
+    const previousNodes = [...nodes];
+    const previousEdges = [...edges];
+    const previousSelection = [...selectedNodeIds];
+    const previousFocusedNodeId = focusedNodeId;
+    const nextNodes = [...previousNodes, ...pastedGraph.nodes];
+    const nextEdges = [...previousEdges, ...pastedGraph.edges];
+
+    nodeStore.hydrate(nextNodes, activeCanvasId);
+    edgeStore.hydrate(nextEdges, activeCanvasId);
+    selectionStore.setSelection(pastedGraph.nodes.map((node) => node.id));
+    focusedNodeId = pastedGraph.nodes[0]?.id ?? null;
+    nodeUiStore.clear();
+
+    try {
+      const response = await fetch('/api/graph-fragments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'paste',
+          canvasId: activeCanvasId,
+          nodes: pastedGraph.nodes,
+          edges: pastedGraph.edges
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Paste graph fragment failed with ${response.status}`);
+      }
+
+      clipboardStore.incrementPasteCount();
+    } catch (error) {
+      nodeStore.hydrate(previousNodes, activeCanvasId);
+      edgeStore.hydrate(previousEdges, activeCanvasId);
+      selectionStore.setSelection(previousSelection);
+      focusedNodeId = previousFocusedNodeId;
+      console.error(error);
+    }
+  }
 </script>
 
 <div class="app-shell" class:app-shell--sidebar-collapsed={sidebarCollapsed}>
@@ -301,8 +466,7 @@
         }}
         onSelectionChange={handleSelectionChange}
         onPaneClick={handlePaneClick}
-        onDeleteNodes={handleDeleteNodes}
-        onDeleteEdges={handleDeleteEdges}
+        onDelete={deleteGraphSelection}
       />
     </div>
 

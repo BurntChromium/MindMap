@@ -16,8 +16,7 @@
     onNodeClick: (nodeId: string, shiftKey: boolean) => void;
     onSelectionChange: (nodeIds: string[]) => void;
     onPaneClick: () => void;
-    onDeleteNodes: (nodeIds: string[]) => void;
-    onDeleteEdges: (edgeIds: string[]) => void;
+    onDelete: (nodeIds: string[], edgeIds: string[]) => void | Promise<void>;
   }
 
   let {
@@ -28,8 +27,7 @@
     onNodeClick,
     onSelectionChange,
     onPaneClick,
-    onDeleteNodes,
-    onDeleteEdges
+    onDelete
   }: Props = $props();
 </script>
 
@@ -59,8 +57,10 @@
     onselectionchange={({ nodes }) => onSelectionChange(nodes.map((node) => node.id))}
     onpaneclick={onPaneClick}
     ondelete={(event) => {
-      onDeleteNodes(event.nodes.map((node) => node.id));
-      onDeleteEdges(event.edges.map((edge) => edge.id));
+      onDelete(
+        event.nodes.map((node) => node.id),
+        event.edges.map((edge) => edge.id)
+      );
     }}
     fitView
   >

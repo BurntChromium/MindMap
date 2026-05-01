@@ -11,6 +11,7 @@ vi.stubEnv('MINDMAP_DB_PATH', dbPath);
 let canvasesApi: typeof import('./api/canvases/+server');
 let nodesApi: typeof import('./api/nodes/+server');
 let bulkTagsApi: typeof import('./api/nodes/bulk-tags/+server');
+let graphFragmentsApi: typeof import('./api/graph-fragments/+server');
 let edgesApi: typeof import('./api/edges/+server');
 let searchApi: typeof import('./api/search/+server');
 let db: any;
@@ -22,6 +23,7 @@ beforeAll(async () => {
   canvasesApi = await import('./api/canvases/+server');
   nodesApi = await import('./api/nodes/+server');
   bulkTagsApi = await import('./api/nodes/bulk-tags/+server');
+  graphFragmentsApi = await import('./api/graph-fragments/+server');
   edgesApi = await import('./api/edges/+server');
   searchApi = await import('./api/search/+server');
   db = (await import('$lib/server/db')).db;
@@ -195,6 +197,123 @@ describe('API integration', () => {
 
     const tagRows = db.prepare('SELECT name FROM tags ORDER BY name').all();
     expect(tagRows.map((row: { name: string }) => row.name)).toEqual(['lore', 'npc']);
+  });
+
+  it('pastes copied graph fragments transactionally', async () => {
+    const canvas = await canvasesApi.POST({
+      request: request({ id: 'canvas-1', name: 'Clipboard' })
+    } as any);
+    const { id: canvasId } = await canvas.json();
+
+    await graphFragmentsApi.POST({
+      request: request({
+        action: 'paste',
+        canvasId,
+        nodes: [
+          {
+            id: 'copy-node-1',
+            title: 'Alpha',
+            body: 'Body',
+            tags: ['lore', 'lore'],
+            x: 10,
+            y: 20,
+            collapsed: 0
+          },
+          {
+            id: 'copy-node-2',
+            title: 'Beta',
+            body: '',
+            tags: ['npc'],
+            x: 100,
+            y: 120,
+            collapsed: 1
+          }
+        ],
+        edges: [
+          {
+            id: 'copy-edge-1',
+            source_node_id: 'copy-node-1',
+            target_node_id: 'copy-node-2'
+          }
+        ]
+      })
+    } as any);
+
+    const listed = await nodesApi.GET({
+      url: new URL(`http://localhost/api/nodes?canvasId=${canvasId}`)
+    } as any);
+    const nodes = await listed.json();
+
+    const edgesListed = await edgesApi.GET({
+      url: new URL(`http://localhost/api/edges?canvasId=${canvasId}`)
+    } as any);
+    const edges = await edgesListed.json();
+
+    expect(nodes).toHaveLength(2);
+    expect(nodes[0]).toMatchObject({
+      id: 'copy-node-1',
+      title: 'Alpha',
+      tags: ['lore']
+    });
+    expect(nodes[1]).toMatchObject({
+      id: 'copy-node-2',
+      title: 'Beta',
+      tags: ['npc']
+    });
+    expect(edges).toEqual([
+      expect.objectContaining({
+        id: 'copy-edge-1',
+        source_node_id: 'copy-node-1',
+        target_node_id: 'copy-node-2'
+      })
+    ]);
+  });
+
+  it('deletes nodes and attached edges in one transaction', async () => {
+    const canvas = await canvasesApi.POST({
+      request: request({ id: 'canvas-1', name: 'Delete Graph' })
+    } as any);
+    const { id: canvasId } = await canvas.json();
+
+    const firstNode = await nodesApi.POST({
+      request: request({ id: 'node-1', canvasId, x: 0, y: 0 })
+    } as any);
+    const secondNode = await nodesApi.POST({
+      request: request({ id: 'node-2', canvasId, x: 120, y: 120 })
+    } as any);
+
+    const { id: firstNodeId } = await firstNode.json();
+    const { id: secondNodeId } = await secondNode.json();
+
+    await edgesApi.POST({
+      request: request({
+        id: 'edge-1',
+        canvasId,
+        source: firstNodeId,
+        target: secondNodeId
+      })
+    } as any);
+
+    await graphFragmentsApi.POST({
+      request: request({
+        action: 'delete',
+        nodeIds: [firstNodeId]
+      })
+    } as any);
+
+    const listedNodes = await nodesApi.GET({
+      url: new URL(`http://localhost/api/nodes?canvasId=${canvasId}`)
+    } as any);
+    const nodes = await listedNodes.json();
+
+    const listedEdges = await edgesApi.GET({
+      url: new URL(`http://localhost/api/edges?canvasId=${canvasId}`)
+    } as any);
+    const edges = await listedEdges.json();
+
+    expect(nodes).toHaveLength(1);
+    expect(nodes[0].id).toBe(secondNodeId);
+    expect(edges).toHaveLength(0);
   });
 
   it('searches nodes by keyword and tag', async () => {
