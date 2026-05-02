@@ -41,6 +41,9 @@ This checklist tracks the practical work needed to make the app feel faster unde
 - [ ] Capture a baseline for canvas load time.
 - [ ] Capture a baseline for search/filter latency on the active canvas.
 - [ ] Capture a baseline for large-canvas drag performance.
+- [ ] Run `npm run bench` against the shared fixtures and compare the same scenarios over time.
+- [ ] Use `npm run bench:compare` with a tighter `--budget` when you want a stricter release-candidate gate.
+- [ ] Treat the `cached repeat` and `cold canvas` probes as diagnostic-only, not as release gates.
 - [ ] Re-run the same measurements after each optimization.
 
 ## Notes
