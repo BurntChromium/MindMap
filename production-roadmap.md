@@ -104,7 +104,7 @@ Feature work:
 - undo/redo
 - clearer save indicators when writes are in flight or failed
     - A simple "synced" badge in the canvas could solve this (or "syncing", "synced", "failed" or whatever)
-- stronger keyboard shortcuts
+- ~~stronger keyboard shortcuts~~ (Already done!)
 - better empty, loading, and error states
 
 Plumbing to support it:
