@@ -104,8 +104,7 @@ describe('graphAdapter', () => {
         deletable: false,
         focusable: false,
         zIndex: 0,
-        style:
-          'stroke: var(--accent); stroke-dasharray: 6 5; stroke-width: 2; opacity: 0.7; cursor: pointer;',
+        style: 'stroke-dasharray: 6 5;',
         data: {
           kind: 'associative',
           sourceNodeId: 'node-a',
@@ -135,8 +134,7 @@ describe('graphAdapter', () => {
         deletable: false,
         focusable: false,
         zIndex: 0,
-        style:
-          'stroke: var(--accent); stroke-dasharray: 6 5; stroke-width: 2; opacity: 0.7; cursor: pointer;',
+        style: 'stroke-dasharray: 6 5;',
         data: {
           kind: 'associative',
           sourceNodeId: 'node-a',
@@ -161,8 +159,7 @@ describe('graphAdapter', () => {
         deletable: false,
         focusable: false,
         zIndex: 0,
-        style:
-          'stroke: var(--accent); stroke-dasharray: 6 5; stroke-width: 2; opacity: 0.7; cursor: pointer;',
+        style: 'stroke-dasharray: 6 5;',
         data: {
           kind: 'associative',
           sourceNodeId: 'node-b',
