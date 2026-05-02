@@ -238,4 +238,60 @@ describe('nodeStore', () => {
       })
     );
   });
+
+  it('bulk-updates node positions through the batch endpoint', async () => {
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(
+        jsonResponse([
+          {
+            id: 'node-6',
+            canvas_id: 'canvas-1',
+            title: 'Mover',
+            body: '',
+            tags: [],
+            x: 0,
+            y: 0,
+            collapsed: 0
+          },
+          {
+            id: 'node-7',
+            canvas_id: 'canvas-1',
+            title: 'Other',
+            body: '',
+            tags: [],
+            x: 10,
+            y: 20,
+            collapsed: 0
+          }
+        ])
+      )
+      .mockResolvedValueOnce(jsonResponse({ success: true }));
+
+    await nodeStore.load('canvas-1');
+    await nodeStore.updateNodePositions([
+      { id: 'node-6', x: 48, y: 64 },
+      { id: 'node-7', x: 96, y: 128 }
+    ]);
+
+    expect(snapshot().get('node-6')).toMatchObject({
+      x: 48,
+      y: 64
+    });
+    expect(snapshot().get('node-7')).toMatchObject({
+      x: 96,
+      y: 128
+    });
+    expect(fetch).toHaveBeenLastCalledWith(
+      '/api/nodes/bulk-position',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({
+          nodes: [
+            { id: 'node-6', x: 48, y: 64 },
+            { id: 'node-7', x: 96, y: 128 }
+          ]
+        })
+      })
+    );
+  });
 });

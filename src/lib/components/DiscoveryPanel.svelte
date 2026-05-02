@@ -10,6 +10,7 @@
     selectedNodeCount: number;
     selectedTagSummaries: TagSummary[];
     collapsed: boolean;
+    focusBulkTagInputSignal: number;
     tagSummaries: TagSummary[];
     searchResults: DiscoveryNode[];
     activeFilterLabel: string;
@@ -30,6 +31,7 @@
     selectedNodeCount,
     selectedTagSummaries,
     collapsed = $bindable(false),
+    focusBulkTagInputSignal,
     tagSummaries,
     searchResults,
     activeFilterLabel,
@@ -44,11 +46,30 @@
   }: Props = $props();
 
   let selectedTagInput = $state('');
+  let selectedTagInputRef = $state<HTMLInputElement | undefined>(undefined);
+  let lastFocusBulkTagInputSignal = $state(0);
 
   $effect(() => {
     if (!selectedNodeCount) {
       selectedTagInput = '';
     }
+  });
+
+  $effect(() => {
+    if (!selectedNodeCount) {
+      return;
+    }
+
+    if (focusBulkTagInputSignal === lastFocusBulkTagInputSignal) {
+      return;
+    }
+
+    lastFocusBulkTagInputSignal = focusBulkTagInputSignal;
+    collapsed = false;
+    queueMicrotask(() => {
+      selectedTagInputRef?.focus();
+      selectedTagInputRef?.select();
+    });
   });
 
   function handleAddSelectedTag() {
@@ -160,6 +181,7 @@
           <span>Bulk tag</span>
           <div class="discovery-search-field">
             <input
+              bind:this={selectedTagInputRef}
               bind:value={selectedTagInput}
               class="sidebar-input discovery-search-input"
               placeholder="Add tag to selected nodes"

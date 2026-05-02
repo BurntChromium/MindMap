@@ -3,6 +3,7 @@
   import type { Connection } from '@xyflow/svelte';
   import type { PageData } from './$types';
   import { createClientId } from '$lib/clientId';
+  import type { CanvasStageApi } from '$lib/canvasApi';
   import CanvasSidebar from '$lib/components/CanvasSidebar.svelte';
   import CanvasStage from '$lib/components/CanvasStage.svelte';
   import DiscoveryPanel from '$lib/components/DiscoveryPanel.svelte';
@@ -13,6 +14,7 @@
     getConnectedEdgeIds,
     type ClipboardFragmentV1
   } from '$lib/graph/clipboard';
+  import { getNearestNodeInDirection, type Direction } from '$lib/graph/navigation';
   import { collectTagSummaries, filterDiscoveryNodes } from '$lib/discovery';
   import {
     isCanvasToggleShortcut,
@@ -33,7 +35,8 @@
   } from '$lib/routes/mindmapPage';
   import {
     nodeStore,
-    type Node
+    type Node,
+    type NodePositionUpdate
   } from '$lib/stores/nodeStore';
   import { nodeUiStore } from '$lib/stores/nodeUiStore';
   import { clipboardStore } from '$lib/stores/clipboardStore';
@@ -50,6 +53,7 @@
   let storeClipboardFragment = $state<ClipboardFragmentV1 | null>(null);
   let storeClipboardPasteCount = $state(0);
   let duplicateCount = $state(0);
+  let bulkTagFocusSignal = $state(0);
   let searchQuery = $state('');
   let activeTag = $state<string | null>(null);
   let focusedNodeId = $state<string | null>(null);
@@ -58,6 +62,8 @@
   let discoveryCollapsed = $state(false);
   let loadedCanvasId = $state<string | null>(null);
   let initialHydrationDone = $state(false);
+  let canvasStageApi = $state<CanvasStageApi | null>(null);
+  let nodeMoveQueue = Promise.resolve();
   let canvasShell: HTMLDivElement | undefined;
 
   const initialCanvases = $derived.by(() => data.canvases);
@@ -99,7 +105,9 @@
     edgeStore.hydrate(initialEdges, initialActiveCanvasId);
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (isTextInputElement(document.activeElement)) {
+      const activeElement = document.activeElement;
+
+      if (isTextInputElement(activeElement)) {
         return;
       }
 
@@ -135,19 +143,23 @@
         }
       }
 
+      if (
+        event.key.toLowerCase() === 'a' &&
+        (event.metaKey || event.ctrlKey) &&
+        !event.altKey
+      ) {
+        event.preventDefault();
+        selectAllNodes();
+        return;
+      }
+
       if (isCreateNodeShortcut(event)) {
-        if (shouldBlockCreateNodeShortcut(document.activeElement, canvasShell, document.body)) {
+        if (shouldBlockCreateNodeShortcut(activeElement, canvasShell, document.body)) {
           return;
         }
 
         event.preventDefault();
         addNode();
-        return;
-      }
-
-      if (event.key.toLowerCase() === 'a' && (event.metaKey || event.ctrlKey) && !event.altKey) {
-        event.preventDefault();
-        selectAllNodes();
         return;
       }
 
@@ -160,6 +172,68 @@
       if (isDiscoveryToggleShortcut(event)) {
         event.preventDefault();
         toggleDiscoveryPanel();
+        return;
+      }
+
+      if (
+        !canvasShell ||
+        !(activeElement instanceof HTMLElement) ||
+        !canvasShell.contains(activeElement)
+      ) {
+        return;
+      }
+
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        clearSelection();
+        return;
+      }
+
+      if (event.key === 'Tab') {
+        event.preventDefault();
+        cycleFocusedNode(event.shiftKey);
+        return;
+      }
+
+      if (event.key === ' ') {
+        event.preventDefault();
+        toggleFocusedNodeSelection();
+        return;
+      }
+
+      const direction = getCanvasDirectionFromKey(event.key);
+
+      if (direction) {
+        if (event.altKey && !event.metaKey && !event.ctrlKey) {
+          event.preventDefault();
+          focusNearestNode(direction, event.shiftKey);
+          return;
+        }
+
+        if (event.metaKey || event.ctrlKey || event.altKey) {
+          return;
+        }
+
+        event.preventDefault();
+        const isArrowKey = event.key.startsWith('Arrow');
+
+        if (isArrowKey && event.shiftKey) {
+          moveSelectedNodes(direction, true);
+          return;
+        }
+
+        if (isArrowKey) {
+          moveSelectedNodes(direction, false);
+          return;
+        }
+
+        panCanvas(direction);
+        return;
+      }
+
+      if (event.key.toLowerCase() === 't') {
+        event.preventDefault();
+        focusBulkTagEditor();
       }
     };
 
@@ -275,6 +349,181 @@
 
   function toggleDiscoveryPanel() {
     discoveryCollapsed = !discoveryCollapsed;
+  }
+
+  function getCanvasDirectionFromKey(key: string): Direction | null {
+    switch (key.toLowerCase()) {
+      case 'arrowleft':
+      case 'h':
+        return 'left';
+      case 'arrowright':
+      case 'l':
+        return 'right';
+      case 'arrowup':
+      case 'k':
+        return 'up';
+      case 'arrowdown':
+      case 'j':
+        return 'down';
+      default:
+        return null;
+    }
+  }
+
+  function getCanvasZoom() {
+    return canvasStageApi?.getViewport().zoom ?? 1;
+  }
+
+  function getSelectionNodeIds() {
+    if (selectedNodeIds.length > 0) {
+      return selectedNodeIds;
+    }
+
+    return focusedNodeId ? [focusedNodeId] : [];
+  }
+
+  function getSelectionNodes() {
+    const selectedIds = new Set(getSelectionNodeIds());
+    return nodes.filter((node) => selectedIds.has(node.id));
+  }
+
+  function queueNodePositionUpdates(updates: NodePositionUpdate[]) {
+    nodeMoveQueue = nodeMoveQueue
+      .then(() => nodeStore.updateNodePositions(updates))
+      .catch((error) => {
+        console.error(error);
+      });
+  }
+
+  function moveSelectedNodes(direction: Direction, accelerate = false) {
+    const nodesToMove = getSelectionNodes();
+
+    if (!nodesToMove.length) {
+      return;
+    }
+
+    const zoom = getCanvasZoom();
+    const baseStep = accelerate ? 72 : 24;
+    const flowStep = baseStep / zoom;
+    const delta =
+      direction === 'left'
+        ? { x: -flowStep, y: 0 }
+        : direction === 'right'
+          ? { x: flowStep, y: 0 }
+          : direction === 'up'
+            ? { x: 0, y: -flowStep }
+            : { x: 0, y: flowStep };
+
+    queueNodePositionUpdates(
+      nodesToMove.map((node) => ({
+        id: node.id,
+        x: node.x + delta.x,
+        y: node.y + delta.y
+      }))
+    );
+  }
+
+  function panCanvas(direction: Direction) {
+    if (!canvasStageApi) {
+      return;
+    }
+
+    const viewport = canvasStageApi.getViewport();
+    const flowStep = 160 / viewport.zoom;
+    const nextViewport =
+      direction === 'left'
+        ? { ...viewport, x: viewport.x + flowStep }
+        : direction === 'right'
+          ? { ...viewport, x: viewport.x - flowStep }
+          : direction === 'up'
+            ? { ...viewport, y: viewport.y + flowStep }
+            : { ...viewport, y: viewport.y - flowStep };
+
+    void canvasStageApi.setViewport(nextViewport);
+  }
+
+  function focusNearestNode(direction: Direction, extendSelection = false) {
+    const originNodeId = focusedNodeId ?? selectedNodeIds[0] ?? null;
+
+    if (!originNodeId) {
+      return;
+    }
+
+    const nextNodeId = getNearestNodeInDirection(nodes, originNodeId, direction);
+
+    if (!nextNodeId) {
+      return;
+    }
+
+    focusedNodeId = nextNodeId;
+
+    if (extendSelection) {
+      selectionStore.setSelection([...selectedNodeIds, nextNodeId]);
+    } else {
+      selectionStore.selectNode(nextNodeId);
+    }
+
+    const nextNode = nodes.find((node) => node.id === nextNodeId);
+
+    if (nextNode && canvasStageApi) {
+      const currentZoom = canvasStageApi.getViewport().zoom;
+      void canvasStageApi.setCenter(nextNode.x, nextNode.y, { zoom: currentZoom });
+    }
+  }
+
+  function cycleFocusedNode(reverse = false) {
+    const useFilteredNodes = searchQuery.trim() || activeTag;
+    const candidates = useFilteredNodes ? searchResults : nodes;
+
+    if (!candidates.length) {
+      return;
+    }
+
+    const candidateIds = candidates.map((node) => node.id);
+    const currentNodeId =
+      (focusedNodeId && candidateIds.includes(focusedNodeId) ? focusedNodeId : null) ??
+      selectedNodeIds.find((id) => candidateIds.includes(id)) ??
+      null;
+    const currentIndex = currentNodeId ? candidateIds.indexOf(currentNodeId) : -1;
+    const nextIndex =
+      currentIndex === -1
+        ? reverse
+          ? candidateIds.length - 1
+          : 0
+        : (currentIndex + (reverse ? -1 : 1) + candidateIds.length) % candidateIds.length;
+    const nextNodeId = candidateIds[nextIndex];
+    const nextNode = nodes.find((node) => node.id === nextNodeId);
+
+    if (!nextNode) {
+      return;
+    }
+
+    focusedNodeId = nextNodeId;
+    selectionStore.selectNode(nextNodeId);
+
+    if (canvasStageApi) {
+      const currentZoom = canvasStageApi.getViewport().zoom;
+      void canvasStageApi.setCenter(nextNode.x, nextNode.y, { zoom: currentZoom });
+    }
+  }
+
+  function toggleFocusedNodeSelection() {
+    const nodeId = focusedNodeId ?? selectedNodeIds[0] ?? null;
+
+    if (!nodeId) {
+      return;
+    }
+
+    selectionStore.toggleNode(nodeId);
+  }
+
+  function focusBulkTagEditor() {
+    if (!selectedNodeIds.length) {
+      return;
+    }
+
+    discoveryCollapsed = false;
+    bulkTagFocusSignal += 1;
   }
 
   function copySelection() {
@@ -450,7 +699,7 @@
   }
 
   function handlePaneClick() {
-    selectionStore.clear();
+    clearSelection();
   }
 
   function addTagToSelection(tag: string) {
@@ -475,6 +724,7 @@
 
   function clearSelection() {
     selectionStore.clear();
+    focusedNodeId = null;
   }
 
   async function pasteClipboardFragment() {
@@ -518,6 +768,9 @@
         onSelectionChange={handleSelectionChange}
         onPaneClick={handlePaneClick}
         onDelete={deleteGraphSelection}
+        onApiReady={(api) => {
+          canvasStageApi = api;
+        }}
       />
     </div>
 
@@ -527,6 +780,7 @@
       activeTag={activeTag}
       focusedNodeId={focusedNodeId}
       selectedNodeCount={selectedNodeIds.length}
+      focusBulkTagInputSignal={bulkTagFocusSignal}
       selectedTagSummaries={selectedTagSummaries}
       tagSummaries={tagSummaries}
       searchResults={searchResults}

@@ -17,6 +17,12 @@ export type NodeTagUpdate = {
   tags: string[];
 };
 
+export type NodePositionUpdate = {
+  id: string;
+  x: number;
+  y: number;
+};
+
 function createNodeStore() {
   const store = writable<{
     nodes: Map<string, Node>;
@@ -243,6 +249,57 @@ function createNodeStore() {
 
         if (!response.ok) {
           throw new Error(`Bulk tag update failed with ${response.status}`);
+        }
+      } catch (error) {
+        set(previous);
+        syncCache(previous);
+        console.error(error);
+        return;
+      }
+
+      syncCache();
+    },
+
+    async updateNodePositions(updates: NodePositionUpdate[]) {
+      if (!updates.length) {
+        return;
+      }
+
+      const previous = snapshotState();
+      const nextPositionsById = new Map(updates.map((update) => [update.id, { x: update.x, y: update.y }]));
+
+      update((state) => {
+        for (const [id, position] of nextPositionsById) {
+          const existing = state.nodes.get(id);
+
+          if (existing) {
+            state.nodes.set(id, {
+              ...existing,
+              x: position.x,
+              y: position.y
+            });
+          }
+        }
+
+        return state;
+      });
+      syncCache();
+
+      try {
+        const response = await fetch('/api/nodes/bulk-position', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            nodes: updates.map((update) => ({
+              id: update.id,
+              x: update.x,
+              y: update.y
+            }))
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error(`Bulk node position update failed with ${response.status}`);
         }
       } catch (error) {
         set(previous);

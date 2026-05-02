@@ -11,6 +11,7 @@ vi.stubEnv('MINDMAP_DB_PATH', dbPath);
 let canvasesApi: typeof import('./api/canvases/+server');
 let nodesApi: typeof import('./api/nodes/+server');
 let bulkTagsApi: typeof import('./api/nodes/bulk-tags/+server');
+let bulkPositionApi: typeof import('./api/nodes/bulk-position/+server');
 let graphFragmentsApi: typeof import('./api/graph-fragments/+server');
 let edgesApi: typeof import('./api/edges/+server');
 let searchApi: typeof import('./api/search/+server');
@@ -23,6 +24,7 @@ beforeAll(async () => {
   canvasesApi = await import('./api/canvases/+server');
   nodesApi = await import('./api/nodes/+server');
   bulkTagsApi = await import('./api/nodes/bulk-tags/+server');
+  bulkPositionApi = await import('./api/nodes/bulk-position/+server');
   graphFragmentsApi = await import('./api/graph-fragments/+server');
   edgesApi = await import('./api/edges/+server');
   searchApi = await import('./api/search/+server');
@@ -197,6 +199,50 @@ describe('API integration', () => {
 
     const tagRows = db.prepare('SELECT name FROM tags ORDER BY name').all();
     expect(tagRows.map((row: { name: string }) => row.name)).toEqual(['lore', 'npc']);
+  });
+
+  it('bulk-updates node positions transactionally across selected nodes', async () => {
+    const canvas = await canvasesApi.POST({
+      request: request({ id: 'canvas-1', name: 'Bulk Positions' })
+    } as any);
+    const { id: canvasId } = await canvas.json();
+
+    const firstNode = await nodesApi.POST({
+      request: request({ id: 'node-1', canvasId, x: 0, y: 0 })
+    } as any);
+    const secondNode = await nodesApi.POST({
+      request: request({ id: 'node-2', canvasId, x: 120, y: 120 })
+    } as any);
+
+    const { id: firstNodeId } = await firstNode.json();
+    const { id: secondNodeId } = await secondNode.json();
+
+    await bulkPositionApi.POST({
+      request: request({
+        nodes: [
+          { id: firstNodeId, x: 48, y: 64 },
+          { id: secondNodeId, x: 96, y: 128 }
+        ]
+      })
+    } as any);
+
+    const listed = await nodesApi.GET({
+      url: new URL(`http://localhost/api/nodes?canvasId=${canvasId}`)
+    } as any);
+    const nodes = await listed.json();
+
+    expect(nodes).toEqual([
+      expect.objectContaining({
+        id: firstNodeId,
+        x: 48,
+        y: 64
+      }),
+      expect.objectContaining({
+        id: secondNodeId,
+        x: 96,
+        y: 128
+      })
+    ]);
   });
 
   it('pastes copied graph fragments transactionally', async () => {

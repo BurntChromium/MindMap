@@ -55,6 +55,14 @@ export function shouldBlockCreateNodeShortcut(
   canvasShell: HTMLElement | undefined,
   bodyElement: HTMLElement | null = null
 ) {
+  return shouldBlockCanvasInteractionShortcut(activeElement, canvasShell, bodyElement);
+}
+
+export function shouldBlockCanvasInteractionShortcut(
+  activeElement: Element | null,
+  canvasShell: HTMLElement | undefined,
+  bodyElement: HTMLElement | null = null
+) {
   const isHTMLElementAvailable = typeof HTMLElement !== 'undefined';
 
   return (

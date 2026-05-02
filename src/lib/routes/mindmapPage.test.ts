@@ -5,6 +5,7 @@ import {
   getActiveFilterLabel,
   getSearchHitIds,
   shouldBlockCreateNodeShortcut,
+  shouldBlockCanvasInteractionShortcut,
   shouldClearFocusedNode,
   shouldCommitCanvasRename,
   toggleActiveTagFilter
@@ -129,6 +130,21 @@ describe('mindmapPage helpers', () => {
     expect(shouldBlockCreateNodeShortcut(outside as unknown as Element, canvasShell, null)).toBe(
       true
     );
+  });
+
+  it('blocks canvas interactions when focus is outside the canvas shell', () => {
+    const inside = new TestHTMLElement();
+    const outside = new TestHTMLElement();
+    const canvasShell = {
+      contains: (node: unknown) => node === inside
+    } as HTMLElement;
+
+    expect(
+      shouldBlockCanvasInteractionShortcut(inside as unknown as Element, canvasShell, null)
+    ).toBe(false);
+    expect(
+      shouldBlockCanvasInteractionShortcut(outside as unknown as Element, canvasShell, null)
+    ).toBe(true);
   });
 
   it('skips canvas rename on blur into row actions', () => {

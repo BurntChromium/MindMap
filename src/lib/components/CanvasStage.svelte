@@ -2,6 +2,8 @@
   import { SvelteFlow, Background, Controls, type Connection } from '@xyflow/svelte';
   import { Plus } from 'lucide-svelte';
   import CustomNode from '$lib/components/CustomNode.svelte';
+  import CanvasStageApiBridge from '$lib/components/CanvasStageApiBridge.svelte';
+  import type { CanvasStageApi } from '$lib/canvasApi';
   import { handleNodeDragStop } from '$lib/graph/graphAdapter';
 
   const nodeTypes = {
@@ -17,6 +19,7 @@
     onSelectionChange: (nodeIds: string[]) => void;
     onPaneClick: () => void;
     onDelete: (nodeIds: string[], edgeIds: string[]) => void | Promise<void>;
+    onApiReady: (api: CanvasStageApi | null) => void;
   }
 
   let {
@@ -27,7 +30,8 @@
     onNodeClick,
     onSelectionChange,
     onPaneClick,
-    onDelete
+    onDelete,
+    onApiReady
   }: Props = $props();
 </script>
 
@@ -64,6 +68,7 @@
     }}
     fitView
   >
+    <CanvasStageApiBridge {onApiReady} />
     <Background />
     <Controls />
   </SvelteFlow>
