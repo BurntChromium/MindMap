@@ -44,6 +44,7 @@
   import { nodeUiStore } from '$lib/stores/nodeUiStore';
   import { clipboardStore } from '$lib/stores/clipboardStore';
   import { toFlowEdges, toFlowNodes } from '$lib/graph/graphAdapter';
+  import { buildAssociativeFlowEdges } from '$lib/graph/associativeEdges';
   import { selectionStore } from '$lib/stores/selectionStore';
   import {
     buildEntityInspectorEntries,
@@ -70,6 +71,7 @@
   let activeTag = $state<string | null>(null);
   let activePanelTab = $state<'search' | 'tags' | 'entities'>('search');
   let activeEntityId = $state<string | null>(null);
+  let activeAssociativeEdgeId = $state<string | null>(null);
   let focusedNodeId = $state<string | null>(null);
   let editingNodeId = $state<string | null>(null);
   let sidebarCollapsed = $state(false);
@@ -111,6 +113,9 @@
   const entityInspectorEntries = $derived(
     buildEntityInspectorEntries(entities, entityMentions, nodes)
   );
+  const associativeFlowEdges = $derived(
+    buildAssociativeFlowEdges(nodes, entities, entityMentions)
+  );
   const flowNodes = $derived(
     toFlowNodes(nodes, {
       editingNodeId,
@@ -123,7 +128,12 @@
       onEntityClick: focusEntityReference
     })
   );
-  const flowEdges = $derived(toFlowEdges(edges));
+  const flowEdges = $derived(toFlowEdges(edges, associativeFlowEdges));
+  const activeAssociativeEdge = $derived(
+    activeAssociativeEdgeId
+      ? associativeFlowEdges.find((edge) => edge.id === activeAssociativeEdgeId) ?? null
+      : null
+  );
   const activeFilterLabel = $derived(getActiveFilterLabel(searchQuery, activeTag));
   const canvasStatusLabel = $derived(
     mutationPhase === 'loading'
@@ -396,6 +406,16 @@
     }
   });
 
+  $effect(() => {
+    if (!activeAssociativeEdgeId) {
+      return;
+    }
+
+    if (!associativeFlowEdges.some((edge) => edge.id === activeAssociativeEdgeId)) {
+      activeAssociativeEdgeId = null;
+    }
+  });
+
   function addNode() {
     if (!activeCanvasId) return;
 
@@ -453,6 +473,7 @@
   function focusNode(nodeId: string, options: { select?: boolean } = {}) {
     const { select = true } = options;
     focusedNodeId = nodeId;
+    activeAssociativeEdgeId = null;
 
     if (select) {
       selectionStore.selectNode(nodeId);
@@ -478,6 +499,7 @@
     discoveryCollapsed = false;
     activePanelTab = 'entities';
     activeEntityId = entry.id;
+    activeAssociativeEdgeId = null;
 
     if (entry.primaryNode) {
       focusNode(entry.primaryNode.id, { select: false });
@@ -488,6 +510,19 @@
 
   function toggleDiscoveryPanel() {
     discoveryCollapsed = !discoveryCollapsed;
+  }
+
+  function inspectAssociativeEdge(edgeId: string) {
+    const edge = associativeFlowEdges.find((candidate) => candidate.id === edgeId);
+
+    if (!edge) {
+      return;
+    }
+
+    discoveryCollapsed = false;
+    activePanelTab = 'entities';
+    activeEntityId = null;
+    activeAssociativeEdgeId = activeAssociativeEdgeId === edgeId ? null : edgeId;
   }
 
   function getCanvasDirectionFromKey(key: string): Direction | null {
@@ -935,6 +970,7 @@
   function clearSelection() {
     selectionStore.clear();
     focusedNodeId = null;
+    activeAssociativeEdgeId = null;
   }
 
   async function pasteClipboardFragment() {
@@ -956,6 +992,7 @@
   }
 
   async function loadActiveCanvas(canvasId: string) {
+    activeAssociativeEdgeId = null;
     await Promise.all([
       nodeStore.load(canvasId),
       edgeStore.load(canvasId),
@@ -989,6 +1026,9 @@
           }
 
           focusNode(nodeId);
+        }}
+        onEdgeClick={(edgeId) => {
+          inspectAssociativeEdge(edgeId);
         }}
         onSelectionChange={handleSelectionChange}
         onPaneClick={handlePaneClick}
@@ -1083,10 +1123,15 @@
       searchResults={searchResults}
       activeFilterLabel={activeFilterLabel}
       entityEntries={entityInspectorEntries}
+      activeAssociativeEdge={activeAssociativeEdge}
       onToggleTagFilter={toggleTagFilter}
       onClearFilters={clearDiscoveryFilters}
       onFocusSearchResult={focusSearchResult}
       onFocusEntityNode={focusNode}
+      onFocusEntityTitle={focusEntityReference}
+      onClearAssociativeEdge={() => {
+        activeAssociativeEdgeId = null;
+      }}
       onAddSelectedTag={addTagToSelection}
       onRemoveSelectedTag={removeTagFromSelection}
       onDuplicateSelection={duplicateSelection}

@@ -16,6 +16,7 @@
     onAddNode: () => void;
     onConnect: (connection: Connection) => void;
     onNodeClick: (nodeId: string, shiftKey: boolean) => void;
+    onEdgeClick: (edgeId: string) => void;
     onSelectionChange: (nodeIds: string[]) => void;
     onPaneClick: () => void;
     onDelete: (nodeIds: string[], edgeIds: string[]) => void | Promise<void>;
@@ -28,6 +29,7 @@
     onAddNode,
     onConnect,
     onNodeClick,
+    onEdgeClick,
     onSelectionChange,
     onPaneClick,
     onDelete,
@@ -59,6 +61,13 @@
     onconnect={onConnect}
     onnodedragstop={handleNodeDragStop}
     onnodeclick={(event) => onNodeClick(event.node.id, event.event.shiftKey)}
+    onedgeclick={({ edge }) => {
+      if (edge.data?.kind !== 'associative') {
+        return;
+      }
+
+      onEdgeClick(edge.id);
+    }}
     onselectionchange={({ nodes }) => onSelectionChange(nodes.map((node) => node.id))}
     onpaneclick={onPaneClick}
     ondelete={(event) => {

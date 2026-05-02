@@ -3,6 +3,7 @@
   import type { DiscoveryNode, TagSummary } from '$lib/discovery';
   import { formatTagLabel } from '$lib/tagUtils';
   import type { EntityInspectorEntry } from '$lib/entityInspector';
+  import type { AssociativeFlowEdge } from '$lib/graph/associativeEdges';
 
   type PanelTab = 'search' | 'tags' | 'entities';
 
@@ -18,12 +19,15 @@
     searchResults: DiscoveryNode[];
     activeFilterLabel: string;
     entityEntries: EntityInspectorEntry[];
+    activeAssociativeEdge: AssociativeFlowEdge | null;
     activeTab: PanelTab;
     activeEntityId: string | null;
     onToggleTagFilter: (tag: string) => void;
     onClearFilters: () => void;
     onFocusSearchResult: (nodeId: string) => void;
     onFocusEntityNode: (nodeId: string) => void;
+    onFocusEntityTitle: (title: string) => void;
+    onClearAssociativeEdge: () => void;
     onAddSelectedTag: (tag: string) => void;
     onRemoveSelectedTag: (tag: string) => void;
     onDuplicateSelection: () => void;
@@ -44,12 +48,15 @@
     searchResults,
     activeFilterLabel,
     entityEntries,
+    activeAssociativeEdge,
     activeTab = $bindable<PanelTab>('search'),
     activeEntityId = $bindable<string | null>(null),
     onToggleTagFilter,
     onClearFilters,
     onFocusSearchResult,
     onFocusEntityNode,
+    onFocusEntityTitle,
+    onClearAssociativeEdge,
     onAddSelectedTag,
     onRemoveSelectedTag,
     onDuplicateSelection,
@@ -109,6 +116,13 @@
 
     const noun = entry.sourceNodeCount === 1 ? 'node' : 'nodes';
     return `${entry.mentionCount} mentions across ${entry.sourceNodeCount} ${noun}`;
+  }
+
+  function getAssociativeEdgeSummary(edge: AssociativeFlowEdge) {
+    const sharedCount = edge.data.sharedEntities.length;
+    const noun = sharedCount === 1 ? 'entity' : 'entities';
+
+    return `${sharedCount} shared ${noun}`;
   }
 </script>
 
@@ -330,6 +344,75 @@
             <h4>Entities</h4>
             <span>{entityEntries.length} total</span>
           </div>
+
+          {#if activeAssociativeEdge}
+            <article class="entity-edge-card">
+              <div class="entity-card__section-header">
+                <h5>Associative edge</h5>
+                <button
+                  class="icon-button entity-edge-card__clear"
+                  type="button"
+                  aria-label="Clear associative edge inspection"
+                  title="Clear associative edge inspection"
+                  onclick={onClearAssociativeEdge}
+                >
+                  <X size={12} aria-hidden="true" />
+                </button>
+              </div>
+
+              <div class="entity-edge-card__summary">
+                <span class="entity-edge-card__title">
+                  {activeAssociativeEdge.data.sourceNodeTitle || activeAssociativeEdge.data.sourceNodeId}
+                  →
+                  {activeAssociativeEdge.data.targetNodeTitle || activeAssociativeEdge.data.targetNodeId}
+                </span>
+                <span class="entity-edge-card__meta">
+                  {getAssociativeEdgeSummary(activeAssociativeEdge)}
+                </span>
+              </div>
+
+              <div class="entity-card__section">
+                <h5>Endpoint nodes</h5>
+                <div class="entity-node-list">
+                  <button
+                    type="button"
+                    class="entity-node"
+                    onclick={() => onFocusEntityNode(activeAssociativeEdge.data.sourceNodeId)}
+                  >
+                    <span class="entity-node__title">
+                      {activeAssociativeEdge.data.sourceNodeTitle || activeAssociativeEdge.data.sourceNodeId}
+                    </span>
+                    <span class="entity-node__meta">Source</span>
+                  </button>
+                  <button
+                    type="button"
+                    class="entity-node"
+                    onclick={() => onFocusEntityNode(activeAssociativeEdge.data.targetNodeId)}
+                  >
+                    <span class="entity-node__title">
+                      {activeAssociativeEdge.data.targetNodeTitle || activeAssociativeEdge.data.targetNodeId}
+                    </span>
+                    <span class="entity-node__meta">Target</span>
+                  </button>
+                </div>
+              </div>
+
+              <div class="entity-card__section">
+                <h5>Shared entities</h5>
+                <div class="entity-edge-chip-list">
+                  {#each activeAssociativeEdge.data.sharedEntities as entity}
+                    <button
+                      type="button"
+                      class="entity-edge-chip"
+                      onclick={() => onFocusEntityTitle(entity.title)}
+                    >
+                      <span>{entity.title}</span>
+                    </button>
+                  {/each}
+                </div>
+              </div>
+            </article>
+          {/if}
 
           {#if entityEntries.length}
             <div class="entity-list">
@@ -729,6 +812,33 @@
     gap: 0.75rem;
   }
 
+  .entity-edge-card {
+    border: 1px solid var(--border-color);
+    border-radius: 0.85rem;
+    background: color-mix(in srgb, var(--surface) 82%, var(--accent) 4%);
+    padding: 0.75rem;
+    display: grid;
+    gap: 0.7rem;
+  }
+
+  .entity-edge-card__clear {
+    margin-left: auto;
+  }
+
+  .entity-edge-card__summary {
+    display: grid;
+    gap: 0.2rem;
+  }
+
+  .entity-edge-card__title {
+    font-weight: 600;
+  }
+
+  .entity-edge-card__meta {
+    color: var(--text-muted);
+    font-size: 0.82rem;
+  }
+
   .entity-card__section {
     display: grid;
     gap: 0.5rem;
@@ -771,6 +881,23 @@
     color: var(--text-muted);
     font-size: 0.8rem;
     line-height: 1.35;
+  }
+
+  .entity-edge-chip-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+  }
+
+  .entity-edge-chip {
+    border: 1px solid var(--border-color);
+    border-radius: 999px;
+    padding: 0.35rem 0.65rem;
+    background: var(--surface);
+    color: var(--text-main);
+    font-size: 0.8rem;
+    line-height: 1;
+    text-align: left;
   }
 
   .panel-selection-actions {

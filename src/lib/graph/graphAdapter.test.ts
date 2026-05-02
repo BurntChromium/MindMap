@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { buildAssociativeFlowEdges } from './associativeEdges';
 
 vi.mock('$lib/stores/nodeStore', () => ({
   nodeStore: {
@@ -65,6 +66,138 @@ describe('graphAdapter', () => {
     ]);
   });
 
+  it('builds associative flow edges with shared entity metadata', () => {
+    const associativeEdges = buildAssociativeFlowEdges(
+      [
+        { id: 'node-a', title: 'A' },
+        { id: 'node-b', title: 'B' },
+        { id: 'node-c', title: 'C' }
+      ],
+      [
+        {
+          id: 'entity-smaug',
+          title: 'Smaug',
+          title_key: 'smaug',
+          primary_node_id: 'node-a'
+        },
+        {
+          id: 'entity-bilbo',
+          title: 'Bilbo',
+          title_key: 'bilbo',
+          primary_node_id: 'node-b'
+        }
+      ],
+      [
+        { entity_id: 'entity-smaug', node_id: 'node-b' },
+        { entity_id: 'entity-smaug', node_id: 'node-c' },
+        { entity_id: 'entity-bilbo', node_id: 'node-a' }
+      ]
+    );
+
+    expect(associativeEdges).toEqual([
+      {
+        id: 'assoc:node-a:node-b',
+        source: 'node-a',
+        target: 'node-b',
+        type: 'smoothstep',
+        selectable: false,
+        deletable: false,
+        focusable: false,
+        zIndex: 0,
+        style:
+          'stroke: var(--accent); stroke-dasharray: 6 5; stroke-width: 2; opacity: 0.7; cursor: pointer;',
+        data: {
+          kind: 'associative',
+          sourceNodeId: 'node-a',
+          targetNodeId: 'node-b',
+          sourceNodeTitle: 'A',
+          targetNodeTitle: 'B',
+          sharedEntities: [
+            {
+              id: 'entity-bilbo',
+              title: 'Bilbo',
+              titleKey: 'bilbo'
+            },
+            {
+              id: 'entity-smaug',
+              title: 'Smaug',
+              titleKey: 'smaug'
+            }
+          ]
+        }
+      },
+      {
+        id: 'assoc:node-a:node-c',
+        source: 'node-a',
+        target: 'node-c',
+        type: 'smoothstep',
+        selectable: false,
+        deletable: false,
+        focusable: false,
+        zIndex: 0,
+        style:
+          'stroke: var(--accent); stroke-dasharray: 6 5; stroke-width: 2; opacity: 0.7; cursor: pointer;',
+        data: {
+          kind: 'associative',
+          sourceNodeId: 'node-a',
+          targetNodeId: 'node-c',
+          sourceNodeTitle: 'A',
+          targetNodeTitle: 'C',
+          sharedEntities: [
+            {
+              id: 'entity-smaug',
+              title: 'Smaug',
+              titleKey: 'smaug'
+            }
+          ]
+        }
+      },
+      {
+        id: 'assoc:node-b:node-c',
+        source: 'node-b',
+        target: 'node-c',
+        type: 'smoothstep',
+        selectable: false,
+        deletable: false,
+        focusable: false,
+        zIndex: 0,
+        style:
+          'stroke: var(--accent); stroke-dasharray: 6 5; stroke-width: 2; opacity: 0.7; cursor: pointer;',
+        data: {
+          kind: 'associative',
+          sourceNodeId: 'node-b',
+          targetNodeId: 'node-c',
+          sourceNodeTitle: 'B',
+          targetNodeTitle: 'C',
+          sharedEntities: [
+            {
+              id: 'entity-smaug',
+              title: 'Smaug',
+              titleKey: 'smaug'
+            }
+          ]
+        }
+      }
+    ]);
+  });
+
+  it('skips entities that do not connect more than one node', () => {
+    const associativeEdges = buildAssociativeFlowEdges(
+      [{ id: 'node-a', title: 'A' }],
+      [
+        {
+          id: 'entity-smaug',
+          title: 'Smaug',
+          title_key: 'smaug',
+          primary_node_id: 'node-a'
+        }
+      ],
+      []
+    );
+
+    expect(associativeEdges).toEqual([]);
+  });
+
   it('reuses unchanged flow nodes and edges across repeated projections', () => {
     const nodes = [
       {
@@ -103,5 +236,43 @@ describe('graphAdapter', () => {
 
     expect(secondNodes[0]).toBe(firstNodes[0]);
     expect(secondEdges[0]).toBe(firstEdges[0]);
+    expect(firstEdges[0]).toMatchObject({
+      id: 'edge-1',
+      source: '1',
+      target: '2',
+      zIndex: 1
+    });
+  });
+
+  it('reuses associative flow edges across repeated projections', () => {
+    const associativeEdges = buildAssociativeFlowEdges(
+      [
+        { id: 'node-a', title: 'A' },
+        { id: 'node-b', title: 'B' }
+      ],
+      [
+        {
+          id: 'entity-smaug',
+          title: 'Smaug',
+          title_key: 'smaug',
+          primary_node_id: 'node-a'
+        }
+      ],
+      [{ entity_id: 'entity-smaug', node_id: 'node-b' }]
+    );
+
+    const firstEdges = toFlowEdges([], associativeEdges);
+    const secondEdges = toFlowEdges([], associativeEdges);
+
+    expect(secondEdges[0]).toBe(firstEdges[0]);
+    expect(firstEdges[0]).toMatchObject({
+      id: 'assoc:node-a:node-b',
+      source: 'node-a',
+      target: 'node-b',
+      type: 'smoothstep',
+      selectable: false,
+      deletable: false,
+      focusable: false
+    });
   });
 });

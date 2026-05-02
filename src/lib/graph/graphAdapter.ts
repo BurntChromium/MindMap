@@ -1,5 +1,6 @@
 import { nodeStore, type Node as AppNode } from '$lib/stores/nodeStore';
 import { type Edge as AppEdge } from '$lib/stores/edgeStore';
+import type { AssociativeFlowEdge } from '$lib/graph/associativeEdges';
 import { getTagColor } from '$lib/tagColors';
 
 export type FlowNodeOptions = {
@@ -14,7 +15,18 @@ export type FlowNodeOptions = {
 };
 
 type FlowNode = ReturnType<typeof buildFlowNode>;
-type FlowEdge = ReturnType<typeof buildFlowEdge>;
+type FlowEdge = {
+  id: string;
+  source: string;
+  target: string;
+  type?: string;
+  selectable?: boolean;
+  deletable?: boolean;
+  focusable?: boolean;
+  zIndex?: number;
+  style?: string;
+  data?: Record<string, unknown>;
+};
 
 type CachedFlowNode = {
   id: string;
@@ -36,8 +48,7 @@ type CachedFlowNode = {
 };
 
 type CachedFlowEdge = {
-  source: string;
-  target: string;
+  signature: string;
   edge: FlowEdge;
 };
 
@@ -79,12 +90,36 @@ function buildFlowNode(
   };
 }
 
-function buildFlowEdge(edge: AppEdge) {
+type FlowEdgeInput = AppEdge | AssociativeFlowEdge;
+
+function buildFlowEdge(edge: FlowEdgeInput): FlowEdge {
+  if ('data' in edge) {
+    return {
+      ...edge
+    };
+  }
+
   return {
     id: edge.id,
     source: edge.source_node_id,
-    target: edge.target_node_id
+    target: edge.target_node_id,
+    zIndex: 1
   };
+}
+
+function buildFlowEdgeSignature(edge: FlowEdge) {
+  return JSON.stringify({
+    id: edge.id,
+    source: edge.source,
+    target: edge.target,
+    type: edge.type ?? null,
+    selectable: edge.selectable ?? null,
+    deletable: edge.deletable ?? null,
+    focusable: edge.focusable ?? null,
+    zIndex: edge.zIndex ?? null,
+    style: edge.style ?? null,
+    data: edge.data ?? null
+  });
 }
 
 export function toFlowNodes(nodes: AppNode[], options: FlowNodeOptions) {
@@ -176,26 +211,26 @@ export function toFlowNodes(nodes: AppNode[], options: FlowNodeOptions) {
   return flowNodes;
 }
 
-export function toFlowEdges(edges: AppEdge[]) {
+export function toFlowEdges(edges: AppEdge[], associativeEdges: AssociativeFlowEdge[] = []) {
   const seenIds = new Set<string>();
+  const combinedEdges: FlowEdgeInput[] = [...edges, ...associativeEdges];
 
-  const flowEdges = edges.map((e) => {
-    seenIds.add(e.id);
-    const cached = flowEdgeCache.get(e.id);
+  const flowEdges = combinedEdges.map((edge) => {
+    seenIds.add(edge.id);
+    const flowEdge = buildFlowEdge(edge);
+    const signature = buildFlowEdgeSignature(flowEdge);
+    const cached = flowEdgeCache.get(edge.id);
 
-    if (cached && cached.source === e.source_node_id && cached.target === e.target_node_id) {
+    if (cached && cached.signature === signature) {
       return cached.edge;
     }
 
-    const edge = buildFlowEdge(e);
-
-    flowEdgeCache.set(e.id, {
-      source: e.source_node_id,
-      target: e.target_node_id,
-      edge
+    flowEdgeCache.set(edge.id, {
+      signature,
+      edge: flowEdge
     });
 
-    return edge;
+    return flowEdge;
   });
 
   for (const id of flowEdgeCache.keys()) {
