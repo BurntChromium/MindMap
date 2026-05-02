@@ -1,12 +1,12 @@
 import { app, BrowserWindow, ipcMain } from 'electron';
 import { join } from 'node:path';
+import * as backend from '../src/lib/server/appData';
+import { initSchema } from '../src/lib/server/schema';
 
 type AppDataRequest = {
   method: string;
   payload?: unknown;
 };
-
-let backendPromise: Promise<typeof import('../src/lib/server/appData')> | null = null;
 
 function ensureDbPath() {
   if (!process.env.MINDMAP_DB_PATH) {
@@ -16,16 +16,8 @@ function ensureDbPath() {
 
 async function loadBackend() {
   ensureDbPath();
-
-  if (!backendPromise) {
-    backendPromise = (async () => {
-      const schema = await import('../src/lib/server/schema');
-      schema.initSchema();
-      return import('../src/lib/server/appData');
-    })();
-  }
-
-  return backendPromise;
+  initSchema();
+  return backend;
 }
 
 async function handleAppData(request: AppDataRequest) {

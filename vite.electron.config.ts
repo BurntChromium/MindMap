@@ -14,6 +14,7 @@ export default defineConfig({
     }
   },
   build: {
+    modulePreload: false,
     outDir: 'dist-electron',
     emptyOutDir: true,
     sourcemap: true,
