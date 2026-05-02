@@ -1,8 +1,13 @@
 import { json } from '@sveltejs/kit';
 import { db } from '$lib/server/db';
 import { createId, now } from '$lib/server/utils';
-import { getNodesByCanvasId } from '$lib/server/graphData';
+import { getNodeTitlesByCanvasId, getNodesByCanvasId } from '$lib/server/graphData';
 import { replaceNodeTags } from '$lib/server/nodeTags';
+import {
+  hasNodeTitleConflict,
+  normalizeNodeTitle,
+  resolveUniqueNodeTitle
+} from '$lib/nodeTitles';
 import { isString, toNumber, toTagList } from '$lib/mutationPayloads';
 
 // GET /api/nodes?canvasId=...
@@ -17,7 +22,11 @@ export async function POST({ request }) {
   const providedId = isString(payload?.id) ? payload.id : '';
   const canvasId = isString(payload?.canvasId) ? payload.canvasId : '';
   const id = providedId || createId();
-  const title = typeof payload?.title === 'string' ? payload.title : 'New Node';
+  const existingTitles = getNodeTitlesByCanvasId(canvasId);
+  const title = resolveUniqueNodeTitle(
+    existingTitles,
+    typeof payload?.title === 'string' ? payload.title : ''
+  );
   const body = typeof payload?.body === 'string' ? payload.body : '';
   const tags = toTagList(payload?.tags);
   const x = toNumber(payload?.x);
@@ -50,7 +59,7 @@ export async function POST({ request }) {
     replaceNodeTags(id, tags);
   }
 
-  return json({ success: true, id });
+  return json({ success: true, id, title });
 }
 
 // PATCH /api/nodes
@@ -67,6 +76,25 @@ export async function PATCH({ request }) {
 
   if (!id) {
     return json({ success: false, error: 'Missing id' }, { status: 400 });
+  }
+
+  if (typeof title === 'string' && !normalizeNodeTitle(title)) {
+    return json({ success: false, error: 'Node title cannot be empty.' }, { status: 400 });
+  }
+
+  const node = db
+    .prepare('SELECT id, canvas_id FROM nodes WHERE id = ?')
+    .get(id) as { id: string; canvas_id: string } | undefined;
+
+  if (!node) {
+    return json({ success: false, error: 'Missing id' }, { status: 404 });
+  }
+
+  if (title && hasNodeTitleConflict(getNodeTitlesByCanvasId(node.canvas_id), title, id)) {
+    return json(
+      { success: false, error: `A node titled "${title.trim()}" already exists in this canvas.` },
+      { status: 409 }
+    );
   }
 
   const updateNode = db.prepare(`

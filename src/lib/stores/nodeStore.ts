@@ -1,5 +1,6 @@
 import { get, writable } from 'svelte/store';
 import { createClientId } from '$lib/clientId';
+import { hasNodeTitleConflict, normalizeNodeTitle, resolveUniqueNodeTitle } from '$lib/nodeTitles';
 import { buildBulkPositionsBody, buildBulkTagsBody, buildNodeCreateBody, buildNodePatchBody } from '$lib/mutationPayloads';
 import { historyStore } from '$lib/stores/historyStore';
 import { mutationStateStore } from '$lib/stores/mutationStateStore';
@@ -156,17 +157,21 @@ function createNodeStore() {
       y = 0,
       options?: Partial<Pick<Node, 'id' | 'title' | 'body' | 'tags' | 'collapsed'>>
     ) {
+      const current = get(store);
+      const currentNodes = Array.from(current.nodes.values());
       const id = options?.id ?? createClientId('node');
+      const title = resolveUniqueNodeTitle(currentNodes, options?.title);
       const newNode: Node = {
         id,
         canvas_id: canvasId,
-        title: options?.title ?? 'New Node',
+        title,
         body: options?.body ?? '',
         tags: Array.isArray(options?.tags) ? [...options.tags] : [],
         x,
         y,
         collapsed: options?.collapsed ?? 0
       };
+      let finalTitle = newNode.title;
       const previous = snapshotState();
       mutationStateStore.beginWrite();
 
@@ -197,6 +202,26 @@ function createNodeStore() {
           throw new Error(`Create node failed with ${res.status}`);
         }
 
+        const responseBody = await res.json().catch(() => null);
+        const resolvedTitle =
+          typeof responseBody?.title === 'string' ? responseBody.title : newNode.title;
+        finalTitle = resolvedTitle;
+
+        if (resolvedTitle !== newNode.title) {
+          update((state) => {
+            const existing = state.nodes.get(id);
+
+            if (existing) {
+              state.nodes.set(id, {
+                ...existing,
+                title: resolvedTitle
+              });
+            }
+
+            return state;
+          });
+        }
+
         cacheByCanvasId.set(canvasId, snapshotNodes(get(store).nodes));
         if (!historyStore.isReplaying()) {
           historyStore.record({
@@ -205,7 +230,7 @@ function createNodeStore() {
             redo: async () =>
               nodeStore.create(canvasId, newNode.x, newNode.y, {
                 id,
-                title: newNode.title,
+                title: finalTitle,
                 body: newNode.body,
                 tags: [...newNode.tags],
                 collapsed: newNode.collapsed
@@ -217,7 +242,8 @@ function createNodeStore() {
       } catch (error) {
         set(previous);
         syncCache(previous);
-        mutationStateStore.finishWrite(false, `Create node failed with ${String(error)}`);
+        const message = error instanceof Error ? error.message : String(error);
+        mutationStateStore.finishWrite(false, `Create node failed with ${message}`);
         console.error(error);
         return false;
       }
@@ -226,7 +252,23 @@ function createNodeStore() {
     async updateNode(partial: Partial<Node> & { id: string }) {
       const previous = snapshotState();
       const before = previous.nodes.get(partial.id);
+      const currentNodes = Array.from(previous.nodes.values());
       const nextNode = before ? { ...before, ...partial } : null;
+
+      if (typeof partial.title === 'string' && !normalizeNodeTitle(partial.title)) {
+        mutationStateStore.finishWrite(false, 'Node title cannot be empty.');
+        return false;
+      }
+
+      if (typeof partial.title === 'string' && hasNodeTitleConflict(currentNodes, partial.title, partial.id)) {
+        const nextTitle = normalizeNodeTitle(partial.title);
+        mutationStateStore.finishWrite(
+          false,
+          `A node titled "${nextTitle}" already exists in this canvas.`
+        );
+        return false;
+      }
+
       mutationStateStore.beginWrite();
 
       update((state) => {
@@ -245,7 +287,12 @@ function createNodeStore() {
         });
 
         if (!response.ok) {
-          throw new Error(`Update node failed with ${response.status}`);
+          const body = await response.json().catch(() => null);
+          const message =
+            typeof body?.error === 'string'
+              ? body.error
+              : `Update node failed with ${response.status}`;
+          throw new Error(message);
         }
 
         if (before && nextNode && !historyStore.isReplaying()) {
@@ -279,7 +326,8 @@ function createNodeStore() {
       } catch (error) {
         set(previous);
         syncCache(previous);
-        mutationStateStore.finishWrite(false, `Update node failed with ${String(error)}`);
+        const message = error instanceof Error ? error.message : String(error);
+        mutationStateStore.finishWrite(false, `Update node failed with ${message}`);
         console.error(error);
         return false;
       }

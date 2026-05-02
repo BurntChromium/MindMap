@@ -1,4 +1,5 @@
 import { createClientId } from '$lib/clientId';
+import { createNodeTitleAllocator } from '$lib/nodeTitles';
 import type { Edge } from '$lib/stores/edgeStore';
 import type { Node } from '$lib/stores/nodeStore';
 import { normalizeTagList } from '$lib/tagUtils';
@@ -150,10 +151,12 @@ export function buildPastedGraph(
   canvasId: string,
   pasteIndex: number,
   createNodeId: () => string = () => createClientId('node'),
-  createEdgeId: () => string = () => createClientId('edge')
+  createEdgeId: () => string = () => createClientId('edge'),
+  existingNodes: Pick<Node, 'id' | 'title'>[] = []
 ): PastedGraph {
   const offset = 48 + Math.max(0, pasteIndex) * 24;
   const nodeIdMap = new Map<string, string>();
+  const titleAllocator = createNodeTitleAllocator(existingNodes);
 
   const nodes = fragment.nodes.map((node) => {
     const id = createNodeId();
@@ -162,7 +165,7 @@ export function buildPastedGraph(
     return {
       id,
       canvas_id: canvasId,
-      title: node.title,
+      title: titleAllocator.nextCopyTitle(node.title),
       body: node.body,
       tags: cloneTags(node.tags),
       x: node.x + offset,

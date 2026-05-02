@@ -239,6 +239,49 @@ describe('clipboard graph helpers', () => {
     });
   });
 
+  it('suffixes pasted titles against existing canvas nodes', () => {
+    const fragment = {
+      version: 1 as const,
+      sourceCanvasId: 'canvas-1',
+      nodes: [
+        {
+          id: 'node-1',
+          title: 'Smaug',
+          body: '',
+          tags: [],
+          x: 10,
+          y: 20,
+          collapsed: 0
+        },
+        {
+          id: 'node-2',
+          title: 'Smaug',
+          body: '',
+          tags: [],
+          x: 50,
+          y: 70,
+          collapsed: 0
+        }
+      ],
+      edges: []
+    };
+
+    const pasted = buildPastedGraph(
+      fragment,
+      'canvas-2',
+      0,
+      (() => {
+        const ids = ['copy-node-a', 'copy-node-b'];
+        let index = 0;
+        return () => ids[index++] ?? 'copy-node-z';
+      })(),
+      () => 'copy-edge-a',
+      [{ id: 'existing-node', title: 'Smaug' }]
+    );
+
+    expect(pasted.nodes.map((node) => node.title)).toEqual(['Smaug (1)', 'Smaug (2)']);
+  });
+
   it('lists connected edge ids for cut operations', () => {
     expect(
       getConnectedEdgeIds(

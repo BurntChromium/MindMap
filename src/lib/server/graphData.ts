@@ -22,6 +22,11 @@ export type NodeRow = {
   updated_at: number;
 };
 
+export type NodeTitleRow = {
+  id: string;
+  title: string;
+};
+
 export type TagRow = {
   id: string;
   name: string;
@@ -87,6 +92,23 @@ export function getNodesByCanvasId(canvasId: string | null) {
       ...node,
       tags: parseTags(node.tags)
     })) as NodeRow[];
+}
+
+export function getNodeTitlesByCanvasId(canvasId: string | null) {
+  if (!canvasId) {
+    return [];
+  }
+
+  return db
+    .prepare(
+      `
+        SELECT id, title
+        FROM nodes
+        WHERE canvas_id = ?
+        ORDER BY created_at ASC
+      `
+    )
+    .all(canvasId) as NodeTitleRow[];
 }
 
 export function getTagsByCanvasId(canvasId: string | null) {

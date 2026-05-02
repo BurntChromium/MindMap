@@ -148,6 +148,20 @@ describe('API integration', () => {
     ]);
   });
 
+  it('creates nodes with enumerated default titles', async () => {
+    const canvas = await canvasesApi.POST({
+      request: request({ id: 'canvas-1', name: 'Numbered' })
+    } as any);
+    const { id: canvasId } = await canvas.json();
+
+    const created = await nodesApi.POST({
+      request: request({ id: 'node-1', canvasId, x: 10, y: 20 })
+    } as any);
+    const createdJson = await created.json();
+
+    expect(createdJson.title).toBe('Node 1');
+  });
+
   it('bulk-updates tags transactionally across selected nodes', async () => {
     const canvas = await canvasesApi.POST({
       request: request({ id: 'canvas-1', name: 'Bulk Tags' })
@@ -209,6 +223,36 @@ describe('API integration', () => {
     expect(tagRows.map((row: { name: string }) => row.name)).toEqual(['lore', 'npc']);
   });
 
+  it('rejects duplicate titles on patch', async () => {
+    const canvas = await canvasesApi.POST({
+      request: request({ id: 'canvas-1', name: 'Duplicate Titles' })
+    } as any);
+    const { id: canvasId } = await canvas.json();
+
+    await nodesApi.POST({
+      request: request({ id: 'node-1', canvasId, x: 0, y: 0, title: 'Alpha' })
+    } as any);
+    const secondNode = await nodesApi.POST({
+      request: request({ id: 'node-2', canvasId, x: 120, y: 120, title: 'Beta' })
+    } as any);
+
+    const { id: secondNodeId } = await secondNode.json();
+
+    const response = await nodesApi.PATCH({
+      request: request({
+        id: secondNodeId,
+        title: 'alpha'
+      })
+    } as any);
+    const payload = await response.json();
+
+    expect(response.status).toBe(409);
+    expect(payload).toMatchObject({
+      success: false,
+      error: 'A node titled "alpha" already exists in this canvas.'
+    });
+  });
+
   it('bulk-updates node positions transactionally across selected nodes', async () => {
     const canvas = await canvasesApi.POST({
       request: request({ id: 'canvas-1', name: 'Bulk Positions' })
@@ -259,6 +303,10 @@ describe('API integration', () => {
     } as any);
     const { id: canvasId } = await canvas.json();
 
+    await nodesApi.POST({
+      request: request({ id: 'existing-node', canvasId, x: 0, y: 0, title: 'Alpha' })
+    } as any);
+
     await graphFragmentsApi.POST({
       request: request({
         action: 'paste',
@@ -275,7 +323,7 @@ describe('API integration', () => {
           },
           {
             id: 'copy-node-2',
-            title: 'Beta',
+            title: 'Alpha',
             body: '',
             tags: ['npc'],
             x: 100,
@@ -303,15 +351,19 @@ describe('API integration', () => {
     } as any);
     const edges = await edgesListed.json();
 
-    expect(nodes).toHaveLength(2);
-    expect(nodes[0]).toMatchObject({
+    expect(nodes).toHaveLength(3);
+    expect(nodes.find((node: { id: string }) => node.id === 'existing-node')).toMatchObject({
+      id: 'existing-node',
+      title: 'Alpha'
+    });
+    expect(nodes.find((node: { id: string }) => node.id === 'copy-node-1')).toMatchObject({
       id: 'copy-node-1',
-      title: 'Alpha',
+      title: 'Alpha (1)',
       tags: ['lore']
     });
-    expect(nodes[1]).toMatchObject({
+    expect(nodes.find((node: { id: string }) => node.id === 'copy-node-2')).toMatchObject({
       id: 'copy-node-2',
-      title: 'Beta',
+      title: 'Alpha (2)',
       tags: ['npc']
     });
     expect(edges).toEqual([

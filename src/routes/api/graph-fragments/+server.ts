@@ -1,7 +1,9 @@
 import { json } from '@sveltejs/kit';
 import { db } from '$lib/server/db';
 import { createId, now } from '$lib/server/utils';
+import { getNodeTitlesByCanvasId } from '$lib/server/graphData';
 import { replaceNodeTags } from '$lib/server/nodeTags';
+import { createNodeTitleAllocator } from '$lib/nodeTitles';
 import { isString, toNumber, toStringList, toTagList } from '$lib/mutationPayloads';
 
 type PastedNode = {
@@ -43,7 +45,7 @@ export async function POST({ request }) {
     const normalizedNodes = nodes
       .map((node) => ({
         id: isString(node?.id) ? node.id : '',
-        title: typeof node?.title === 'string' ? node.title : 'New Node',
+        title: typeof node?.title === 'string' ? node.title : '',
         body: typeof node?.body === 'string' ? node.body : '',
         tags: toTagList(node?.tags),
         x: toNumber(node?.x),
@@ -52,7 +54,13 @@ export async function POST({ request }) {
       }))
       .filter((node) => node.id.length > 0);
 
-    const nodeIds = new Set(normalizedNodes.map((node) => node.id));
+    const titleAllocator = createNodeTitleAllocator(getNodeTitlesByCanvasId(canvasId));
+    const resolvedNodes = normalizedNodes.map((node) => ({
+      ...node,
+      title: titleAllocator.nextCopyTitle(node.title)
+    }));
+
+    const nodeIds = new Set(resolvedNodes.map((node) => node.id));
 
     const normalizedEdges = edges
       .map((edge) => ({
@@ -79,7 +87,7 @@ export async function POST({ request }) {
     const timestamp = now();
 
     const tx = db.transaction(() => {
-      for (const [index, node] of normalizedNodes.entries()) {
+      for (const [index, node] of resolvedNodes.entries()) {
         const nodeTimestamp = timestamp + index;
         insertNode.run(
           node.id,
@@ -102,7 +110,11 @@ export async function POST({ request }) {
 
     tx();
 
-    return json({ success: true, insertedNodes: normalizedNodes.length, insertedEdges: normalizedEdges.length });
+    return json({
+      success: true,
+      insertedNodes: resolvedNodes,
+      insertedEdges: normalizedEdges.length
+    });
   }
 
   if (payload?.action === 'delete') {

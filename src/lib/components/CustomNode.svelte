@@ -1,5 +1,6 @@
 <script lang="ts">
   import { tick } from 'svelte';
+  import { get } from 'svelte/store';
   import { Handle, Position } from '@xyflow/svelte';
   import { Check, ChevronDown, ChevronUp, Pencil } from 'lucide-svelte';
   import { nodeStore } from '$lib/stores/nodeStore';
@@ -14,6 +15,7 @@
     normalizeTagList,
     normalizeTagName
   } from '$lib/tagUtils';
+  import { hasNodeTitleConflict, normalizeNodeTitle } from '$lib/nodeTitles';
   import { getTagColor, getTagColorWithAlpha, rgbaFromHex } from '$lib/tagColors';
 
   let { id, data, selected } = $props();
@@ -24,6 +26,7 @@
   let draftBody = $state('');
   let draftTags = $state<string[]>([]);
   let draftTagInput = $state('');
+  let titleError = $state<string | null>(null);
 
   const isEditing = $derived(nodeMode === 'edit');
   const isExpanded = $derived(nodeMode !== 'compact');
@@ -55,6 +58,7 @@
       draftBody = bodyText;
       draftTags = normalizeTagList(nodeTags);
       draftTagInput = '';
+      titleError = null;
     }
   });
 
@@ -63,6 +67,7 @@
     draftBody = bodyText;
     draftTags = normalizeTagList(nodeTags);
     draftTagInput = '';
+    titleError = null;
     nodeUiStore.beginEdit(id);
     await tick();
     titleInput?.focus();
@@ -97,20 +102,40 @@
     const nextTitle = draftTitle.trim() || 'Untitled';
     const nextBody = draftBody;
     const nextTags = normalizeTagList([...draftTags, draftTagInput]);
+    const currentTitle = data.label || 'Untitled';
+    const titleChanged = normalizeNodeTitle(nextTitle) !== normalizeNodeTitle(currentTitle);
     const changed =
-      nextTitle !== (data.label || 'Untitled') ||
+      titleChanged ||
       nextBody !== bodyText ||
       tagKey(nextTags) !== tagKey(nodeTags);
 
     if (changed) {
-      await nodeStore.updateNode({
+      const updatePayload: Parameters<typeof nodeStore.updateNode>[0] = {
         id,
-        title: nextTitle,
         body: nextBody,
         tags: nextTags
-      });
+      };
+
+      if (titleChanged) {
+        const currentState = get(nodeStore);
+        const currentNodes = Array.from(currentState.nodes.values());
+
+        if (hasNodeTitleConflict(currentNodes, nextTitle, id)) {
+          titleError = `A node titled "${nextTitle}" already exists in this canvas.`;
+          return;
+        }
+
+        updatePayload.title = nextTitle;
+      }
+
+      const success = await nodeStore.updateNode(updatePayload);
+
+      if (!success) {
+        return;
+      }
     }
 
+    titleError = null;
     nodeUiStore.endEdit(id);
   }
 
@@ -219,6 +244,9 @@
           class="title-input nodrag"
           aria-label="Node title"
           onkeydown={handleTitleKeyDown}
+          oninput={() => {
+            titleError = null;
+          }}
         />
       {:else}
         <div class="title-display">{data.label}</div>
@@ -255,6 +283,10 @@
         </button>
       </div>
     </div>
+
+    {#if isEditing && titleError}
+      <p class="title-error" role="alert">{titleError}</p>
+    {/if}
 
     {#if isEditing || nodeTags.length}
       <div class="tags-area" class:tags-area--compact={nodeMode === 'compact'}>
@@ -383,6 +415,13 @@
     line-height: 1.25;
     outline: none;
     box-sizing: border-box;
+  }
+
+  .title-error {
+    margin: 6px 0 0;
+    color: #b42318;
+    font-size: 0.75rem;
+    line-height: 1.35;
   }
 
   .header-actions {

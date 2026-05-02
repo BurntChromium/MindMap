@@ -138,7 +138,7 @@ describe('nodeStore', () => {
     expect(snapshot().get(body.id)).toMatchObject({
       id: body.id,
       canvas_id: 'canvas-1',
-      title: 'New Node',
+      title: 'Node 1',
       tags: [],
       x: 50,
       y: 75
@@ -146,6 +146,7 @@ describe('nodeStore', () => {
     expect(body).toMatchObject({
       id: expect.any(String),
       canvasId: 'canvas-1',
+      title: 'Node 1',
       x: 50,
       y: 75
     });
@@ -183,6 +184,42 @@ describe('nodeStore', () => {
         body: JSON.stringify({ id: 'node-3', title: 'New', tags: ['lore'] })
       })
     );
+  });
+
+  it('blocks duplicate titles before sending a patch request', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(
+      jsonResponse([
+        {
+          id: 'node-3',
+          canvas_id: 'canvas-1',
+          title: 'Alpha',
+          body: '',
+          tags: [],
+          x: 0,
+          y: 0,
+          collapsed: 0
+        },
+        {
+          id: 'node-4',
+          canvas_id: 'canvas-1',
+          title: 'Beta',
+          body: '',
+          tags: [],
+          x: 0,
+          y: 0,
+          collapsed: 0
+        }
+      ])
+    );
+
+    await nodeStore.load('canvas-1');
+    const success = await nodeStore.updateNode({ id: 'node-4', title: 'alpha' });
+
+    expect(success).toBe(false);
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(snapshot().get('node-4')).toMatchObject({
+      title: 'Beta'
+    });
   });
 
   it('bulk-updates node tags through the batch endpoint', async () => {

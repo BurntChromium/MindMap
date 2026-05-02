@@ -645,6 +645,32 @@
         throw new Error(`Paste graph fragment failed with ${response.status}`);
       }
 
+      const responseBody = await response.json().catch(() => null);
+      const insertedNodes = Array.isArray(responseBody?.insertedNodes)
+        ? (responseBody.insertedNodes as Array<{ id?: unknown; title?: unknown }>)
+        : null;
+
+      if (insertedNodes) {
+        const insertedTitleById = new Map(
+          insertedNodes
+            .filter((node): node is { id: string; title: string } => {
+              return typeof node.id === 'string' && typeof node.title === 'string';
+            })
+            .map((node) => [node.id, node.title])
+        );
+        const reconciledNodes = nextNodes.map((node) =>
+          insertedTitleById.has(node.id)
+            ? {
+                ...node,
+                title: insertedTitleById.get(node.id) ?? node.title
+              }
+            : node
+          );
+
+        graph.nodes = reconciledNodes;
+        nodeStore.hydrate(reconciledNodes, activeCanvasId);
+      }
+
       onSuccess?.();
       return true;
     } catch (error) {
@@ -672,7 +698,8 @@
       activeCanvasId,
       pasteIndex,
       () => createClientId('node'),
-      () => createClientId('edge')
+      () => createClientId('edge'),
+      nodes
     );
 
     if (pastedGraph.nodes.length === 0) {
