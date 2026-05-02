@@ -356,6 +356,12 @@
     flex: 0 0 auto;
   }
 
+  .discovery-search + .discovery-section,
+  .discovery-section + .discovery-section {
+    padding-top: 0.9rem;
+    border-top: var(--border-thin);
+  }
+
   .discovery-search {
     display: grid;
     gap: 0.45rem;

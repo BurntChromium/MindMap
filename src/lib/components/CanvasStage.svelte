@@ -54,6 +54,7 @@
     nodes={flowNodes}
     edges={flowEdges}
     nodeTypes={nodeTypes}
+    proOptions={{ hideAttribution: true }}
     multiSelectionKey="Shift"
     onconnect={onConnect}
     onnodedragstop={handleNodeDragStop}

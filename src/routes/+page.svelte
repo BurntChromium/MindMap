@@ -1035,7 +1035,7 @@
   }
 
   .canvas-hint--status {
-    left: 1rem;
+    left: 3.75rem;
     bottom: 1rem;
   }
 

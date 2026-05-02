@@ -33,7 +33,10 @@
 
 <div class="sidebar" class:sidebar--collapsed={collapsed}>
   <div class="sidebar-topbar">
-    <h3>{collapsed ? 'C' : 'Canvases'}</h3>
+    <div class="sidebar-topbar__title">
+      <p class="sidebar-brand">{collapsed ? 'M' : 'Mindmap'}</p>
+      <h3>{collapsed ? 'C' : 'Canvases'}</h3>
+    </div>
     <button
       class="icon-button sidebar-toggle"
       type="button"

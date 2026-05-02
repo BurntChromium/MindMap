@@ -176,8 +176,26 @@ ul {
   gap: 0.5rem;
 }
 
+.sidebar-topbar__title {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.sidebar-brand {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--text-main);
+  letter-spacing: 0.01em;
+}
+
 .sidebar--collapsed .sidebar-topbar {
   justify-content: center;
+}
+
+.sidebar--collapsed .sidebar-topbar__title {
+  justify-items: center;
 }
 
 .sidebar-toggle {
