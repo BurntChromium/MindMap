@@ -10,6 +10,7 @@ export type FlowNodeOptions = {
   searchHitIds?: Set<string>;
   tagColors?: Record<string, string>;
   onTagClick?: (tag: string) => void;
+  onEntityClick?: (title: string) => void;
 };
 
 type FlowNode = ReturnType<typeof buildFlowNode>;
@@ -30,6 +31,7 @@ type CachedFlowNode = {
   activeTagColor: string | null;
   tagColors: Record<string, string>;
   onTagClick?: (tag: string) => void;
+  onEntityClick?: (title: string) => void;
   node: FlowNode;
 };
 
@@ -53,6 +55,7 @@ function buildFlowNode(
     activeTagColor: string | null;
     tagColors: Record<string, string>;
     onTagClick?: (tag: string) => void;
+    onEntityClick?: (title: string) => void;
   }
 ) {
   return {
@@ -67,6 +70,7 @@ function buildFlowNode(
       activeTag: options.activeTag,
       activeTagColor: options.activeTagColor,
       onTagClick: options.onTagClick,
+      onEntityClick: options.onEntityClick,
       isSearchHit: options.isSearchHit,
       isFocused: options.isFocused
     },
@@ -91,7 +95,8 @@ export function toFlowNodes(nodes: AppNode[], options: FlowNodeOptions) {
     activeTag = null,
     searchHitIds = new Set<string>(),
     tagColors = {},
-    onTagClick
+    onTagClick,
+    onEntityClick
   } = options;
   const hasSearchFilter = searchHitIds.size > 0;
   const selectedNodeIdSet = new Set(selectedNodeIds);
@@ -122,7 +127,8 @@ export function toFlowNodes(nodes: AppNode[], options: FlowNodeOptions) {
       cached.activeTag === activeTag &&
       cached.activeTagColor === activeTagColor &&
       cached.tagColors === tagColors &&
-      cached.onTagClick === onTagClick
+      cached.onTagClick === onTagClick &&
+      cached.onEntityClick === onEntityClick
     ) {
       return cached.node;
     }
@@ -135,7 +141,8 @@ export function toFlowNodes(nodes: AppNode[], options: FlowNodeOptions) {
       activeTag,
       activeTagColor,
       tagColors,
-      onTagClick
+      onTagClick,
+      onEntityClick
     });
 
     flowNodeCache.set(n.id, {
@@ -153,6 +160,7 @@ export function toFlowNodes(nodes: AppNode[], options: FlowNodeOptions) {
       activeTagColor,
       tagColors,
       onTagClick,
+      onEntityClick,
       node
     });
 

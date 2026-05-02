@@ -1,4 +1,5 @@
 import type { DiscoveryNode } from '$lib/discovery';
+import { canonicalizeNodeTitle } from '$lib/nodeTitles';
 import type { Entity, EntityMention } from '$lib/stores/entityStore';
 
 export type EntityInspectorNodeRef = {
@@ -19,6 +20,37 @@ export type EntityInspectorEntry = {
   childNodes: EntityInspectorNodeRef[];
   flatNodes: EntityInspectorNodeRef[];
 };
+
+export function findEntityInspectorEntryByTitle(
+  entries: EntityInspectorEntry[],
+  title: string
+) {
+  const titleKey = canonicalizeNodeTitle(title);
+
+  if (!titleKey) {
+    return null;
+  }
+
+  return entries.find((entry) => entry.titleKey === titleKey) ?? null;
+}
+
+export function getEntityInspectorNodeIds(entry: EntityInspectorEntry) {
+  const nodeIds = new Set<string>();
+
+  if (entry.primaryNode) {
+    nodeIds.add(entry.primaryNode.id);
+  }
+
+  for (const node of entry.childNodes) {
+    nodeIds.add(node.id);
+  }
+
+  for (const node of entry.flatNodes) {
+    nodeIds.add(node.id);
+  }
+
+  return Array.from(nodeIds);
+}
 
 function createNodeRef(
   node: DiscoveryNode,

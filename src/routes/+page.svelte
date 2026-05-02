@@ -45,7 +45,11 @@
   import { clipboardStore } from '$lib/stores/clipboardStore';
   import { toFlowEdges, toFlowNodes } from '$lib/graph/graphAdapter';
   import { selectionStore } from '$lib/stores/selectionStore';
-  import { buildEntityInspectorEntries } from '$lib/entityInspector';
+  import {
+    buildEntityInspectorEntries,
+    findEntityInspectorEntryByTitle,
+    getEntityInspectorNodeIds
+  } from '$lib/entityInspector';
 
   let { data }: { data: PageData } = $props();
 
@@ -115,7 +119,8 @@
       activeTag,
       searchHitIds,
       tagColors: tagColorMap,
-      onTagClick: toggleTagFilter
+      onTagClick: toggleTagFilter,
+      onEntityClick: focusEntityReference
     })
   );
   const flowEdges = $derived(toFlowEdges(edges));
@@ -445,9 +450,13 @@
     focusNode(nodeId);
   }
 
-  function focusNode(nodeId: string) {
+  function focusNode(nodeId: string, options: { select?: boolean } = {}) {
+    const { select = true } = options;
     focusedNodeId = nodeId;
-    selectionStore.selectNode(nodeId);
+
+    if (select) {
+      selectionStore.selectNode(nodeId);
+    }
 
     const nextNode = nodes.find((node) => node.id === nodeId);
 
@@ -455,6 +464,26 @@
       const currentZoom = canvasStageApi.getViewport().zoom;
       void canvasStageApi.setCenter(nextNode.x, nextNode.y, { zoom: currentZoom });
     }
+  }
+
+  function focusEntityReference(title: string) {
+    const entry = findEntityInspectorEntryByTitle(entityInspectorEntries, title);
+
+    if (!entry) {
+      return;
+    }
+
+    const nodeIds = getEntityInspectorNodeIds(entry);
+
+    discoveryCollapsed = false;
+    activePanelTab = 'entities';
+    activeEntityId = entry.id;
+
+    if (entry.primaryNode) {
+      focusNode(entry.primaryNode.id, { select: false });
+    }
+
+    selectionStore.setSelection(nodeIds);
   }
 
   function toggleDiscoveryPanel() {

@@ -16,6 +16,7 @@
     normalizeTagName
   } from '$lib/tagUtils';
   import { hasNodeTitleConflict, normalizeNodeTitle } from '$lib/nodeTitles';
+  import { parseInlineContent } from '$lib/inlineContent';
   import { getTagColor, getTagColorWithAlpha, rgbaFromHex } from '$lib/tagColors';
 
   let { id, data, selected } = $props();
@@ -33,6 +34,7 @@
   const isExpanded = $derived(nodeMode !== 'compact');
   const bodyText = $derived(data.body ?? '');
   const isEntityPage = $derived(Boolean(data.is_entity ?? 0));
+  const onEntityClick = $derived(data.onEntityClick ?? null);
   const nodeTags = $derived(Array.isArray(data.tags) ? data.tags : []);
   const isSearchHit = $derived(Boolean(data.isSearchHit));
   const activeTagName = $derived(normalizeTagName(data.activeTag ?? ''));
@@ -45,6 +47,7 @@
   const overlayColor = $derived(
     isTagHighlighted ? rgbaFromHex(highlightHex, 0.22) : 'transparent'
   );
+  const bodySegments = $derived(parseInlineContent(bodyText));
 
   $effect(() => {
     const unsub = nodeUiStore.subscribe((v: NodeUiState) => {
@@ -236,6 +239,10 @@
   function handleReadonlyTagClick(tag: string) {
     onTagClick?.(tag);
   }
+
+  function handleEntityReferenceClick(title: string) {
+    onEntityClick?.(title);
+  }
 </script>
 
 <div class="node-shell" style={`width: ${nodeWidth};`}>
@@ -362,7 +369,48 @@
             onkeydown={handleBodyKeyDown}
           ></textarea>
         {:else if bodyText}
-          <div class="body-display">{bodyText}</div>
+          <div class="body-display">
+            {#each bodySegments as segment (segment.startIndex)}
+              {#if segment.type === 'entity'}
+                <button
+                  class="body-inline body-inline--entity nodrag"
+                  class:body-inline--bold={segment.bold}
+                  class:body-inline--italic={segment.italic}
+                  type="button"
+                  aria-label={`Jump to ${segment.title}`}
+                  title={`Jump to ${segment.title}`}
+                  onclick={(event) => {
+                    event.stopPropagation();
+                    handleEntityReferenceClick(segment.title);
+                  }}
+                >
+                  {segment.text}
+                </button>
+              {:else if segment.type === 'link'}
+                <a
+                  class="body-inline body-inline--link nodrag"
+                  class:body-inline--bold={segment.bold}
+                  class:body-inline--italic={segment.italic}
+                  href={segment.href}
+                  rel="noreferrer"
+                  target="_blank"
+                  onclick={(event) => {
+                    event.stopPropagation();
+                  }}
+                >
+                  {segment.text}
+                </a>
+              {:else}
+                <span
+                  class="body-inline"
+                  class:body-inline--bold={segment.bold}
+                  class:body-inline--italic={segment.italic}
+                >
+                  {segment.text}
+                </span>
+              {/if}
+            {/each}
+          </div>
         {:else}
           <div class="body-placeholder">Add body text</div>
         {/if}
@@ -575,6 +623,33 @@
     white-space: pre-wrap;
     word-break: break-word;
     color: var(--text-main);
+  }
+
+  .body-inline {
+    display: inline;
+  }
+
+  .body-inline--bold {
+    font-weight: 700;
+  }
+
+  .body-inline--italic {
+    font-style: italic;
+  }
+
+  .body-inline--entity {
+    border: 0;
+    padding: 0;
+    background: transparent;
+    color: var(--accent);
+    cursor: pointer;
+    font: inherit;
+    text-decoration: underline;
+    text-underline-offset: 0.12em;
+  }
+
+  .body-inline--link {
+    color: var(--accent);
   }
 
   .body-placeholder {

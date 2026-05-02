@@ -1,6 +1,7 @@
 import { db } from './db';
 import { createId, now } from './utils';
 import { canonicalizeNodeTitle, normalizeNodeTitle } from '$lib/nodeTitles';
+import { parseInlineContent, type InlineContentSegment } from '$lib/inlineContent';
 
 export type EntityRow = {
   id: string;
@@ -65,31 +66,17 @@ export function canonicalizeEntityTitle(rawTitle: string) {
 }
 
 export function extractEntityReferences(body: string): EntityReference[] {
-  if (!body) {
-    return [];
-  }
-
-  const references: EntityReference[] = [];
-  const pattern = /\[\[([^\[\]]+?)\]\]/g;
-  let match: RegExpExecArray | null;
-
-  while ((match = pattern.exec(body))) {
-    const title = normalizeEntityTitle(match[1]);
-
-    if (!title) {
-      continue;
-    }
-
-    references.push({
-      title,
-      titleKey: canonicalizeEntityTitle(title),
-      referenceText: match[0],
-      startIndex: match.index,
-      endIndex: match.index + match[0].length
-    });
-  }
-
-  return references;
+  return parseInlineContent(body)
+    .filter((segment): segment is Extract<InlineContentSegment, { type: 'entity' }> => {
+      return segment.type === 'entity';
+    })
+    .map((segment) => ({
+      title: segment.title,
+      titleKey: segment.titleKey,
+      referenceText: segment.referenceText,
+      startIndex: segment.startIndex,
+      endIndex: segment.endIndex
+    }));
 }
 
 export function replaceEntityReferences(body: string, fromTitle: string, toTitle: string) {

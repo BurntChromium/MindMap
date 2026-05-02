@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { buildEntityInspectorEntries } from './entityInspector';
+import {
+  buildEntityInspectorEntries,
+  findEntityInspectorEntryByTitle,
+  getEntityInspectorNodeIds
+} from './entityInspector';
 
 describe('entity inspector', () => {
   it('groups a primary node with child referents', () => {
@@ -140,5 +144,29 @@ describe('entity inspector', () => {
     );
     expect(entries[0].flatNodes.map((node) => node.id)).toEqual(['node-guide', 'node-note']);
     expect(entries[0].childNodes).toEqual([]);
+  });
+
+  it('resolves entries by title case-insensitively', () => {
+    const entries = buildEntityInspectorEntries(
+      [
+        {
+          id: 'entity-smaug',
+          canvas_id: 'canvas-1',
+          title: 'Smaug',
+          title_key: 'smaug',
+          primary_node_id: 'node-smaug',
+          mention_count: 1,
+          created_at: 1,
+          updated_at: 1
+        }
+      ],
+      [],
+      [{ id: 'node-smaug', title: 'Smaug', body: '', tags: [] }]
+    );
+
+    const entry = findEntityInspectorEntryByTitle(entries, 'sMaUg');
+
+    expect(entry?.id).toBe('entity-smaug');
+    expect(getEntityInspectorNodeIds(entry ?? entries[0])).toEqual(['node-smaug']);
   });
 });

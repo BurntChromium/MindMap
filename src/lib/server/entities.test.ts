@@ -21,6 +21,25 @@ describe('entities', () => {
     ]);
   });
 
+  it('extracts entity references through markdown-lite formatting', () => {
+    expect(extractEntityReferences('**[[Smaug]]** and *[[Bilbo]]*')).toEqual([
+      {
+        title: 'Smaug',
+        titleKey: 'smaug',
+        referenceText: '[[Smaug]]',
+        startIndex: 2,
+        endIndex: 11
+      },
+      {
+        title: 'Bilbo',
+        titleKey: 'bilbo',
+        referenceText: '[[Bilbo]]',
+        startIndex: 19,
+        endIndex: 28
+      }
+    ]);
+  });
+
   it('rewrites matching entity references case-insensitively', () => {
     expect(replaceEntityReferences('[[smaug]] meets [[Smaug]]', 'Smaug', 'Dragon')).toBe(
       '[[Dragon]] meets [[Dragon]]'
