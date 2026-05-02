@@ -31,6 +31,35 @@ export function initSchema() {
       FOREIGN KEY(canvas_id) REFERENCES canvases(id) ON DELETE CASCADE
     );
 
+    CREATE TABLE IF NOT EXISTS entities (
+      id TEXT PRIMARY KEY,
+      canvas_id TEXT NOT NULL,
+      title TEXT NOT NULL,
+      title_key TEXT NOT NULL,
+      primary_node_id TEXT,
+      created_at INTEGER,
+      updated_at INTEGER,
+      FOREIGN KEY(canvas_id) REFERENCES canvases(id) ON DELETE CASCADE,
+      FOREIGN KEY(primary_node_id) REFERENCES nodes(id) ON DELETE SET NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS entity_mentions (
+      id TEXT PRIMARY KEY,
+      canvas_id TEXT NOT NULL,
+      entity_id TEXT NOT NULL,
+      node_id TEXT NOT NULL,
+      reference_text TEXT NOT NULL,
+      title TEXT NOT NULL,
+      title_key TEXT NOT NULL,
+      start_index INTEGER NOT NULL,
+      end_index INTEGER NOT NULL,
+      created_at INTEGER,
+      updated_at INTEGER,
+      FOREIGN KEY(canvas_id) REFERENCES canvases(id) ON DELETE CASCADE,
+      FOREIGN KEY(entity_id) REFERENCES entities(id) ON DELETE CASCADE,
+      FOREIGN KEY(node_id) REFERENCES nodes(id) ON DELETE CASCADE
+    );
+
     CREATE TABLE IF NOT EXISTS tags (
       id TEXT PRIMARY KEY,
       name TEXT UNIQUE,
@@ -53,5 +82,23 @@ export function initSchema() {
 
     CREATE INDEX IF NOT EXISTS idx_node_tags_tag_id
       ON node_tags(tag_id);
+
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_entities_canvas_title_key
+      ON entities(canvas_id, title_key);
+
+    CREATE INDEX IF NOT EXISTS idx_entities_canvas_id
+      ON entities(canvas_id);
+
+    CREATE INDEX IF NOT EXISTS idx_entities_primary_node_id
+      ON entities(primary_node_id);
+
+    CREATE INDEX IF NOT EXISTS idx_entity_mentions_canvas_id
+      ON entity_mentions(canvas_id);
+
+    CREATE INDEX IF NOT EXISTS idx_entity_mentions_entity_id
+      ON entity_mentions(entity_id);
+
+    CREATE INDEX IF NOT EXISTS idx_entity_mentions_node_id
+      ON entity_mentions(node_id);
   `);
 }

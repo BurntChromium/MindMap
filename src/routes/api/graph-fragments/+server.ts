@@ -3,6 +3,7 @@ import { db } from '$lib/server/db';
 import { createId, now } from '$lib/server/utils';
 import { getNodeTitlesByCanvasId } from '$lib/server/graphData';
 import { replaceNodeTags } from '$lib/server/nodeTags';
+import { rebuildEntitiesForCanvasId } from '$lib/server/entities';
 import { createNodeTitleAllocator } from '$lib/nodeTitles';
 import { isString, toNumber, toStringList, toTagList } from '$lib/mutationPayloads';
 
@@ -106,6 +107,8 @@ export async function POST({ request }) {
       for (const edge of normalizedEdges) {
         insertEdge.run(edge.id, canvasId, edge.source_node_id, edge.target_node_id);
       }
+
+      rebuildEntitiesForCanvasId(canvasId);
     });
 
     tx();
@@ -125,6 +128,24 @@ export async function POST({ request }) {
       return json({ success: true });
     }
 
+    const affectedCanvasIds = nodeIds.length
+      ? Array.from(
+          new Set(
+            (
+              db.prepare(
+                `
+                  SELECT DISTINCT canvas_id
+                  FROM nodes
+                  WHERE id IN (${nodeIds.map(() => '?').join(',')})
+                `
+              ).all(...nodeIds) as Array<{ canvas_id: string | null }>
+            )
+              .map((row) => row.canvas_id)
+              .filter((canvasId): canvasId is string => Boolean(canvasId))
+          )
+        )
+      : [];
+
     const deleteEdges = db.prepare(
       'DELETE FROM edges WHERE source_node_id = ? OR target_node_id = ?'
     );
@@ -142,6 +163,10 @@ export async function POST({ request }) {
 
       for (const nodeId of nodeIds) {
         deleteNodes.run(nodeId);
+      }
+
+      for (const canvasId of affectedCanvasIds) {
+        rebuildEntitiesForCanvasId(canvasId);
       }
     });
 

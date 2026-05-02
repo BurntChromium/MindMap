@@ -39,6 +39,8 @@ beforeEach(() => {
   db.prepare('DELETE FROM node_tags').run();
   db.prepare('DELETE FROM edges').run();
   db.prepare('DELETE FROM nodes').run();
+  db.prepare('DELETE FROM entity_mentions').run();
+  db.prepare('DELETE FROM entities').run();
   db.prepare('DELETE FROM canvases').run();
   db.prepare('DELETE FROM tags').run();
 });
@@ -160,6 +162,162 @@ describe('API integration', () => {
     const createdJson = await created.json();
 
     expect(createdJson.title).toBe('Node 1');
+  });
+
+  it('rebuilds entity rows and mentions from node bodies', async () => {
+    const canvas = await canvasesApi.POST({
+      request: request({ id: 'canvas-1', name: 'Entities' })
+    } as any);
+    const { id: canvasId } = await canvas.json();
+
+    const smaug = await nodesApi.POST({
+      request: request({ id: 'node-1', canvasId, x: 0, y: 0, title: 'Smaug' })
+    } as any);
+    const guide = await nodesApi.POST({
+      request: request({ id: 'node-2', canvasId, x: 120, y: 120, title: 'Guide' })
+    } as any);
+
+    const { id: smaugId } = await smaug.json();
+    const { id: guideId } = await guide.json();
+
+    await nodesApi.PATCH({
+      request: request({
+        id: guideId,
+        body: '[[Smaug]] [[Bilbo]] [[Smaug]]'
+      })
+    } as any);
+
+    const entityRows = db.prepare(`
+      SELECT title, title_key, primary_node_id
+      FROM entities
+      ORDER BY title_key
+    `).all();
+
+    expect(entityRows).toEqual([
+      expect.objectContaining({
+        title: 'Bilbo',
+        title_key: 'bilbo',
+        primary_node_id: null
+      }),
+      expect.objectContaining({
+        title: 'Guide',
+        title_key: 'guide',
+        primary_node_id: guideId
+      }),
+      expect.objectContaining({
+        title: 'Smaug',
+        title_key: 'smaug',
+        primary_node_id: smaugId
+      })
+    ]);
+
+    const mentionRows = db.prepare(`
+      SELECT title, title_key, node_id, reference_text, start_index, end_index
+      FROM entity_mentions
+      ORDER BY node_id, start_index
+    `).all();
+
+    expect(mentionRows).toEqual([
+      expect.objectContaining({
+        title: 'Smaug',
+        title_key: 'smaug',
+        node_id: guideId,
+        reference_text: '[[Smaug]]',
+        start_index: 0,
+        end_index: 9
+      }),
+      expect.objectContaining({
+        title: 'Bilbo',
+        title_key: 'bilbo',
+        node_id: guideId,
+        reference_text: '[[Bilbo]]',
+        start_index: 10,
+        end_index: 19
+      }),
+      expect.objectContaining({
+        title: 'Smaug',
+        title_key: 'smaug',
+        node_id: guideId,
+        reference_text: '[[Smaug]]',
+        start_index: 20,
+        end_index: 29
+      })
+    ]);
+  });
+
+  it('cascades title renames through matching entity references', async () => {
+    const canvas = await canvasesApi.POST({
+      request: request({ id: 'canvas-1', name: 'Rename Cascade' })
+    } as any);
+    const { id: canvasId } = await canvas.json();
+
+    const smaug = await nodesApi.POST({
+      request: request({ id: 'node-1', canvasId, x: 0, y: 0, title: 'Smaug' })
+    } as any);
+    const note = await nodesApi.POST({
+      request: request({ id: 'node-2', canvasId, x: 120, y: 120, title: 'Note' })
+    } as any);
+
+    const { id: smaugId } = await smaug.json();
+    const { id: noteId } = await note.json();
+
+    await nodesApi.PATCH({
+      request: request({
+        id: noteId,
+        body: '[[Smaug]] watches the gate.'
+      })
+    } as any);
+
+    await nodesApi.PATCH({
+      request: request({
+        id: smaugId,
+        title: 'Dragon'
+      })
+    } as any);
+
+    const listed = await nodesApi.GET({
+      url: new URL(`http://localhost/api/nodes?canvasId=${canvasId}`)
+    } as any);
+    const nodes = await listed.json();
+
+    expect(nodes.find((node: { id: string }) => node.id === noteId)).toMatchObject({
+      id: noteId,
+      body: '[[Dragon]] watches the gate.'
+    });
+
+    const entityRows = db.prepare(`
+      SELECT title, title_key, primary_node_id
+      FROM entities
+      ORDER BY title_key
+    `).all();
+
+    expect(entityRows).toEqual([
+      expect.objectContaining({
+        title: 'Dragon',
+        title_key: 'dragon',
+        primary_node_id: smaugId
+      }),
+      expect.objectContaining({
+        title: 'Note',
+        title_key: 'note',
+        primary_node_id: noteId
+      })
+    ]);
+
+    const mentionRows = db.prepare(`
+      SELECT title, title_key, node_id, reference_text
+      FROM entity_mentions
+      ORDER BY node_id, start_index
+    `).all();
+
+    expect(mentionRows).toEqual([
+      expect.objectContaining({
+        title: 'Dragon',
+        title_key: 'dragon',
+        node_id: noteId,
+        reference_text: '[[Dragon]]'
+      })
+    ]);
   });
 
   it('bulk-updates tags transactionally across selected nodes', async () => {
