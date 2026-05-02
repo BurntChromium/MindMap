@@ -25,6 +25,16 @@ function runDocker(args) {
 async function main() {
   const projectDir = process.cwd();
   const cacheDir = resolve(homedir(), '.cache');
+  const nodeModulesVolume = 'mindmap-win-node-modules';
+  const envArgs = [];
+
+  if (process.env.DEBUG) {
+    envArgs.push('-e', `DEBUG=${process.env.DEBUG}`);
+  }
+
+  if (process.env.npm_config_loglevel) {
+    envArgs.push('-e', `npm_config_loglevel=${process.env.npm_config_loglevel}`);
+  }
 
   await runDocker([
     'run',
@@ -35,17 +45,18 @@ async function main() {
     '-v',
     `${projectDir}:/project`,
     '-v',
-    `${resolve(projectDir, 'node_modules')}:/project/node_modules`,
+    `${nodeModulesVolume}:/project/node_modules`,
     '-v',
     `${resolve(cacheDir, 'electron')}:/root/.cache/electron`,
     '-v',
     `${resolve(cacheDir, 'electron-builder')}:/root/.cache/electron-builder`,
+    ...envArgs,
     '-w',
     '/project',
     'electronuserland/builder:wine',
     '/bin/bash',
     '-lc',
-    'npm run build:desktop && npx electron-builder --win'
+    'npm ci && npm run build:desktop && npx electron-builder --win'
   ]);
 }
 

@@ -46,6 +46,9 @@
 		"appId": "com.burntchrome.mindmap",
 		"productName": "Mindmap",
 		"asar": true,
+		"win": {
+			"signAndEditExecutable": false
+		},
 		"directories": {
 			"output": "release"
 		},

@@ -11,8 +11,12 @@ import {
 
 type JsonValue = Record<string, unknown> | Array<unknown> | string | number | boolean | null;
 
-async function requestJson<T>(input: RequestInfo | URL, init?: RequestInit): Promise<T> {
-  const response = init === undefined ? await fetch(input) : await fetch(input, init);
+async function requestJson<T>(
+  input: RequestInfo | URL,
+  init?: RequestInit,
+  fetchImpl: typeof fetch = fetch
+): Promise<T> {
+  const response = init === undefined ? await fetchImpl(input) : await fetchImpl(input, init);
 
   if (!response.ok) {
     const body = await response.json().catch(() => null);
@@ -27,7 +31,7 @@ async function requestJson<T>(input: RequestInfo | URL, init?: RequestInit): Pro
 }
 
 export type AppDataClient = {
-  loadInitialPageData: () => Promise<JsonValue>;
+  loadInitialPageData: (fetchImpl?: typeof fetch) => Promise<JsonValue>;
   loadCanvases: () => Promise<JsonValue>;
   createCanvas: (input: { id: string; name: string }) => Promise<JsonValue>;
   renameCanvas: (input: { id: string; name: string }) => Promise<JsonValue>;
@@ -55,7 +59,7 @@ export type AppDataIpcBridge = {
 
 function createFetchClient(): AppDataClient {
   return {
-    loadInitialPageData: () => requestJson('/api/page-data'),
+    loadInitialPageData: (fetchImpl) => requestJson('/api/page-data', undefined, fetchImpl),
     loadCanvases: () => requestJson('/api/canvases'),
     createCanvas: (input) =>
       requestJson('/api/canvases', {
@@ -174,7 +178,7 @@ export function setAppDataClient(client: AppDataClient) {
 }
 
 export const appDataClient = {
-  loadInitialPageData: () => activeClient.loadInitialPageData(),
+  loadInitialPageData: (fetchImpl?: typeof fetch) => activeClient.loadInitialPageData(fetchImpl),
   loadCanvases: () => activeClient.loadCanvases(),
   createCanvas: (input: { id: string; name: string }) => activeClient.createCanvas(input),
   renameCanvas: (input: { id: string; name: string }) => activeClient.renameCanvas(input),
