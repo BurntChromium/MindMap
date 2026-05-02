@@ -140,6 +140,4 @@ Plumbing to support it:
 
 ## Notes
 
-- Tags are already implemented at the node level, but tag management as a first-class system still needs search, filtering, and bulk editing before it feels complete.
-- The current editing model is explicit save on check, which is a good base for productionization because it gives us clearer mutation boundaries.
 - Rich text, references, and collaboration remain later-stage features and should be added only after the navigation and data-handling path is solid.
