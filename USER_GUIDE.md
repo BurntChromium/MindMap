@@ -16,11 +16,17 @@ Mindmap is a Svelte and SQLite app for building mind maps and linked notebooks o
 - `N`: create a new node
 - `C`: toggle the left canvas panel
 - `F`: toggle the right search panel
+- `-`: zoom out
+- `=`: zoom in
+- `E`: begin editing the currently selected node when exactly one node is selected
+- `V`: toggle the currently selected node between compact and view mode when exactly one node is selected and it is not being edited
+- `Tab` in edit mode: move through the node's editable fields
 - `Backspace` or `Delete`: delete the current selection
 - `Cmd/Ctrl+A`: select all nodes on the active canvas
 - `Cmd/Ctrl+C`: copy the current selection
 - `Cmd/Ctrl+X`: cut the current selection
 - `Cmd/Ctrl+V`: paste the copied fragment
+- `Shift+E`: save and exit node edit mode from a title, body, or tag field
 - `Cmd/Ctrl+Z`: undo the last canvas mutation
 - `Cmd/Ctrl+Shift+Z`: redo the last undone canvas mutation
 - `Cmd/Ctrl+D`: duplicate the current selection

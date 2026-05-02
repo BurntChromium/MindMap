@@ -21,6 +21,8 @@
     isCanvasToggleShortcut,
     isCreateNodeShortcut,
     isDiscoveryToggleShortcut,
+    isZoomInShortcut,
+    isZoomOutShortcut,
     isTextInputElement
   } from '$lib/shortcutUtils';
   import { canvasStore, type Canvas } from '$lib/stores/canvasStore';
@@ -242,6 +244,26 @@
         return;
       }
 
+      if (isZoomOutShortcut(event)) {
+        if (!canvasShell || !(activeElement instanceof Element) || !canvasShell.contains(activeElement)) {
+          return;
+        }
+
+        event.preventDefault();
+        void zoomCanvas(-1);
+        return;
+      }
+
+      if (isZoomInShortcut(event)) {
+        if (!canvasShell || !(activeElement instanceof Element) || !canvasShell.contains(activeElement)) {
+          return;
+        }
+
+        event.preventDefault();
+        void zoomCanvas(1);
+        return;
+      }
+
       if (
         !canvasShell ||
         !(activeElement instanceof HTMLElement) ||
@@ -271,6 +293,42 @@
       if (event.key === '/') {
         event.preventDefault();
         openQuickSearch();
+        return;
+      }
+
+      if (
+        event.key.toLowerCase() === 'e' &&
+        !event.metaKey &&
+        !event.ctrlKey &&
+        !event.altKey &&
+        !event.shiftKey
+      ) {
+        const nodeId = getSingleSelectedNodeId();
+
+        if (!nodeId || editingNodeId) {
+          return;
+        }
+
+        event.preventDefault();
+        void beginEditingNode(nodeId);
+        return;
+      }
+
+      if (
+        event.key.toLowerCase() === 'v' &&
+        !event.metaKey &&
+        !event.ctrlKey &&
+        !event.altKey &&
+        !event.shiftKey
+      ) {
+        const nodeId = getSingleSelectedNodeId();
+
+        if (!nodeId || editingNodeId) {
+          return;
+        }
+
+        event.preventDefault();
+        nodeUiStore.toggleExpanded(nodeId);
         return;
       }
 
@@ -561,6 +619,10 @@
     return nodes.filter((node) => selectedIds.has(node.id));
   }
 
+  function getSingleSelectedNodeId() {
+    return selectedNodeIds.length === 1 ? selectedNodeIds[0] ?? null : null;
+  }
+
   function queueNodePositionUpdates(updates: NodePositionUpdate[]) {
     nodeMoveQueue = nodeMoveQueue
       .then(() => nodeStore.updateNodePositions(updates).then(() => undefined))
@@ -614,6 +676,36 @@
             : { ...viewport, y: viewport.y - flowStep };
 
     void canvasStageApi.setViewport(nextViewport);
+  }
+
+  async function zoomCanvas(direction: -1 | 1) {
+    if (!canvasStageApi) {
+      return;
+    }
+
+    if (direction === -1) {
+      await canvasStageApi.zoomOut();
+      return;
+    }
+
+    await canvasStageApi.zoomIn();
+  }
+
+  async function beginEditingNode(nodeId: string) {
+    const nextNode = nodes.find((node) => node.id === nodeId);
+
+    if (!nextNode) {
+      return;
+    }
+
+    focusedNodeId = nodeId;
+    selectionStore.selectNode(nodeId);
+    nodeUiStore.beginEdit(nodeId);
+
+    if (canvasStageApi) {
+      const currentZoom = canvasStageApi.getViewport().zoom;
+      void canvasStageApi.setCenter(nextNode.x, nextNode.y, { zoom: currentZoom });
+    }
   }
 
   function focusNearestNode(direction: Direction, extendSelection = false) {

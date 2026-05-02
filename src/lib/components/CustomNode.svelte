@@ -23,12 +23,15 @@
 
   let nodeMode = $state<NodeMode>('compact');
   let titleInput = $state<HTMLInputElement | undefined>(undefined);
+  let tagInput = $state<HTMLInputElement | undefined>(undefined);
+  let bodyInput = $state<HTMLTextAreaElement | undefined>(undefined);
   let draftTitle = $state('');
   let draftBody = $state('');
   let draftTags = $state<string[]>([]);
   let draftTagInput = $state('');
   let draftIsEntity = $state(true);
   let titleError = $state<string | null>(null);
+  let editFocusApplied = $state(false);
 
   const isEditing = $derived(nodeMode === 'edit');
   const isExpanded = $derived(nodeMode !== 'compact');
@@ -59,6 +62,7 @@
 
   $effect(() => {
     if (!isEditing) {
+      editFocusApplied = false;
       draftTitle = data.label || 'Untitled';
       draftBody = bodyText;
       draftTags = normalizeTagList(nodeTags);
@@ -66,6 +70,31 @@
       draftIsEntity = isEntityPage;
       titleError = null;
     }
+  });
+
+  $effect(() => {
+    if (!isEditing || editFocusApplied) {
+      return;
+    }
+
+    editFocusApplied = true;
+
+    let cancelled = false;
+
+    void (async () => {
+      await tick();
+
+      if (cancelled) {
+        return;
+      }
+
+      titleInput?.focus();
+      titleInput?.select();
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   });
 
   async function beginEdit() {
@@ -76,9 +105,37 @@
     draftIsEntity = isEntityPage;
     titleError = null;
     nodeUiStore.beginEdit(id);
-    await tick();
-    titleInput?.focus();
-    titleInput?.select();
+  }
+
+  function focusEditField(target: 'title' | 'tag' | 'body') {
+    if (target === 'title') {
+      titleInput?.focus();
+      titleInput?.select();
+      return;
+    }
+
+    if (target === 'tag') {
+      tagInput?.focus();
+      tagInput?.select();
+      return;
+    }
+
+    bodyInput?.focus();
+    bodyInput?.select();
+  }
+
+  function focusNextEditField(current: 'title' | 'tag' | 'body') {
+    if (current === 'title') {
+      focusEditField(tagInput ? 'tag' : 'body');
+      return;
+    }
+
+    if (current === 'tag') {
+      focusEditField('body');
+      return;
+    }
+
+    focusEditField('title');
   }
 
   function tagKey(tags: string[]) {
@@ -167,6 +224,18 @@
   }
 
   function handleTitleKeyDown(e: KeyboardEvent) {
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      focusNextEditField('title');
+      return;
+    }
+
+    if (e.shiftKey && !e.metaKey && !e.ctrlKey && !e.altKey && e.key.toLowerCase() === 'e') {
+      e.preventDefault();
+      void saveAndLock();
+      return;
+    }
+
     if (e.key === 'Enter') {
       e.preventDefault();
       void saveAndLock();
@@ -174,6 +243,18 @@
   }
 
   function handleBodyKeyDown(e: KeyboardEvent) {
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      focusNextEditField('body');
+      return;
+    }
+
+    if (e.shiftKey && !e.metaKey && !e.ctrlKey && !e.altKey && e.key.toLowerCase() === 'e') {
+      e.preventDefault();
+      void saveAndLock();
+      return;
+    }
+
     if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
       e.preventDefault();
       void saveAndLock();
@@ -181,6 +262,18 @@
   }
 
   function handleTagKeyDown(e: KeyboardEvent) {
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      focusNextEditField('tag');
+      return;
+    }
+
+    if (e.shiftKey && !e.metaKey && !e.ctrlKey && !e.altKey && e.key.toLowerCase() === 'e') {
+      e.preventDefault();
+      void saveAndLock();
+      return;
+    }
+
     if (e.key === 'Enter' || e.key === ',') {
       e.preventDefault();
       commitDraftTagInput();
@@ -270,6 +363,7 @@
         <button
           class="mode-button nodrag"
           type="button"
+          tabindex={isEditing ? -1 : 0}
           disabled={isEditing}
           aria-label={isExpanded ? 'Collapse node preview' : 'Expand node preview'}
           title={isExpanded ? 'Collapse node preview' : 'Expand node preview'}
@@ -285,6 +379,7 @@
         <button
           class="mode-button nodrag"
           type="button"
+          tabindex={isEditing ? -1 : 0}
           aria-label={isEditing ? 'Save node' : 'Edit node'}
           title={isEditing ? 'Save node' : 'Edit node'}
           onclick={handleEditToggle}
@@ -306,6 +401,7 @@
       <label class="entity-toggle nodrag">
         <input
           type="checkbox"
+          tabindex="-1"
           bind:checked={draftIsEntity}
         />
         <span>Treat as entity page</span>
@@ -321,6 +417,7 @@
               <button
                 class="tag-remove nodrag"
                 type="button"
+                tabindex={-1}
                 aria-label={`Remove ${formatTagLabel(tag)}`}
                 title={`Remove ${formatTagLabel(tag)}`}
                 onclick={() => removeDraftTag(tag)}
@@ -333,6 +430,7 @@
           <span class="tag-input-shell">
             <span class="tag-prefix">#</span>
             <input
+              bind:this={tagInput}
               bind:value={draftTagInput}
               class="tag-input nodrag"
               aria-label="Add tag"
@@ -363,6 +461,7 @@
       <div class="body-area">
         {#if isEditing}
           <textarea
+            bind:this={bodyInput}
             bind:value={draftBody}
             class="body-editor nodrag"
             placeholder="Add body text"

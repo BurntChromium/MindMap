@@ -13,6 +13,8 @@
   const api: CanvasStageApi = {
     getViewport: () => flow.getViewport(),
     setViewport: (viewport) => flow.setViewport(viewport),
+    zoomIn: () => flow.zoomIn(),
+    zoomOut: () => flow.zoomOut(),
     setCenter: (x, y, options) => flow.setCenter(x, y, options)
   };
 

@@ -30,6 +30,14 @@ export function isDiscoveryToggleShortcut(event: KeyboardEvent) {
   return isKeyShortcut(event, 'f');
 }
 
+export function isZoomOutShortcut(event: KeyboardEvent) {
+  return isKeyShortcut(event, '-');
+}
+
+export function isZoomInShortcut(event: KeyboardEvent) {
+  return isKeyShortcut(event, '=');
+}
+
 function isKeyShortcut(event: KeyboardEvent, key: string) {
   if (event.defaultPrevented) {
     return false;

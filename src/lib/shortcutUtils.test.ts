@@ -3,6 +3,8 @@ import {
   isCanvasToggleShortcut,
   isCreateNodeShortcut,
   isDiscoveryToggleShortcut,
+  isZoomInShortcut,
+  isZoomOutShortcut,
   isTextInputElement
 } from '$lib/shortcutUtils';
 
@@ -44,6 +46,30 @@ describe('shortcutUtils', () => {
     } as KeyboardEvent;
 
     expect(isDiscoveryToggleShortcut(event)).toBe(true);
+  });
+
+  it('recognizes zoom shortcuts', () => {
+    expect(
+      isZoomOutShortcut({
+        key: '-',
+        metaKey: false,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: false,
+        defaultPrevented: false
+      } as KeyboardEvent)
+    ).toBe(true);
+
+    expect(
+      isZoomInShortcut({
+        key: '=',
+        metaKey: false,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: false,
+        defaultPrevented: false
+      } as KeyboardEvent)
+    ).toBe(true);
   });
 
   it('ignores modifier combinations', () => {
