@@ -58,6 +58,14 @@ function request(body: unknown) {
 }
 
 describe('API integration', () => {
+  it('creates the node_tags tag lookup index', () => {
+    const index = db
+      .prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND name = ?")
+      .get('idx_node_tags_tag_id');
+
+    expect(index).toEqual(expect.objectContaining({ name: 'idx_node_tags_tag_id' }));
+  });
+
   it('creates canvases and lists them back', async () => {
     const created = await canvasesApi.POST({
       request: request({ id: 'canvas-1', name: 'World' })

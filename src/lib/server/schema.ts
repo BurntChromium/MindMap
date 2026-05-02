@@ -50,5 +50,8 @@ export function initSchema() {
 
     CREATE INDEX IF NOT EXISTS idx_edges_canvas_id
       ON edges(canvas_id);
+
+    CREATE INDEX IF NOT EXISTS idx_node_tags_tag_id
+      ON node_tags(tag_id);
   `);
 }

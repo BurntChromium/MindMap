@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { collectTagSummaries, filterDiscoveryNodes } from './discovery';
+import { collectTagSummaries, createDiscoveryState, filterDiscoveryNodes } from './discovery';
 
 describe('discovery helpers', () => {
   const nodes = [
@@ -36,5 +36,15 @@ describe('discovery helpers', () => {
     expect(filterDiscoveryNodes(nodes, 'dragon', 'npc').map((node) => node.id)).toEqual(['1']);
     expect(filterDiscoveryNodes(nodes, '', null)).toEqual([]);
   });
-});
 
+  it('derives tag summaries and search hits in a single pass', () => {
+    const state = createDiscoveryState(nodes, 'dragon', 'npc');
+
+    expect(state.tagSummaries).toEqual([
+      expect.objectContaining({ name: 'npc', count: 2, color: expect.any(String) }),
+      expect.objectContaining({ name: 'lore', count: 1, color: expect.any(String) })
+    ]);
+    expect(state.searchResults.map((node) => node.id)).toEqual(['1']);
+    expect(Array.from(state.searchHitIds)).toEqual(['1']);
+  });
+});

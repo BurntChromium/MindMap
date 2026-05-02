@@ -16,7 +16,7 @@
     type ClipboardFragmentV1
   } from '$lib/graph/clipboard';
   import { getNearestNodeInDirection, type Direction } from '$lib/graph/navigation';
-  import { collectTagSummaries, filterDiscoveryNodes } from '$lib/discovery';
+  import { collectTagSummaries, createDiscoveryState } from '$lib/discovery';
   import {
     isCanvasToggleShortcut,
     isCreateNodeShortcut,
@@ -29,7 +29,6 @@
     buildBulkTagMutations,
     buildTagColorMap,
     getActiveFilterLabel,
-    getSearchHitIds,
     shouldBlockCreateNodeShortcut,
     shouldClearFocusedNode,
     toggleActiveTagFilter
@@ -89,11 +88,12 @@
   const mutationError = $derived(storeMutationError);
   const selectedNodeIdSet = $derived(new Set(selectedNodeIds));
   const selectedNodes = $derived(nodes.filter((node) => selectedNodeIdSet.has(node.id)));
-  const tagSummaries = $derived(collectTagSummaries(nodes));
+  const discoveryState = $derived(createDiscoveryState(nodes, searchQuery, activeTag));
+  const tagSummaries = $derived(discoveryState.tagSummaries);
   const tagColorMap = $derived(buildTagColorMap(tagSummaries));
   const selectedTagSummaries = $derived(collectTagSummaries(selectedNodes));
-  const searchResults = $derived(filterDiscoveryNodes(nodes, searchQuery, activeTag));
-  const searchHitIds = $derived(getSearchHitIds(nodes, searchQuery, activeTag));
+  const searchResults = $derived(discoveryState.searchResults);
+  const searchHitIds = $derived(discoveryState.searchHitIds);
   const flowNodes = $derived(
     toFlowNodes(nodes, {
       editingNodeId,

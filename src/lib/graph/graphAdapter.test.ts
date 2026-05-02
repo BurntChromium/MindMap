@@ -6,7 +6,7 @@ vi.mock('$lib/stores/nodeStore', () => ({
   }
 }));
 
-import { fromFlowPositionChange, toFlowNodes } from './graphAdapter';
+import { fromFlowPositionChange, toFlowEdges, toFlowNodes } from './graphAdapter';
 
 describe('graphAdapter', () => {
   it('maps node positions from flow state', () => {
@@ -62,5 +62,44 @@ describe('graphAdapter', () => {
         draggable: false
       }
     ]);
+  });
+
+  it('reuses unchanged flow nodes and edges across repeated projections', () => {
+    const nodes = [
+      {
+        id: '1',
+        canvas_id: 'canvas-1',
+        title: 'First',
+        body: 'Body',
+        tags: ['lore'],
+        x: 1,
+        y: 2,
+        collapsed: 0
+      }
+    ];
+    const edges = [
+      {
+        id: 'edge-1',
+        canvas_id: 'canvas-1',
+        source_node_id: '1',
+        target_node_id: '2'
+      }
+    ];
+    const options = {
+      editingNodeId: null,
+      selectedNodeIds: [],
+      activeTag: null,
+      searchHitIds: new Set<string>(),
+      tagColors: {},
+      onTagClick: vi.fn()
+    };
+
+    const firstNodes = toFlowNodes(nodes, options);
+    const secondNodes = toFlowNodes(nodes, options);
+    const firstEdges = toFlowEdges(edges);
+    const secondEdges = toFlowEdges(edges);
+
+    expect(secondNodes[0]).toBe(firstNodes[0]);
+    expect(secondEdges[0]).toBe(firstEdges[0]);
   });
 });
