@@ -7,7 +7,7 @@
   import type { CanvasStageApi } from '$lib/canvasApi';
   import CanvasSidebar from '$lib/components/CanvasSidebar.svelte';
   import CanvasStage from '$lib/components/CanvasStage.svelte';
-  import DiscoveryPanel from '$lib/components/DiscoveryPanel.svelte';
+  import RightPanel from '$lib/components/RightPanel.svelte';
   import {
     buildClipboardFragment,
     buildPastedGraph,
@@ -38,12 +38,14 @@
     type Node,
     type NodePositionUpdate
   } from '$lib/stores/nodeStore';
+  import { entityStore, type Entity, type EntityMention } from '$lib/stores/entityStore';
   import { historyStore } from '$lib/stores/historyStore';
   import { mutationStateStore } from '$lib/stores/mutationStateStore';
   import { nodeUiStore } from '$lib/stores/nodeUiStore';
   import { clipboardStore } from '$lib/stores/clipboardStore';
   import { toFlowEdges, toFlowNodes } from '$lib/graph/graphAdapter';
   import { selectionStore } from '$lib/stores/selectionStore';
+  import { buildEntityInspectorEntries } from '$lib/entityInspector';
 
   let { data }: { data: PageData } = $props();
 
@@ -51,6 +53,8 @@
   let storeActiveCanvasId = $state<string | null>(null);
   let storeNodes = $state.raw<Node[] | null>(null);
   let storeEdges = $state<Edge[] | null>(null);
+  let storeEntities = $state.raw<Entity[] | null>(null);
+  let storeEntityMentions = $state.raw<EntityMention[] | null>(null);
   let storeSelectedNodeIds = $state<string[] | null>(null);
   let storeClipboardFragment = $state<ClipboardFragmentV1 | null>(null);
   let storeClipboardPasteCount = $state(0);
@@ -60,6 +64,8 @@
   let bulkTagFocusSignal = $state(0);
   let searchQuery = $state('');
   let activeTag = $state<string | null>(null);
+  let activePanelTab = $state<'search' | 'tags' | 'entities'>('search');
+  let activeEntityId = $state<string | null>(null);
   let focusedNodeId = $state<string | null>(null);
   let editingNodeId = $state<string | null>(null);
   let sidebarCollapsed = $state(false);
@@ -76,11 +82,15 @@
   const initialActiveCanvasId = $derived.by(() => data.activeCanvasId);
   const initialNodes = $derived.by(() => data.nodes);
   const initialEdges = $derived.by(() => data.edges);
+  const initialEntities = $derived.by(() => data.entities);
+  const initialEntityMentions = $derived.by(() => data.entityMentions);
 
   const canvases = $derived(storeCanvases ?? initialCanvases);
   const activeCanvasId = $derived(storeActiveCanvasId ?? initialActiveCanvasId);
   const nodes = $derived(storeNodes ?? initialNodes);
   const edges = $derived(storeEdges ?? initialEdges);
+  const entities = $derived(storeEntities ?? initialEntities);
+  const entityMentions = $derived(storeEntityMentions ?? initialEntityMentions);
   const selectedNodeIds = $derived(storeSelectedNodeIds ?? []);
   const clipboardFragment = $derived(storeClipboardFragment);
   const clipboardPasteCount = $derived(storeClipboardPasteCount);
@@ -94,6 +104,9 @@
   const selectedTagSummaries = $derived(collectTagSummaries(selectedNodes));
   const searchResults = $derived(discoveryState.searchResults);
   const searchHitIds = $derived(discoveryState.searchHitIds);
+  const entityInspectorEntries = $derived(
+    buildEntityInspectorEntries(entities, entityMentions, nodes)
+  );
   const flowNodes = $derived(
     toFlowNodes(nodes, {
       editingNodeId,
@@ -131,6 +144,7 @@
     canvasStore.hydrate(initialCanvases, initialActiveCanvasId);
     nodeStore.hydrate(initialNodes, initialActiveCanvasId);
     edgeStore.hydrate(initialEdges, initialActiveCanvasId);
+    entityStore.hydrate(initialEntities, initialEntityMentions, initialActiveCanvasId);
 
     const handleKeyDown = (event: KeyboardEvent) => {
       const activeElement = document.activeElement;
@@ -296,6 +310,11 @@
       storeEdges = Array.from(v.edges.values());
     });
 
+    const unsubEntities = entityStore.subscribe((v) => {
+      storeEntities = v.entities;
+      storeEntityMentions = v.mentions;
+    });
+
     const unsubNodeUi = nodeUiStore.subscribe((v) => {
       editingNodeId = v.editingNodeId;
     });
@@ -322,6 +341,7 @@
       unsubCanvas();
       unsubNodes();
       unsubEdges();
+      unsubEntities();
       unsubNodeUi();
       unsubSelection();
       unsubClipboard();
@@ -338,6 +358,8 @@
     duplicateCount = 0;
     searchQuery = '';
     activeTag = null;
+    activePanelTab = 'search';
+    activeEntityId = null;
     focusedNodeId = null;
     void loadActiveCanvas(activeCanvasId);
   });
@@ -356,6 +378,16 @@
 
     if (!(searchQuery.trim() || activeTag) && (!focusedNodeId || !selectedNodeIds.includes(focusedNodeId))) {
       focusedNodeId = selectedNodeIds[0] ?? null;
+    }
+  });
+
+  $effect(() => {
+    if (!activeEntityId) {
+      return;
+    }
+
+    if (!entityInspectorEntries.some((entry) => entry.id === activeEntityId)) {
+      activeEntityId = null;
     }
   });
 
@@ -410,8 +442,19 @@
   }
 
   function focusSearchResult(nodeId: string) {
+    focusNode(nodeId);
+  }
+
+  function focusNode(nodeId: string) {
     focusedNodeId = nodeId;
     selectionStore.selectNode(nodeId);
+
+    const nextNode = nodes.find((node) => node.id === nodeId);
+
+    if (nextNode && canvasStageApi) {
+      const currentZoom = canvasStageApi.getViewport().zoom;
+      void canvasStageApi.setCenter(nextNode.x, nextNode.y, { zoom: currentZoom });
+    }
   }
 
   function toggleDiscoveryPanel() {
@@ -590,6 +633,7 @@
     }
 
     discoveryCollapsed = false;
+    activePanelTab = 'tags';
     bulkTagFocusSignal += 1;
   }
 
@@ -671,6 +715,7 @@
         nodeStore.hydrate(reconciledNodes, activeCanvasId);
       }
 
+      await entityStore.load(activeCanvasId);
       onSuccess?.();
       return true;
     } catch (error) {
@@ -817,6 +862,8 @@
       return false;
     }
 
+    await entityStore.load(activeCanvasId);
+
     if (!historyStore.isReplaying()) {
       historyStore.record({
         label: 'Delete nodes',
@@ -880,7 +927,11 @@
   }
 
   async function loadActiveCanvas(canvasId: string) {
-    await Promise.all([nodeStore.load(canvasId), edgeStore.load(canvasId)]);
+    await Promise.all([
+      nodeStore.load(canvasId),
+      edgeStore.load(canvasId),
+      entityStore.load(canvasId)
+    ]);
   }
 </script>
 
@@ -902,14 +953,13 @@
         onAddNode={addNode}
         onConnect={onConnect}
         onNodeClick={(nodeId, shiftKey) => {
-          focusedNodeId = nodeId;
-
           if (shiftKey) {
+            focusedNodeId = nodeId;
             selectionStore.toggleNode(nodeId);
             return;
           }
 
-          selectionStore.selectNode(nodeId);
+          focusNode(nodeId);
         }}
         onSelectionChange={handleSelectionChange}
         onPaneClick={handlePaneClick}
@@ -990,9 +1040,11 @@
       {/if}
     </div>
 
-    <DiscoveryPanel
+    <RightPanel
       bind:collapsed={discoveryCollapsed}
       bind:searchQuery={searchQuery}
+      bind:activeTab={activePanelTab}
+      bind:activeEntityId={activeEntityId}
       activeTag={activeTag}
       focusedNodeId={focusedNodeId}
       selectedNodeCount={selectedNodeIds.length}
@@ -1001,9 +1053,11 @@
       tagSummaries={tagSummaries}
       searchResults={searchResults}
       activeFilterLabel={activeFilterLabel}
+      entityEntries={entityInspectorEntries}
       onToggleTagFilter={toggleTagFilter}
       onClearFilters={clearDiscoveryFilters}
       onFocusSearchResult={focusSearchResult}
+      onFocusEntityNode={focusNode}
       onAddSelectedTag={addTagToSelection}
       onRemoveSelectedTag={removeTagFromSelection}
       onDuplicateSelection={duplicateSelection}

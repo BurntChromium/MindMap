@@ -2,6 +2,7 @@ import { get, writable } from 'svelte/store';
 import { createClientId } from '$lib/clientId';
 import { hasNodeTitleConflict, normalizeNodeTitle, resolveUniqueNodeTitle } from '$lib/nodeTitles';
 import { buildBulkPositionsBody, buildBulkTagsBody, buildNodeCreateBody, buildNodePatchBody } from '$lib/mutationPayloads';
+import { entityStore } from '$lib/stores/entityStore';
 import { historyStore } from '$lib/stores/historyStore';
 import { mutationStateStore } from '$lib/stores/mutationStateStore';
 
@@ -237,6 +238,7 @@ function createNodeStore() {
               })
           });
         }
+        await entityStore.load(canvasId);
         mutationStateStore.finishWrite(true);
         return true;
       } catch (error) {
@@ -321,6 +323,11 @@ function createNodeStore() {
           });
         }
 
+        const refreshCanvasId = before?.canvas_id ?? previous.activeCanvasId;
+
+        if (refreshCanvasId) {
+          await entityStore.load(refreshCanvasId);
+        }
         mutationStateStore.finishWrite(true);
         return true;
       } catch (error) {
@@ -513,6 +520,11 @@ function createNodeStore() {
           });
         }
 
+        const refreshCanvasId = removedNode?.canvas_id ?? previous.activeCanvasId;
+
+        if (refreshCanvasId) {
+          await entityStore.load(refreshCanvasId);
+        }
         mutationStateStore.finishWrite(true);
         return true;
       } catch (error) {

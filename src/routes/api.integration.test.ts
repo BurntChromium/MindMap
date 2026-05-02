@@ -13,6 +13,7 @@ let nodesApi: typeof import('./api/nodes/+server');
 let bulkTagsApi: typeof import('./api/nodes/bulk-tags/+server');
 let bulkPositionApi: typeof import('./api/nodes/bulk-position/+server');
 let graphFragmentsApi: typeof import('./api/graph-fragments/+server');
+let entitiesApi: typeof import('./api/entities/+server');
 let edgesApi: typeof import('./api/edges/+server');
 let searchApi: typeof import('./api/search/+server');
 let db: any;
@@ -26,6 +27,7 @@ beforeAll(async () => {
   bulkTagsApi = await import('./api/nodes/bulk-tags/+server');
   bulkPositionApi = await import('./api/nodes/bulk-position/+server');
   graphFragmentsApi = await import('./api/graph-fragments/+server');
+  entitiesApi = await import('./api/entities/+server');
   edgesApi = await import('./api/edges/+server');
   searchApi = await import('./api/search/+server');
   db = (await import('$lib/server/db')).db;
@@ -241,6 +243,58 @@ describe('API integration', () => {
         reference_text: '[[Smaug]]',
         start_index: 20,
         end_index: 29
+      })
+    ]);
+  });
+
+  it('returns entity rows and mentions through the entities api', async () => {
+    const canvas = await canvasesApi.POST({
+      request: request({ id: 'canvas-1', name: 'Entities API' })
+    } as any);
+    const { id: canvasId } = await canvas.json();
+
+    await nodesApi.POST({
+      request: request({ id: 'node-1', canvasId, x: 0, y: 0, title: 'Smaug' })
+    } as any);
+    await nodesApi.POST({
+      request: request({
+        id: 'node-2',
+        canvasId,
+        x: 120,
+        y: 120,
+        title: 'Note',
+        body: '[[Smaug]] in the mountain.'
+      })
+    } as any);
+
+    const response = await entitiesApi.GET({
+      url: new URL(`http://localhost/api/entities?canvasId=${canvasId}`)
+    } as any);
+    const payload = await response.json();
+
+    expect(payload.entities).toEqual([
+      expect.objectContaining({
+        title: 'Note',
+        title_key: 'note',
+        primary_node_id: 'node-2',
+        mention_count: 0
+      }),
+      expect.objectContaining({
+        title: 'Smaug',
+        title_key: 'smaug',
+        primary_node_id: 'node-1',
+        mention_count: 1
+      })
+    ]);
+
+    expect(payload.mentions).toEqual([
+      expect.objectContaining({
+        title: 'Smaug',
+        title_key: 'smaug',
+        node_id: 'node-2',
+        reference_text: '[[Smaug]]',
+        start_index: 0,
+        end_index: 9
       })
     ]);
   });

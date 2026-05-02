@@ -1,6 +1,7 @@
 import { db } from './db';
 import { normalizeTagList, normalizeTagName } from '$lib/tagUtils';
 import { getTagColor } from '$lib/tagColors';
+import { getEntitiesByCanvasId, getEntityMentionsByCanvasId } from '$lib/server/entities';
 
 export type CanvasRow = {
   id: string;
@@ -217,6 +218,8 @@ export function getInitialPageData() {
     activeCanvasId,
     nodes: getNodesByCanvasId(activeCanvasId),
     edges: getEdgesByCanvasId(activeCanvasId),
-    tags: getTagsByCanvasId(activeCanvasId)
+    tags: getTagsByCanvasId(activeCanvasId),
+    entities: getEntitiesByCanvasId(activeCanvasId),
+    entityMentions: getEntityMentionsByCanvasId(activeCanvasId)
   };
 }

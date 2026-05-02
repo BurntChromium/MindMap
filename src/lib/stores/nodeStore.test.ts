@@ -122,7 +122,9 @@ describe('nodeStore', () => {
   });
 
   it('creates a node optimistically after POST', async () => {
-    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({ id: 'node-2' }));
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(jsonResponse({ id: 'node-2' }))
+      .mockResolvedValueOnce(jsonResponse({ entities: [], mentions: [] }));
 
     await nodeStore.create('canvas-1', 50, 75);
 
@@ -135,6 +137,7 @@ describe('nodeStore', () => {
         method: 'POST'
       })
     );
+    expect(fetch).toHaveBeenLastCalledWith('/api/entities?canvasId=canvas-1');
     expect(snapshot().get(body.id)).toMatchObject({
       id: body.id,
       canvas_id: 'canvas-1',
@@ -168,7 +171,8 @@ describe('nodeStore', () => {
           }
         ])
       )
-      .mockResolvedValueOnce(jsonResponse({ success: true }));
+      .mockResolvedValueOnce(jsonResponse({ success: true }))
+      .mockResolvedValueOnce(jsonResponse({ entities: [], mentions: [] }));
 
     await nodeStore.load('canvas-1');
     await nodeStore.updateNode({ id: 'node-3', title: 'New', tags: ['lore'] });
@@ -177,13 +181,15 @@ describe('nodeStore', () => {
       title: 'New',
       tags: ['lore']
     });
-    expect(fetch).toHaveBeenLastCalledWith(
+    expect(fetch).toHaveBeenNthCalledWith(
+      2,
       '/api/nodes',
       expect.objectContaining({
         method: 'PATCH',
         body: JSON.stringify({ id: 'node-3', title: 'New', tags: ['lore'] })
       })
     );
+    expect(fetch).toHaveBeenLastCalledWith('/api/entities?canvasId=canvas-1');
   });
 
   it('blocks duplicate titles before sending a patch request', async () => {
