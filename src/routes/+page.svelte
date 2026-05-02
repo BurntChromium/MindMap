@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import type { Connection } from '@xyflow/svelte';
+  import { Search, X } from 'lucide-svelte';
   import type { PageData } from './$types';
   import { createClientId } from '$lib/clientId';
   import type { CanvasStageApi } from '$lib/canvasApi';
@@ -60,11 +61,13 @@
   let editingNodeId = $state<string | null>(null);
   let sidebarCollapsed = $state(false);
   let discoveryCollapsed = $state(false);
+  let quickSearchOpen = $state(false);
   let loadedCanvasId = $state<string | null>(null);
   let initialHydrationDone = $state(false);
   let canvasStageApi = $state<CanvasStageApi | null>(null);
   let nodeMoveQueue = Promise.resolve();
   let canvasShell: HTMLDivElement | undefined;
+  let quickSearchInputRef = $state<HTMLInputElement | undefined>(undefined);
 
   const initialCanvases = $derived.by(() => data.canvases);
   const initialActiveCanvasId = $derived.by(() => data.activeCanvasId);
@@ -201,6 +204,12 @@
         return;
       }
 
+      if (event.key === '/') {
+        event.preventDefault();
+        openQuickSearch();
+        return;
+      }
+
       const direction = getCanvasDirectionFromKey(event.key);
 
       if (direction) {
@@ -331,6 +340,24 @@
     searchQuery = '';
     activeTag = null;
     focusedNodeId = null;
+    quickSearchOpen = false;
+  }
+
+  function openQuickSearch() {
+    quickSearchOpen = true;
+    discoveryCollapsed = false;
+
+    queueMicrotask(() => {
+      quickSearchInputRef?.focus();
+      quickSearchInputRef?.select();
+    });
+  }
+
+  function closeQuickSearch() {
+    quickSearchOpen = false;
+    queueMicrotask(() => {
+      canvasShell?.focus();
+    });
   }
 
   function focusCanvasShell() {
@@ -772,6 +799,44 @@
           canvasStageApi = api;
         }}
       />
+
+      {#if selectedNodeIds.length > 0}
+        <div class="canvas-hint canvas-hint--selection" aria-live="polite">
+          {selectedNodeIds.length} selected
+        </div>
+      {/if}
+
+      {#if quickSearchOpen}
+        <div class="canvas-search-bar">
+          <Search size={14} aria-hidden="true" />
+          <input
+            bind:this={quickSearchInputRef}
+            bind:value={searchQuery}
+            class="canvas-search-bar__input"
+            placeholder="Search nodes"
+            aria-label="Search nodes"
+            onkeydown={(event) => {
+              if (event.key === 'Escape') {
+                event.preventDefault();
+                closeQuickSearch();
+              }
+            }}
+          />
+          <button
+            class="icon-button canvas-search-bar__clear"
+            type="button"
+            aria-label="Clear search"
+            title="Clear search"
+          onclick={() => {
+            searchQuery = '';
+            closeQuickSearch();
+          }}
+            disabled={!searchQuery.trim()}
+          >
+            <X size={12} aria-hidden="true" />
+          </button>
+        </div>
+      {/if}
     </div>
 
     <DiscoveryPanel
@@ -793,6 +858,12 @@
       onDuplicateSelection={duplicateSelection}
       onDuplicateSubtree={duplicateSubtreeSelection}
       onClearSelection={clearSelection}
+      onExitBulkTagInput={() => {
+        focusedNodeId = selectedNodeIds[0] ?? focusedNodeId;
+        queueMicrotask(() => {
+          canvasShell?.focus();
+        });
+      }}
     />
   </main>
 </div>
@@ -810,5 +881,62 @@
     .workspace {
       flex-direction: column;
     }
+  }
+
+  .canvas-hint {
+    position: absolute;
+    z-index: 6;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    border: 1px solid rgba(148, 163, 184, 0.45);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.92);
+    box-shadow: var(--shadow-soft);
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    padding: 0.4rem 0.65rem;
+    backdrop-filter: blur(8px);
+  }
+
+  .canvas-hint--selection {
+    right: 1rem;
+    bottom: 1rem;
+  }
+
+  .canvas-search-bar {
+    position: absolute;
+    right: 1rem;
+    bottom: 3.5rem;
+    z-index: 6;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    min-width: 260px;
+    padding: 0.5rem 0.65rem;
+    border: 1px solid rgba(148, 163, 184, 0.45);
+    border-radius: 0.9rem;
+    background: rgba(255, 255, 255, 0.96);
+    box-shadow: var(--shadow-soft);
+    backdrop-filter: blur(10px);
+  }
+
+  .canvas-search-bar__input {
+    flex: 1 1 auto;
+    min-width: 0;
+    border: 0;
+    background: transparent;
+    color: var(--text-main);
+    outline: none;
+  }
+
+  .canvas-search-bar__input::placeholder {
+    color: var(--text-muted);
+  }
+
+  .canvas-search-bar__clear {
+    flex: 0 0 auto;
+    width: 1.5rem;
+    height: 1.5rem;
   }
 </style>

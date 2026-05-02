@@ -23,6 +23,7 @@ Mindmap is a Svelte and SQLite app for building mind maps and linked notebooks o
 - `Cmd/Ctrl+V`: paste the copied fragment
 - `Cmd/Ctrl+D`: duplicate the current selection
 - `Cmd/Ctrl+Shift+D`: duplicate the selected subtree
+- `/`: open the quick search bar on the canvas
 - `Arrow keys`: move the selected node or nodes around the canvas
 - `Shift + Arrow`: move the selected node or nodes by a larger step
 - `h/j/k/l`: move the view around the canvas
@@ -30,7 +31,7 @@ Mindmap is a Svelte and SQLite app for building mind maps and linked notebooks o
 - `Shift + Alt/Option + Arrow`: jump focus and add the jumped-to node to the selection
 - `Alt/Option + h/j/k/l`: optional Vim-style alias for jump focus
 - `t`: open or focus tag editing for the current selection
-- `Esc`: clear selection and exit the current interaction state
+- `Esc`: clear selection, close the quick search bar, or exit tag editing
 - `Space`: toggle the focused node in or out of the current selection
 - `Tab`: cycle focus through visible nodes or search results
 

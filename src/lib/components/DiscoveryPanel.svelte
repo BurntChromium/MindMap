@@ -22,6 +22,7 @@
     onDuplicateSelection: () => void;
     onDuplicateSubtree: () => void;
     onClearSelection: () => void;
+    onExitBulkTagInput: () => void;
   }
 
   let {
@@ -42,7 +43,8 @@
     onRemoveSelectedTag,
     onDuplicateSelection,
     onDuplicateSubtree,
-    onClearSelection
+    onClearSelection,
+    onExitBulkTagInput
   }: Props = $props();
 
   let selectedTagInput = $state('');
@@ -190,6 +192,12 @@
                 if (event.key === 'Enter') {
                   event.preventDefault();
                   handleAddSelectedTag();
+                  return;
+                }
+
+                if (event.key === 'Escape') {
+                  event.preventDefault();
+                  onExitBulkTagInput();
                 }
               }}
             />
