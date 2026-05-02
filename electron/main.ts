@@ -83,7 +83,7 @@ function createWindow() {
     width: 1440,
     height: 960,
     webPreferences: {
-      preload: join(app.getAppPath(), 'dist-electron/preload.js')
+      preload: join(app.getAppPath(), 'dist-electron/preload.cjs')
     }
   });
 
@@ -92,7 +92,7 @@ function createWindow() {
     return;
   }
 
-  void window.loadFile(join(app.getAppPath(), 'build/desktop/200.html'));
+  void window.loadFile(join(app.getAppPath(), 'build/desktop/index.html'));
 }
 
 app.whenReady().then(() => {

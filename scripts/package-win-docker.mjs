@@ -4,6 +4,16 @@ import { spawn } from 'node:child_process';
 import { homedir } from 'node:os';
 import { resolve } from 'node:path';
 
+function getTarget() {
+  const targetIndex = process.argv.indexOf('--target');
+
+  if (targetIndex !== -1) {
+    return process.argv[targetIndex + 1] ?? 'nsis';
+  }
+
+  return process.env.MINDMAP_WIN_TARGET ?? 'nsis';
+}
+
 function runDocker(args) {
   return new Promise((resolvePromise, reject) => {
     const child = spawn('docker', args, {
@@ -26,6 +36,7 @@ async function main() {
   const projectDir = process.cwd();
   const cacheDir = resolve(homedir(), '.cache');
   const nodeModulesVolume = 'mindmap-win-node-modules';
+  const target = getTarget();
   const envArgs = [];
 
   if (process.env.DEBUG) {
@@ -56,7 +67,7 @@ async function main() {
     'electronuserland/builder:wine',
     '/bin/bash',
     '-lc',
-    'npm ci && npm run build:desktop && npx electron-builder --win'
+    `npm ci && npm run build:desktop && npx electron-builder --win ${target === 'nsis' ? '' : target}`.trim()
   ]);
 }
 

@@ -21,8 +21,7 @@ export default defineConfig({
     target: 'node20',
     rollupOptions: {
       input: {
-        main: resolve('electron/main.ts'),
-        preload: resolve('electron/preload.ts')
+        main: resolve('electron/main.ts')
       },
       external: ['electron', 'better-sqlite3', ...nodeBuiltins],
       output: {

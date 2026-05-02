@@ -10,6 +10,7 @@ See [USER_GUIDE.md](./USER_GUIDE.md) for the app layout and keyboard shortcuts.
 - `npm run build:desktop`: build the desktop static app and the Electron main/preload bundle
 - `npm run electron:package`: build the desktop app and package it with electron-builder
 - `npm run electron:package:win`: package a Windows build from Docker
+- `npm run electron:package:win:portable`: package a portable Windows executable from Docker
 
 ## Windows Builds On WSL2
 
@@ -18,6 +19,10 @@ The Docker-based route emits a normal Windows installer or portable executable, 
 For this project the recommended command is:
 
 - `npm run electron:package:win`
+
+If you want to skip the installer entirely and get a single executable for quick testing, use:
+
+- `npm run electron:package:win:portable`
 
 That uses the `electronuserland/builder:wine` image, mounts the repo into `/project`, and writes the Windows build output into `release/`.
 It also uses an isolated Docker volume for `node_modules`, so the container installs its own native binaries instead of reusing the host build.

@@ -10,11 +10,11 @@ const config = {
 		runes: ({ filename }) => (filename.split(/[/\\]/).includes('node_modules') ? undefined : true)
 	},
 	kit: {
+		paths: desktopBuild ? { relative: true } : undefined,
 		adapter: desktopBuild
 			? adapterStatic({
 					pages: 'build/desktop',
 					assets: 'build/desktop',
-					fallback: '200.html',
 					strict: false
 				})
 			: adapter()
