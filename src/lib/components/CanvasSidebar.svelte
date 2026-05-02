@@ -1,5 +1,16 @@
 <script lang="ts">
-  import { Check, ChevronLeft, ChevronRight, PencilLine, Trash2, X } from 'lucide-svelte';
+  import {
+    Check,
+    ChevronLeft,
+    ChevronRight,
+    Download,
+    PencilLine,
+    Trash2,
+    Upload,
+    X
+  } from 'lucide-svelte';
+  import { appDataClient } from '$lib/appDataClient';
+  import { saveBytesToFile } from '$lib/fileTransfers';
   import { canvasStore, type Canvas } from '$lib/stores/canvasStore';
   import { shouldCommitCanvasRename } from '$lib/routes/mindmapPage';
 
@@ -13,6 +24,8 @@
   let name = $state('');
   let editingCanvasId = $state<string | null>(null);
   let editingCanvasName = $state('');
+  let importInput: HTMLInputElement | null = null;
+  let transferState = $state<'idle' | 'exporting' | 'importing'>('idle');
 
   function startRenameCanvas(canvas: Canvas) {
     editingCanvasId = canvas.id;
@@ -28,6 +41,76 @@
   function cancelRenameCanvas() {
     editingCanvasId = null;
     editingCanvasName = '';
+  }
+
+  function openImportPicker() {
+    importInput?.click();
+  }
+
+  async function exportDatabase() {
+    if (transferState !== 'idle') {
+      return;
+    }
+
+    transferState = 'exporting';
+
+    try {
+      const bytes = await appDataClient.exportDatabase();
+      await saveBytesToFile(bytes, 'mindmap.db');
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        return;
+      }
+
+      console.error(error);
+      window.alert(`Export failed: ${String(error)}`);
+    } finally {
+      transferState = 'idle';
+    }
+  }
+
+  async function importDatabase(event: Event) {
+    if (transferState !== 'idle') {
+      return;
+    }
+
+    const input = event.currentTarget as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
+
+    if (!file) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Replace the current database with "${file.name}"? This will overwrite your current data.`
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    transferState = 'importing';
+
+    try {
+      const bytes = await file.arrayBuffer();
+      const result = (await appDataClient.importDatabase(bytes)) as
+        | { success?: boolean; error?: unknown }
+        | null;
+
+      if (!result || ('success' in result && result.success === false)) {
+        const message =
+          result && typeof result.error === 'string' ? result.error : 'Import failed.';
+        throw new Error(message);
+      }
+
+      window.location.reload();
+    } catch (error) {
+      console.error(error);
+      window.alert(`Import failed: ${String(error)}`);
+    } finally {
+      transferState = 'idle';
+    }
   }
 </script>
 
@@ -149,5 +232,33 @@
         </li>
       {/each}
     </ul>
+  </div>
+
+  <div class="sidebar-footer">
+    <input
+      bind:this={importInput}
+      class="sidebar-file-input"
+      type="file"
+      accept=".db,.sqlite,.sqlite3,application/x-sqlite3"
+      onchange={importDatabase}
+    />
+    <button
+      class="button sidebar-transfer-button"
+      type="button"
+      disabled={transferState !== 'idle'}
+      onclick={exportDatabase}
+    >
+      <Download size={14} aria-hidden="true" />
+      <span>{transferState === 'exporting' ? 'Exporting...' : 'Export DB'}</span>
+    </button>
+    <button
+      class="button button--primary sidebar-transfer-button"
+      type="button"
+      disabled={transferState !== 'idle'}
+      onclick={openImportPicker}
+    >
+      <Upload size={14} aria-hidden="true" />
+      <span>{transferState === 'importing' ? 'Importing...' : 'Import DB'}</span>
+    </button>
   </div>
 </div>

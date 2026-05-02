@@ -73,6 +73,10 @@ async function handleAppData(request: AppDataRequest) {
       return backend.searchNodes(request.payload as Parameters<typeof backend.searchNodes>[0]);
     case 'mutateGraphFragment':
       return backend.pasteGraphFragment(request.payload as Parameters<typeof backend.pasteGraphFragment>[0]);
+    case 'exportDatabase':
+      return backend.exportDatabase();
+    case 'importDatabase':
+      return backend.importDatabase(request.payload as Parameters<typeof backend.importDatabase>[0]);
     default:
       throw new Error(`Unsupported app-data method: ${request.method}`);
   }

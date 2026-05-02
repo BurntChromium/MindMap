@@ -10,6 +10,7 @@ import {
 } from '$lib/mutationPayloads';
 
 type JsonValue = Record<string, unknown> | Array<unknown> | string | number | boolean | null;
+type BinaryValue = ArrayBuffer;
 
 async function requestJson<T>(
   input: RequestInfo | URL,
@@ -28,6 +29,25 @@ async function requestJson<T>(
   }
 
   return (await response.json()) as T;
+}
+
+async function requestBytes(
+  input: RequestInfo | URL,
+  init?: RequestInit,
+  fetchImpl: typeof fetch = fetch
+): Promise<BinaryValue> {
+  const response = init === undefined ? await fetchImpl(input) : await fetchImpl(input, init);
+
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    const message =
+      typeof body?.error === 'string'
+        ? body.error
+        : `Request failed with ${response.status}`;
+    throw new Error(message);
+  }
+
+  return await response.arrayBuffer();
 }
 
 export type AppDataClient = {
@@ -51,6 +71,8 @@ export type AppDataClient = {
   loadEntities: (canvasId: string) => Promise<JsonValue>;
   searchNodes: (input: { canvasId: string; query: string; tag?: string | null }) => Promise<JsonValue>;
   mutateGraphFragment: (input: Parameters<typeof buildGraphFragmentBody>[0]) => Promise<JsonValue>;
+  exportDatabase: () => Promise<BinaryValue>;
+  importDatabase: (input: BinaryValue) => Promise<JsonValue>;
 };
 
 export type AppDataIpcBridge = {
@@ -119,6 +141,13 @@ function createFetchClient(): AppDataClient {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(buildGraphFragmentBody(input))
+      }),
+    exportDatabase: () => requestBytes('/api/database'),
+    importDatabase: (input) =>
+      requestJson('/api/database', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/octet-stream' },
+        body: input
       })
   };
 }
@@ -155,7 +184,10 @@ export function createIpcAppDataClient(bridge: AppDataIpcBridge): AppDataClient 
     searchNodes: (input) =>
       bridge.invoke('mindmap:app-data', { method: 'searchNodes', payload: input }),
     mutateGraphFragment: (input) =>
-      bridge.invoke('mindmap:app-data', { method: 'mutateGraphFragment', payload: input })
+      bridge.invoke('mindmap:app-data', { method: 'mutateGraphFragment', payload: input }),
+    exportDatabase: () => bridge.invoke('mindmap:app-data', { method: 'exportDatabase' }),
+    importDatabase: (input) =>
+      bridge.invoke('mindmap:app-data', { method: 'importDatabase', payload: input })
   };
 }
 
@@ -198,5 +230,7 @@ export const appDataClient = {
   searchNodes: (input: { canvasId: string; query: string; tag?: string | null }) =>
     activeClient.searchNodes(input),
   mutateGraphFragment: (input: Parameters<typeof buildGraphFragmentBody>[0]) =>
-    activeClient.mutateGraphFragment(input)
+    activeClient.mutateGraphFragment(input),
+  exportDatabase: () => activeClient.exportDatabase(),
+  importDatabase: (input: BinaryValue) => activeClient.importDatabase(input)
 };

@@ -11,6 +11,7 @@ import {
   resolveUniqueNodeTitle
 } from '$lib/nodeTitles';
 import { parseInlineContent, type InlineContentSegment } from '$lib/inlineContent';
+import { exportDatabaseSnapshot, importDatabaseSnapshot } from './databaseTransfer';
 
 export type AppDataCanvas = {
   id: string;
@@ -926,6 +927,14 @@ export function pasteGraphFragment(
     insertedNodes: resolvedNodes,
     insertedEdges: normalizedEdges.length
   };
+}
+
+export async function exportDatabase() {
+  return exportDatabaseSnapshot();
+}
+
+export async function importDatabase(input: Uint8Array | ArrayBuffer | ArrayBufferView) {
+  return importDatabaseSnapshot(input);
 }
 
 export function deleteGraphFragment(

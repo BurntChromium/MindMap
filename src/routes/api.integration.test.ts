@@ -1,7 +1,8 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import Database from 'better-sqlite3';
 
 const tempDir = mkdtempSync(join(tmpdir(), 'mindmap-tests-'));
 const dbPath = join(tempDir, 'test.db');
@@ -16,7 +17,8 @@ let graphFragmentsApi: typeof import('./api/graph-fragments/+server');
 let entitiesApi: typeof import('./api/entities/+server');
 let edgesApi: typeof import('./api/edges/+server');
 let searchApi: typeof import('./api/search/+server');
-let db: any;
+let databaseApi: typeof import('./api/database/+server');
+let dbModule: typeof import('$lib/server/db');
 
 beforeAll(async () => {
   const schema = await import('$lib/server/schema');
@@ -30,25 +32,28 @@ beforeAll(async () => {
   entitiesApi = await import('./api/entities/+server');
   edgesApi = await import('./api/edges/+server');
   searchApi = await import('./api/search/+server');
-  db = (await import('$lib/server/db')).db;
+  databaseApi = await import('./api/database/+server');
+  dbModule = await import('$lib/server/db');
 });
 
 beforeEach(() => {
-  if (!db) {
+  if (!dbModule) {
     return;
   }
 
-  db.prepare('DELETE FROM node_tags').run();
-  db.prepare('DELETE FROM edges').run();
-  db.prepare('DELETE FROM nodes').run();
-  db.prepare('DELETE FROM entity_mentions').run();
-  db.prepare('DELETE FROM entities').run();
-  db.prepare('DELETE FROM canvases').run();
-  db.prepare('DELETE FROM tags').run();
+  dbModule.db.prepare('DELETE FROM node_tags').run();
+  dbModule.db.prepare('DELETE FROM edges').run();
+  dbModule.db.prepare('DELETE FROM nodes').run();
+  dbModule.db.prepare('DELETE FROM entity_mentions').run();
+  dbModule.db.prepare('DELETE FROM entities').run();
+  dbModule.db.prepare('DELETE FROM canvases').run();
+  dbModule.db.prepare('DELETE FROM tags').run();
 });
 
 afterAll(() => {
-  db?.close();
+  if (dbModule?.db.open) {
+    dbModule.db.close();
+  }
   vi.unstubAllEnvs();
   rmSync(tempDir, { recursive: true, force: true });
 });
@@ -63,11 +68,131 @@ function request(body: unknown) {
 
 describe('API integration', () => {
   it('creates the node_tags tag lookup index', () => {
-    const index = db
+    const index = dbModule.db
       .prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND name = ?")
       .get('idx_node_tags_tag_id');
 
     expect(index).toEqual(expect.objectContaining({ name: 'idx_node_tags_tag_id' }));
+  });
+
+  it('exports a valid SQLite snapshot', async () => {
+    await canvasesApi.POST({
+      request: request({ id: 'canvas-1', name: 'Exported' })
+    } as any);
+
+    const response = await databaseApi.GET();
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    const snapshotPath = join(tempDir, 'exported.db');
+
+    writeFileSync(snapshotPath, bytes);
+
+    const exportedDb = new Database(snapshotPath, { readonly: true });
+    const canvases = exportedDb.prepare('SELECT id, name FROM canvases ORDER BY name').all();
+
+    expect(response.headers.get('content-type')).toContain('application/x-sqlite3');
+    expect(canvases).toEqual([
+      expect.objectContaining({
+        id: 'canvas-1',
+        name: 'Exported'
+      })
+    ]);
+
+    exportedDb.close();
+  });
+
+  it('replaces the current database when importing a valid snapshot', async () => {
+    await canvasesApi.POST({
+      request: request({ id: 'canvas-original', name: 'Original' })
+    } as any);
+
+    const sourcePath = join(tempDir, 'import-source.db');
+    const sourceDb = new Database(sourcePath);
+    const schema = await import('$lib/server/schema');
+
+    schema.initSchema(sourceDb);
+
+    sourceDb
+      .prepare(
+        `
+        INSERT INTO canvases (id, name, created_at, updated_at)
+        VALUES (?, ?, ?, ?)
+      `
+      )
+      .run('canvas-imported', 'Imported', 1, 1);
+    sourceDb
+      .prepare(
+        `
+        INSERT INTO nodes (
+          id, canvas_id, title, body, is_entity, x, y, collapsed, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `
+      )
+      .run(
+        'node-imported',
+        'canvas-imported',
+        'Imported Node',
+        'Imported body',
+        0,
+        12,
+        34,
+        0,
+        2,
+        2
+      );
+    sourceDb.close();
+
+    const response = await databaseApi.POST({
+      request: new Request('http://localhost/api/database', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/octet-stream' },
+        body: readFileSync(sourcePath)
+      })
+    } as any);
+    const payload = await response.json();
+
+    expect(payload).toEqual({ success: true });
+
+    const canvases = dbModule.db.prepare('SELECT id, name FROM canvases ORDER BY name').all();
+    const nodes = dbModule.db.prepare('SELECT id, title FROM nodes ORDER BY title').all();
+
+    expect(canvases).toEqual([
+      expect.objectContaining({
+        id: 'canvas-imported',
+        name: 'Imported'
+      })
+    ]);
+    expect(nodes).toEqual([
+      expect.objectContaining({
+        id: 'node-imported',
+        title: 'Imported Node'
+      })
+    ]);
+  });
+
+  it('rejects invalid database files without replacing the current db', async () => {
+    await canvasesApi.POST({
+      request: request({ id: 'canvas-original', name: 'Original' })
+    } as any);
+
+    const response = await databaseApi.POST({
+      request: new Request('http://localhost/api/database', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/octet-stream' },
+        body: 'not-a-sqlite-file'
+      })
+    } as any);
+    const payload = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(payload.success).toBe(false);
+
+    const canvases = dbModule.db.prepare('SELECT id, name FROM canvases ORDER BY name').all();
+    expect(canvases).toEqual([
+      expect.objectContaining({
+        id: 'canvas-original',
+        name: 'Original'
+      })
+    ]);
   });
 
   it('creates canvases and lists them back', async () => {
@@ -138,13 +263,15 @@ describe('API integration', () => {
       tags: ['lore', 'npc']
     });
 
-    const tagRows = db.prepare('SELECT name FROM tags ORDER BY name').all();
-    const nodeTagRows = db.prepare('SELECT node_id, tag_id FROM node_tags').all();
+    const tagRows = dbModule.db.prepare('SELECT name FROM tags ORDER BY name').all() as Array<{
+      name: string;
+    }>;
+    const nodeTagRows = dbModule.db.prepare('SELECT node_id, tag_id FROM node_tags').all();
 
-    expect(tagRows.map((row: { name: string }) => row.name)).toEqual(['lore', 'npc']);
+    expect(tagRows.map((row) => row.name)).toEqual(['lore', 'npc']);
     expect(nodeTagRows).toHaveLength(2);
 
-    const tagColors = db.prepare('SELECT name, color FROM tags ORDER BY name').all();
+    const tagColors = dbModule.db.prepare('SELECT name, color FROM tags ORDER BY name').all();
 
     expect(tagColors).toEqual([
       expect.objectContaining({ name: 'lore', color: expect.stringMatching(/^#[0-9a-f]{6}$/i) }),
@@ -203,7 +330,7 @@ describe('API integration', () => {
       })
     } as any);
 
-    const entityRows = db.prepare(`
+    const entityRows = dbModule.db.prepare(`
       SELECT title, title_key, primary_node_id
       FROM entities
       ORDER BY title_key
@@ -227,7 +354,7 @@ describe('API integration', () => {
       })
     ]);
 
-    const mentionRows = db.prepare(`
+    const mentionRows = dbModule.db.prepare(`
       SELECT title, title_key, node_id, reference_text, start_index, end_index
       FROM entity_mentions
       ORDER BY node_id, start_index
@@ -299,7 +426,7 @@ describe('API integration', () => {
       })
     } as any);
 
-    const entityRows = db.prepare(`
+    const entityRows = dbModule.db.prepare(`
       SELECT title, title_key, primary_node_id
       FROM entities
       ORDER BY title_key
@@ -433,7 +560,7 @@ describe('API integration', () => {
       body: '[[Dragon]] watches the gate.'
     });
 
-    const entityRows = db.prepare(`
+    const entityRows = dbModule.db.prepare(`
       SELECT title, title_key, primary_node_id
       FROM entities
       ORDER BY title_key
@@ -452,7 +579,7 @@ describe('API integration', () => {
       })
     ]);
 
-    const mentionRows = db.prepare(`
+    const mentionRows = dbModule.db.prepare(`
       SELECT title, title_key, node_id, reference_text
       FROM entity_mentions
       ORDER BY node_id, start_index
@@ -525,8 +652,10 @@ describe('API integration', () => {
       })
     ]);
 
-    const tagRows = db.prepare('SELECT name FROM tags ORDER BY name').all();
-    expect(tagRows.map((row: { name: string }) => row.name)).toEqual(['lore', 'npc']);
+    const tagRows = dbModule.db.prepare('SELECT name FROM tags ORDER BY name').all() as Array<{
+      name: string;
+    }>;
+    expect(tagRows.map((row) => row.name)).toEqual(['lore', 'npc']);
   });
 
   it('rejects duplicate titles on patch', async () => {
