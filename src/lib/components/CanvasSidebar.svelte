@@ -144,7 +144,7 @@
         placeholder="New canvas"
         aria-label="New canvas name"
       />
-      <button class="button button--primary" type="button" onclick={() => canvasStore.create(name)}>
+      <button class="button" type="button" onclick={() => canvasStore.create(name)}>
         <span>Create</span>
       </button>
     </div>
@@ -252,7 +252,7 @@
       <span>{transferState === 'exporting' ? 'Exporting...' : 'Export DB'}</span>
     </button>
     <button
-      class="button button--primary sidebar-transfer-button"
+      class="button sidebar-transfer-button"
       type="button"
       disabled={transferState !== 'idle'}
       onclick={openImportPicker}
