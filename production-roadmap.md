@@ -47,7 +47,7 @@ Plumbing to support it:
 - index the data shapes we will filter on most often
 - separate transient filter state from persisted content
 
-## Stage 3: Edit at Scale
+## Stage 3: Edit at Scale (Done)
 
 User benefit:
 
