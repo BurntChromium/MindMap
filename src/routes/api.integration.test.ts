@@ -173,10 +173,24 @@ describe('API integration', () => {
     const { id: canvasId } = await canvas.json();
 
     const smaug = await nodesApi.POST({
-      request: request({ id: 'node-1', canvasId, x: 0, y: 0, title: 'Smaug' })
+      request: request({
+        id: 'node-1',
+        canvasId,
+        x: 0,
+        y: 0,
+        title: 'Smaug',
+        isEntity: true
+      })
     } as any);
     const guide = await nodesApi.POST({
-      request: request({ id: 'node-2', canvasId, x: 120, y: 120, title: 'Guide' })
+      request: request({
+        id: 'node-2',
+        canvasId,
+        x: 120,
+        y: 120,
+        title: 'Guide',
+        isEntity: true
+      })
     } as any);
 
     const { id: smaugId } = await smaug.json();
@@ -254,7 +268,14 @@ describe('API integration', () => {
     const { id: canvasId } = await canvas.json();
 
     const entityNode = await nodesApi.POST({
-      request: request({ id: 'node-1', canvasId, x: 0, y: 0, title: 'Smaug' })
+      request: request({
+        id: 'node-1',
+        canvasId,
+        x: 0,
+        y: 0,
+        title: 'Smaug',
+        isEntity: true
+      })
     } as any);
     const noteNode = await nodesApi.POST({
       request: request({
@@ -263,6 +284,7 @@ describe('API integration', () => {
         x: 120,
         y: 120,
         title: 'Note',
+        isEntity: true,
         body: '[[Smaug]]'
       })
     } as any);
@@ -304,7 +326,14 @@ describe('API integration', () => {
     const { id: canvasId } = await canvas.json();
 
     await nodesApi.POST({
-      request: request({ id: 'node-1', canvasId, x: 0, y: 0, title: 'Smaug' })
+      request: request({
+        id: 'node-1',
+        canvasId,
+        x: 0,
+        y: 0,
+        title: 'Smaug',
+        isEntity: true
+      })
     } as any);
     await nodesApi.POST({
       request: request({
@@ -313,6 +342,7 @@ describe('API integration', () => {
         x: 120,
         y: 120,
         title: 'Note',
+        isEntity: true,
         body: '[[Smaug]] in the mountain.'
       })
     } as any);
@@ -356,10 +386,24 @@ describe('API integration', () => {
     const { id: canvasId } = await canvas.json();
 
     const smaug = await nodesApi.POST({
-      request: request({ id: 'node-1', canvasId, x: 0, y: 0, title: 'Smaug' })
+      request: request({
+        id: 'node-1',
+        canvasId,
+        x: 0,
+        y: 0,
+        title: 'Smaug',
+        isEntity: true
+      })
     } as any);
     const note = await nodesApi.POST({
-      request: request({ id: 'node-2', canvasId, x: 120, y: 120, title: 'Note' })
+      request: request({
+        id: 'node-2',
+        canvasId,
+        x: 120,
+        y: 120,
+        title: 'Note',
+        isEntity: true
+      })
     } as any);
 
     const { id: smaugId } = await smaug.json();

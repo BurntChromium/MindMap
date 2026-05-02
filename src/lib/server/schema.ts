@@ -14,7 +14,7 @@ export function initSchema() {
       canvas_id TEXT,
       title TEXT,
       body TEXT,
-      is_entity INTEGER DEFAULT 1,
+      is_entity INTEGER DEFAULT 0,
       x REAL,
       y REAL,
       collapsed INTEGER,
@@ -108,7 +108,7 @@ export function initSchema() {
 
   if (!hasEntityColumn) {
     db.exec(`
-      ALTER TABLE nodes ADD COLUMN is_entity INTEGER DEFAULT 1;
+      ALTER TABLE nodes ADD COLUMN is_entity INTEGER DEFAULT 0;
     `);
   }
 }

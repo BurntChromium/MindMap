@@ -32,7 +32,7 @@
   const isEditing = $derived(nodeMode === 'edit');
   const isExpanded = $derived(nodeMode !== 'compact');
   const bodyText = $derived(data.body ?? '');
-  const isEntityPage = $derived(Boolean(data.is_entity ?? 1));
+  const isEntityPage = $derived(Boolean(data.is_entity ?? 0));
   const nodeTags = $derived(Array.isArray(data.tags) ? data.tags : []);
   const isSearchHit = $derived(Boolean(data.isSearchHit));
   const activeTagName = $derived(normalizeTagName(data.activeTag ?? ''));

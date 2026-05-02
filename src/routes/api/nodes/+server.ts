@@ -29,7 +29,7 @@ export async function POST({ request }) {
     typeof payload?.title === 'string' ? payload.title : ''
   );
   const body = typeof payload?.body === 'string' ? payload.body : '';
-  const isEntity = typeof payload?.isEntity === 'boolean' ? payload.isEntity : true;
+  const isEntity = typeof payload?.isEntity === 'boolean' ? payload.isEntity : false;
   const tags = toTagList(payload?.tags);
   const x = toNumber(payload?.x);
   const y = toNumber(payload?.y);

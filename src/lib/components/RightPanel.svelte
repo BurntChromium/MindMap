@@ -480,30 +480,9 @@
     gap: 0.75rem;
   }
 
-  .inspector-panel__title {
-    min-width: 0;
-  }
-
-  .inspector-panel__title h3,
   .panel-section__header h4,
   .entity-card__section h5 {
     margin: 0;
-  }
-
-  .inspector-panel__title h3 {
-    font-size: 0.8rem;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--text-muted);
-    display: inline-flex;
-    align-items: center;
-    gap: 0.35rem;
-  }
-
-  .inspector-panel--collapsed .inspector-panel__title h3 {
-    letter-spacing: 0;
-    text-transform: none;
-    line-height: 1;
   }
 
   .inspector-panel__header-actions {

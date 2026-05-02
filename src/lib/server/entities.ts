@@ -49,7 +49,7 @@ export type NodeEntitySource = {
   canvas_id: string;
   title: string;
   body: string;
-  is_entity: number;
+  is_entity: number | null;
 };
 
 function escapeRegExp(value: string) {
@@ -145,7 +145,7 @@ export function rebuildEntitiesForCanvasId(canvasId: string | null) {
   const referencesByNodeId = new Map<string, EntityReference[]>();
 
   for (const node of nodes) {
-    if (!node.is_entity) {
+    if (node.is_entity === 0) {
       continue;
     }
 

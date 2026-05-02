@@ -60,7 +60,7 @@ export function buildNodeCreateBody(input: {
 }) {
   const isEntity = typeof input.isEntity === 'boolean' ? input.isEntity : input.is_entity;
   const normalizedIsEntity =
-    typeof isEntity === 'boolean' ? isEntity : typeof isEntity === 'number' ? isEntity !== 0 : true;
+    typeof isEntity === 'boolean' ? isEntity : typeof isEntity === 'number' ? isEntity !== 0 : false;
 
   return {
     id: input.id,

@@ -169,7 +169,7 @@ function createNodeStore() {
         canvas_id: canvasId,
         title,
         body: options?.body ?? '',
-        is_entity: typeof options?.is_entity === 'number' ? options.is_entity : 1,
+        is_entity: typeof options?.is_entity === 'number' ? options.is_entity : 0,
         tags: Array.isArray(options?.tags) ? [...options.tags] : [],
         x,
         y,

@@ -23,7 +23,8 @@ describe('mutationPayloads', () => {
       canvasId: 'canvas-1',
       x: 10,
       y: 20,
-      tags: ['lore', 'npc']
+      tags: ['lore', 'npc'],
+      isEntity: false
     });
 
     expect(
@@ -43,4 +44,3 @@ describe('mutationPayloads', () => {
     });
   });
 });
-

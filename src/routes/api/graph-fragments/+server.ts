@@ -49,7 +49,7 @@ export async function POST({ request }) {
         id: isString(node?.id) ? node.id : '',
         title: typeof node?.title === 'string' ? node.title : '',
         body: typeof node?.body === 'string' ? node.body : '',
-        is_entity: typeof node?.is_entity === 'number' ? node.is_entity : 1,
+        is_entity: typeof node?.is_entity === 'number' ? node.is_entity : 0,
         tags: toTagList(node?.tags),
         x: toNumber(node?.x),
         y: toNumber(node?.y),
