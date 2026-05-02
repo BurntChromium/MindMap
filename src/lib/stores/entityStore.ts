@@ -1,4 +1,5 @@
 import { writable } from 'svelte/store';
+import { appDataClient } from '$lib/appDataClient';
 
 export type Entity = {
   id: string;
@@ -95,8 +96,7 @@ function createEntityStore() {
       }
 
       try {
-        const res = await fetch(`/api/entities?canvasId=${canvasId}`);
-        const data = (await res.json()) as Partial<{
+        const data = (await appDataClient.loadEntities(canvasId)) as Partial<{
           entities: Entity[];
           mentions: EntityMention[];
         }>;

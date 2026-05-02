@@ -1,5 +1,5 @@
 import { json } from '@sveltejs/kit';
-import { searchNodesByCanvasId } from '$lib/server/graphData';
+import { searchNodesByCanvasId } from '$lib/server/appData';
 
 // GET /api/search?canvasId=...&query=...&tag=...
 export function GET({ url }) {
@@ -9,4 +9,3 @@ export function GET({ url }) {
 
   return json(searchNodesByCanvasId(canvasId, query, tag));
 }
-

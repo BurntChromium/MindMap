@@ -1,4 +1,5 @@
 import { get, writable } from 'svelte/store';
+import { appDataClient } from '$lib/appDataClient';
 import { createClientId } from '$lib/clientId';
 import { buildCanvasCreateBody, buildCanvasPatchBody } from '$lib/mutationPayloads';
 import { historyStore } from '$lib/stores/historyStore';
@@ -41,12 +42,11 @@ function createCanvasStore() {
     async load() {
       mutationStateStore.beginLoad();
       try {
-        const res = await fetch('/api/canvases');
-        const canvases = await res.json();
+        const canvases = (await appDataClient.loadCanvases()) as Canvas[];
 
         set({
-          canvases,
-          activeCanvasId: canvases[0]?.id ?? null
+          canvases: Array.isArray(canvases) ? canvases : [],
+          activeCanvasId: Array.isArray(canvases) ? canvases[0]?.id ?? null : null
         });
         mutationStateStore.finishLoad(true);
         return true;
@@ -75,15 +75,7 @@ function createCanvasStore() {
       }));
 
       try {
-        const res = await fetch('/api/canvases', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(buildCanvasCreateBody({ id, name }))
-        });
-
-        if (!res.ok) {
-          throw new Error(`Create canvas failed with ${res.status}`);
-        }
+        await appDataClient.createCanvas(buildCanvasCreateBody({ id, name }));
 
         if (!historyStore.isReplaying()) {
           historyStore.record({
@@ -126,15 +118,7 @@ function createCanvasStore() {
       }));
 
       try {
-        const res = await fetch('/api/canvases', {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(buildCanvasPatchBody({ id, name: trimmed }))
-        });
-
-        if (!res.ok) {
-          throw new Error(`Rename canvas failed with ${res.status}`);
-        }
+        await appDataClient.renameCanvas(buildCanvasPatchBody({ id, name: trimmed }));
 
         if (existing && !historyStore.isReplaying()) {
           historyStore.record({
@@ -168,11 +152,7 @@ function createCanvasStore() {
       });
 
       try {
-        const res = await fetch(`/api/canvases?id=${id}`, { method: 'DELETE' });
-
-        if (!res.ok) {
-          throw new Error(`Delete canvas failed with ${res.status}`);
-        }
+        await appDataClient.deleteCanvas({ id });
 
         if (removedCanvas && !historyStore.isReplaying()) {
           historyStore.record({

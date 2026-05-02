@@ -1,7 +1,10 @@
 import { json } from '@sveltejs/kit';
-import { db } from '$lib/server/db';
-import { createId, now } from '$lib/server/utils';
-import { getCanvases } from '$lib/server/graphData';
+import {
+  createCanvas,
+  deleteCanvas,
+  getCanvases,
+  renameCanvas
+} from '$lib/server/appData';
 import { isString } from '$lib/mutationPayloads';
 
 // GET /api/canvases
@@ -12,17 +15,12 @@ export function GET() {
 // POST /api/canvases
 export async function POST({ request }) {
   const payload = await request.json();
-  const providedId = isString(payload?.id) ? payload.id : '';
-  const name = typeof payload?.name === 'string' ? payload.name : 'New Canvas';
-  const id = providedId || createId();
-  const timestamp = now();
+  const result = createCanvas({
+    id: isString(payload?.id) ? payload.id : undefined,
+    name: typeof payload?.name === 'string' ? payload.name : undefined
+  });
 
-  db.prepare(`
-    INSERT INTO canvases (id, name, created_at, updated_at)
-    VALUES (?, ?, ?, ?)
-  `).run(id, name, timestamp, timestamp);
-
-  return json({ success: true, id, name });
+  return json(result);
 }
 
 // PATCH /api/canvases
@@ -36,22 +34,11 @@ export async function PATCH({ request }) {
     return json({ success: false }, { status: 400 });
   }
 
-  const timestamp = now();
-
-  db.prepare(`
-    UPDATE canvases
-    SET name = ?, updated_at = ?
-    WHERE id = ?
-  `).run(trimmed, timestamp, id);
-
-  return json({ success: true, id, name: trimmed, updated_at: timestamp });
+  return json(renameCanvas({ id, name: trimmed }));
 }
 
 // DELETE /api/canvases/:id
 export async function DELETE({ url }) {
   const id = url.searchParams.get('id');
-
-  db.prepare(`DELETE FROM canvases WHERE id = ?`).run(id);
-
-  return json({ success: true });
+  return json(deleteCanvas(id ?? ''));
 }

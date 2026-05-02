@@ -4,6 +4,7 @@
   import { Search, X } from 'lucide-svelte';
   import type { PageData } from './$types';
   import { createClientId } from '$lib/clientId';
+  import { appDataClient } from '$lib/appDataClient';
   import type { CanvasStageApi } from '$lib/canvasApi';
   import CanvasSidebar from '$lib/components/CanvasSidebar.svelte';
   import CanvasStage from '$lib/components/CanvasStage.svelte';
@@ -870,22 +871,12 @@
     nodeUiStore.clear();
 
     try {
-      const response = await fetch('/api/graph-fragments', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'paste',
-          canvasId: activeCanvasId,
-          nodes: graph.nodes,
-          edges: graph.edges
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error(`Paste graph fragment failed with ${response.status}`);
-      }
-
-      const responseBody = await response.json().catch(() => null);
+      const responseBody = (await appDataClient.mutateGraphFragment({
+        action: 'paste',
+        canvasId: activeCanvasId,
+        nodes: graph.nodes,
+        edges: graph.edges
+      })) as { insertedNodes?: Array<{ id?: unknown; title?: unknown }> } | null;
       const insertedNodes = Array.isArray(responseBody?.insertedNodes)
         ? (responseBody.insertedNodes as Array<{ id?: unknown; title?: unknown }>)
         : null;
@@ -1036,19 +1027,11 @@
     nodeUiStore.clear();
 
     try {
-      const response = await fetch('/api/graph-fragments', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'delete',
-          nodeIds: uniqueNodeIds,
-          edgeIds: uniqueEdgeIds
-        })
+      await appDataClient.mutateGraphFragment({
+        action: 'delete',
+        nodeIds: uniqueNodeIds,
+        edgeIds: uniqueEdgeIds
       });
-
-      if (!response.ok) {
-        throw new Error(`Delete graph fragment failed with ${response.status}`);
-      }
     } catch (error) {
       nodeStore.hydrate(previousNodes, activeCanvasId);
       edgeStore.hydrate(previousEdges, activeCanvasId);

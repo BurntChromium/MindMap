@@ -1,6 +1,5 @@
 import { json } from '@sveltejs/kit';
-import { db } from '$lib/server/db';
-import { now } from '$lib/server/utils';
+import { bulkUpdateNodePositions } from '$lib/server/appData';
 import { isString, toNumberOrNull } from '$lib/mutationPayloads';
 
 type BulkPositionNodeInput = {
@@ -28,15 +27,5 @@ export async function POST({ request }) {
     return json({ success: true });
   }
 
-  const updateNode = db.prepare('UPDATE nodes SET x = ?, y = ?, updated_at = ? WHERE id = ?');
-
-  const tx = db.transaction(() => {
-    for (const update of updates) {
-      updateNode.run(update.x, update.y, now(), update.id);
-    }
-  });
-
-  tx();
-
-  return json({ success: true, count: updates.length });
+  return json(bulkUpdateNodePositions(updates));
 }

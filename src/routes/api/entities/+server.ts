@@ -1,5 +1,5 @@
 import { json } from '@sveltejs/kit';
-import { getEntitiesByCanvasId, getEntityMentionsByCanvasId } from '$lib/server/entities';
+import { getEntitiesByCanvasId, getEntityMentionsByCanvasId } from '$lib/server/appData';
 
 // GET /api/entities?canvasId=...
 export function GET({ url }) {

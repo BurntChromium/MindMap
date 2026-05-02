@@ -1,4 +1,5 @@
 import { get, writable } from 'svelte/store';
+import { appDataClient } from '$lib/appDataClient';
 import { buildEdgeCreateBody } from '$lib/mutationPayloads';
 import { historyStore } from '$lib/stores/historyStore';
 import { mutationStateStore } from '$lib/stores/mutationStateStore';
@@ -92,8 +93,7 @@ function createEdgeStore() {
       }
 
       try {
-        const res = await fetch(`/api/edges?canvasId=${canvasId}`);
-        const data: Edge[] = await res.json();
+        const data = (await appDataClient.loadEdges(canvasId)) as Edge[];
 
         if (requestToken !== loadToken) {
           mutationStateStore.finishLoad(true);
@@ -141,15 +141,7 @@ function createEdgeStore() {
       syncCache();
 
       try {
-        const res = await fetch('/api/edges', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(buildEdgeCreateBody({ id, canvasId, source, target }))
-        });
-
-        if (!res.ok) {
-          throw new Error(`Create edge failed with ${res.status}`);
-        }
+        await appDataClient.createEdge(buildEdgeCreateBody({ id, canvasId, source, target }));
 
         if (!historyStore.isReplaying()) {
           historyStore.record({
@@ -183,11 +175,7 @@ function createEdgeStore() {
       syncCache();
 
       try {
-        const res = await fetch(`/api/edges?id=${id}`, { method: 'DELETE' });
-
-        if (!res.ok) {
-          throw new Error(`Delete edge failed with ${res.status}`);
-        }
+        await appDataClient.deleteEdge({ id });
 
         if (removedEdge && !historyStore.isReplaying()) {
           historyStore.record({

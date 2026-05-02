@@ -1,7 +1,7 @@
 import { get, writable } from 'svelte/store';
+import { appDataClient } from '$lib/appDataClient';
 import { createClientId } from '$lib/clientId';
 import { hasNodeTitleConflict, normalizeNodeTitle, resolveUniqueNodeTitle } from '$lib/nodeTitles';
-import { buildBulkPositionsBody, buildBulkTagsBody, buildNodeCreateBody, buildNodePatchBody } from '$lib/mutationPayloads';
 import { entityStore } from '$lib/stores/entityStore';
 import { historyStore } from '$lib/stores/historyStore';
 import { mutationStateStore } from '$lib/stores/mutationStateStore';
@@ -118,8 +118,7 @@ function createNodeStore() {
       }
 
       try {
-        const res = await fetch(`/api/nodes?canvasId=${canvasId}`);
-        const data: Array<Node & { tags?: unknown }> = await res.json();
+        const data = (await appDataClient.loadNodes(canvasId)) as Array<Node & { tags?: unknown }>;
 
         if (requestToken !== loadToken) {
           mutationStateStore.finishLoad(true);
@@ -185,29 +184,17 @@ function createNodeStore() {
         return state;
       });
       try {
-        const res = await fetch('/api/nodes', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(
-            buildNodeCreateBody({
-              id,
-              canvasId,
-              x,
-              y,
-              title: newNode.title,
-              body: newNode.body,
-              isEntity: Boolean(newNode.is_entity),
-              tags: newNode.tags,
-              collapsed: newNode.collapsed
-            })
-          )
-        });
-
-        if (!res.ok) {
-          throw new Error(`Create node failed with ${res.status}`);
-        }
-
-        const responseBody = await res.json().catch(() => null);
+        const responseBody = (await appDataClient.createNode({
+          id,
+          canvasId,
+          x,
+          y,
+          title: newNode.title,
+          body: newNode.body,
+          isEntity: Boolean(newNode.is_entity),
+          tags: newNode.tags,
+          collapsed: newNode.collapsed
+        })) as { title?: string } | null;
         const resolvedTitle =
           typeof responseBody?.title === 'string' ? responseBody.title : newNode.title;
         finalTitle = resolvedTitle;
@@ -287,20 +274,7 @@ function createNodeStore() {
       });
 
       try {
-        const response = await fetch('/api/nodes', {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(buildNodePatchBody(partial))
-        });
-
-        if (!response.ok) {
-          const body = await response.json().catch(() => null);
-          const message =
-            typeof body?.error === 'string'
-              ? body.error
-              : `Update node failed with ${response.status}`;
-          throw new Error(message);
-        }
+        await appDataClient.updateNode(partial);
 
         if (before && nextNode && !historyStore.isReplaying()) {
           historyStore.record({
@@ -375,15 +349,7 @@ function createNodeStore() {
         return state;
       });
       try {
-        const response = await fetch('/api/nodes/bulk-tags', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(buildBulkTagsBody(updates))
-        });
-
-        if (!response.ok) {
-          throw new Error(`Bulk tag update failed with ${response.status}`);
-        }
+        await appDataClient.bulkUpdateNodeTags(updates);
 
         if (!historyStore.isReplaying()) {
           historyStore.record({
@@ -450,15 +416,7 @@ function createNodeStore() {
       syncCache();
 
       try {
-        const response = await fetch('/api/nodes/bulk-position', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(buildBulkPositionsBody(updates))
-        });
-
-        if (!response.ok) {
-          throw new Error(`Bulk node position update failed with ${response.status}`);
-        }
+        await appDataClient.bulkUpdateNodePositions(updates);
 
         if (!historyStore.isReplaying()) {
           historyStore.record({
@@ -506,11 +464,7 @@ function createNodeStore() {
       syncCache();
 
       try {
-        const res = await fetch(`/api/nodes?id=${id}`, { method: 'DELETE' });
-
-        if (!res.ok) {
-          throw new Error(`Delete node failed with ${res.status}`);
-        }
+        await appDataClient.deleteNode({ id });
 
         if (removedNode && !historyStore.isReplaying()) {
           historyStore.record({

@@ -8,6 +8,12 @@ declare global {
 		// interface PageState {}
 		// interface Platform {}
 	}
+
+	interface Window {
+		mindmapDesktop?: {
+			invoke: <T>(channel: string, request: { method: string; payload?: unknown }) => Promise<T>;
+		};
+	}
 }
 
 export {};

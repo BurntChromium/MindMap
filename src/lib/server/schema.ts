@@ -1,7 +1,7 @@
 import { db } from './db';
 
-export function initSchema() {
-  db.exec(`
+export function initSchema(database = db) {
+  database.exec(`
     CREATE TABLE IF NOT EXISTS canvases (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
@@ -103,11 +103,11 @@ export function initSchema() {
       ON entity_mentions(node_id);
   `);
 
-  const nodeColumns = db.prepare(`PRAGMA table_info(nodes)`).all() as Array<{ name: string }>;
+  const nodeColumns = database.prepare(`PRAGMA table_info(nodes)`).all() as Array<{ name: string }>;
   const hasEntityColumn = nodeColumns.some((column) => column.name === 'is_entity');
 
   if (!hasEntityColumn) {
-    db.exec(`
+    database.exec(`
       ALTER TABLE nodes ADD COLUMN is_entity INTEGER DEFAULT 0;
     `);
   }

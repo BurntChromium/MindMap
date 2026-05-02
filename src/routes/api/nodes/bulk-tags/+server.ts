@@ -1,7 +1,5 @@
 import { json } from '@sveltejs/kit';
-import { db } from '$lib/server/db';
-import { now } from '$lib/server/utils';
-import { replaceNodeTags } from '$lib/server/nodeTags';
+import { bulkUpdateNodeTags } from '$lib/server/appData';
 import { isString, toTagList } from '$lib/mutationPayloads';
 
 type BulkTagNodeInput = {
@@ -21,16 +19,5 @@ export async function POST({ request }) {
     }))
     .filter((entry): entry is { id: string; tags: string[] } => Boolean(entry.id));
 
-  const touchNode = db.prepare('UPDATE nodes SET updated_at = ? WHERE id = ?');
-
-  const tx = db.transaction(() => {
-    for (const update of updates) {
-      touchNode.run(now(), update.id);
-      replaceNodeTags(update.id, update.tags);
-    }
-  });
-
-  tx();
-
-  return json({ success: true, count: updates.length });
+  return json(bulkUpdateNodeTags(updates));
 }

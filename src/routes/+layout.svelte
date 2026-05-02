@@ -1,7 +1,13 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import favicon from '$lib/assets/favicon.svg';
+	import { configureAppDataTransport } from '$lib/appRuntime';
 
 	let { children } = $props();
+
+	onMount(() => {
+		configureAppDataTransport();
+	});
 </script>
 
 <style global>
