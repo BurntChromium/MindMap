@@ -19,7 +19,8 @@
 		"test": "vitest run",
 		"test:watch": "vitest",
 		"electron:run": "electron .",
-		"electron:package": "npm run build:desktop && electron-builder"
+		"electron:package": "npm run build:desktop && electron-builder",
+		"electron:package:win": "node scripts/package-win-docker.mjs"
 	},
 	"devDependencies": {
 		"@sveltejs/adapter-auto": "^7.0.1",
