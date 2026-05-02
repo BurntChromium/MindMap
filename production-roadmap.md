@@ -70,7 +70,7 @@ Plumbing to support it:
 - undo-friendly mutation shapes
 - clearer ownership of optimistic updates versus committed state
 
-## Stage 4: Make the Data Portable
+## Stage 4: Make the Data Portable (Defer)
 
 User benefit:
 
