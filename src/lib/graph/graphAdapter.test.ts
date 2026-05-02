@@ -99,11 +99,12 @@ describe('graphAdapter', () => {
         id: 'assoc:node-a:node-b',
         source: 'node-a',
         target: 'node-b',
-        type: 'smoothstep',
+        sourceHandle: 'source-bottom',
+        targetHandle: 'target-top',
         selectable: false,
         deletable: false,
         focusable: false,
-        zIndex: 0,
+        zIndex: 999,
         style: 'stroke-dasharray: 6 5;',
         data: {
           kind: 'associative',
@@ -129,11 +130,12 @@ describe('graphAdapter', () => {
         id: 'assoc:node-a:node-c',
         source: 'node-a',
         target: 'node-c',
-        type: 'smoothstep',
+        sourceHandle: 'source-bottom',
+        targetHandle: 'target-top',
         selectable: false,
         deletable: false,
         focusable: false,
-        zIndex: 0,
+        zIndex: 999,
         style: 'stroke-dasharray: 6 5;',
         data: {
           kind: 'associative',
@@ -154,11 +156,12 @@ describe('graphAdapter', () => {
         id: 'assoc:node-b:node-c',
         source: 'node-b',
         target: 'node-c',
-        type: 'smoothstep',
+        sourceHandle: 'source-bottom',
+        targetHandle: 'target-top',
         selectable: false,
         deletable: false,
         focusable: false,
-        zIndex: 0,
+        zIndex: 999,
         style: 'stroke-dasharray: 6 5;',
         data: {
           kind: 'associative',
@@ -237,6 +240,8 @@ describe('graphAdapter', () => {
       id: 'edge-1',
       source: '1',
       target: '2',
+      sourceHandle: 'source-bottom',
+      targetHandle: 'target-top',
       zIndex: 1
     });
   });
@@ -266,7 +271,8 @@ describe('graphAdapter', () => {
       id: 'assoc:node-a:node-b',
       source: 'node-a',
       target: 'node-b',
-      type: 'smoothstep',
+      sourceHandle: 'source-bottom',
+      targetHandle: 'target-top',
       selectable: false,
       deletable: false,
       focusable: false

@@ -20,7 +20,8 @@ export type AssociativeFlowEdge = {
   id: string;
   source: string;
   target: string;
-  type: 'smoothstep';
+  sourceHandle?: string;
+  targetHandle?: string;
   selectable: false;
   deletable: false;
   focusable: false;
@@ -119,11 +120,12 @@ export function buildAssociativeFlowEdges(
         id: `assoc:${edge.source}:${edge.target}`,
         source: edge.source,
         target: edge.target,
-        type: 'smoothstep' as const,
+        sourceHandle: 'source-bottom',
+        targetHandle: 'target-top',
         selectable: false as const,
         deletable: false as const,
         focusable: false as const,
-        zIndex: 0,
+        zIndex: 999,
         style: 'stroke-dasharray: 6 5;',
         data: {
           kind: 'associative' as const,

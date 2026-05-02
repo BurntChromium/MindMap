@@ -57,6 +57,17 @@ It is intentionally temporary and should be used to guide implementation and fur
 - Associative edges should show why they exist on hover or click.
 - The edge inspection UI should expose the shared entity or entities.
 
+### Routing Notes
+
+- The current stable associative-edge implementation is dashed bezier curves using the top/bottom ports.
+- A side-port experiment made associative edges disappear even though the same nodes, entities, and mentions were present.
+- Working hypothesis: side ports need additional XYFlow metadata beyond `sourceHandle` / `targetHandle`, or they need a different edge configuration than the one we synthesized.
+- Next debugging experiment, when resumed:
+  - keep the working dashed styling
+  - compare top/bottom ports against side ports in isolation
+  - verify whether side-port edges require explicit position metadata or a custom edge type
+- Do not regress the current working top/bottom version while investigating the side-port path.
+
 ## Inspection and Browsing
 
 - Clicking an entity should surface all nodes that mention it.

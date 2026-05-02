@@ -19,6 +19,8 @@ type FlowEdge = {
   id: string;
   source: string;
   target: string;
+  sourceHandle?: string | null;
+  targetHandle?: string | null;
   type?: string;
   selectable?: boolean;
   deletable?: boolean;
@@ -103,6 +105,8 @@ function buildFlowEdge(edge: FlowEdgeInput): FlowEdge {
     id: edge.id,
     source: edge.source_node_id,
     target: edge.target_node_id,
+    sourceHandle: 'source-bottom',
+    targetHandle: 'target-top',
     zIndex: 1
   };
 }
@@ -112,6 +116,8 @@ function buildFlowEdgeSignature(edge: FlowEdge) {
     id: edge.id,
     source: edge.source,
     target: edge.target,
+    sourceHandle: edge.sourceHandle ?? null,
+    targetHandle: edge.targetHandle ?? null,
     type: edge.type ?? null,
     selectable: edge.selectable ?? null,
     deletable: edge.deletable ?? null,

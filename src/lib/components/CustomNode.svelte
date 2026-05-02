@@ -418,8 +418,8 @@
     {/if}
   </div>
 
-  <Handle type="target" position={Position.Top} />
-  <Handle type="source" position={Position.Bottom} />
+  <Handle id="target-top" type="target" position={Position.Top} />
+  <Handle id="source-bottom" type="source" position={Position.Bottom} />
 </div>
 
 <style>
