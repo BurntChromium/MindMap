@@ -39,6 +39,8 @@
     type Node,
     type NodePositionUpdate
   } from '$lib/stores/nodeStore';
+  import { historyStore } from '$lib/stores/historyStore';
+  import { mutationStateStore } from '$lib/stores/mutationStateStore';
   import { nodeUiStore } from '$lib/stores/nodeUiStore';
   import { clipboardStore } from '$lib/stores/clipboardStore';
   import { toFlowEdges, toFlowNodes } from '$lib/graph/graphAdapter';
@@ -53,6 +55,8 @@
   let storeSelectedNodeIds = $state<string[] | null>(null);
   let storeClipboardFragment = $state<ClipboardFragmentV1 | null>(null);
   let storeClipboardPasteCount = $state(0);
+  let storeMutationPhase = $state<'loading' | 'syncing' | 'synced' | 'failed'>('synced');
+  let storeMutationError = $state<string | null>(null);
   let duplicateCount = $state(0);
   let bulkTagFocusSignal = $state(0);
   let searchQuery = $state('');
@@ -81,6 +85,8 @@
   const selectedNodeIds = $derived(storeSelectedNodeIds ?? []);
   const clipboardFragment = $derived(storeClipboardFragment);
   const clipboardPasteCount = $derived(storeClipboardPasteCount);
+  const mutationPhase = $derived(storeMutationPhase);
+  const mutationError = $derived(storeMutationError);
   const selectedNodeIdSet = $derived(new Set(selectedNodeIds));
   const selectedNodes = $derived(nodes.filter((node) => selectedNodeIdSet.has(node.id)));
   const tagSummaries = $derived(collectTagSummaries(nodes));
@@ -101,6 +107,25 @@
   );
   const flowEdges = $derived(toFlowEdges(edges));
   const activeFilterLabel = $derived(getActiveFilterLabel(searchQuery, activeTag));
+  const canvasStatusLabel = $derived(
+    mutationPhase === 'loading'
+      ? 'Loading'
+      : mutationPhase === 'syncing'
+        ? 'Syncing'
+        : mutationPhase === 'failed'
+          ? 'Failed'
+          : 'Synced'
+  );
+  const canvasHasNodes = $derived(nodes.length > 0);
+  const canvasIsLoading = $derived(mutationPhase === 'loading');
+  const canvasIsFailed = $derived(mutationPhase === 'failed');
+  const showCanvasEmptyState = $derived(
+    Boolean(activeCanvasId) && !canvasHasNodes && !canvasIsLoading && !canvasIsFailed
+  );
+  const showCanvasLoadingState = $derived(
+    Boolean(activeCanvasId) && !canvasHasNodes && canvasIsLoading
+  );
+  const showCanvasErrorState = $derived(Boolean(activeCanvasId) && !canvasHasNodes && canvasIsFailed);
 
   onMount(() => {
     canvasStore.hydrate(initialCanvases, initialActiveCanvasId);
@@ -116,6 +141,16 @@
 
       if ((event.metaKey || event.ctrlKey) && !event.altKey) {
         const key = event.key.toLowerCase();
+
+        if (key === 'z') {
+          event.preventDefault();
+          if (event.shiftKey) {
+            void redoHistory();
+          } else {
+            void undoHistory();
+          }
+          return;
+        }
 
         if (key === 'c' && selectedNodeIds.length > 0) {
           event.preventDefault();
@@ -274,6 +309,11 @@
       storeClipboardPasteCount = value.pasteCount;
     });
 
+    const unsubMutationState = mutationStateStore.subscribe((value) => {
+      storeMutationPhase = value.phase;
+      storeMutationError = value.lastError;
+    });
+
     loadedCanvasId = data.activeCanvasId;
     initialHydrationDone = true;
 
@@ -285,6 +325,7 @@
       unsubNodeUi();
       unsubSelection();
       unsubClipboard();
+      unsubMutationState();
     };
   });
 
@@ -298,8 +339,7 @@
     searchQuery = '';
     activeTag = null;
     focusedNodeId = null;
-    void nodeStore.load(activeCanvasId);
-    void edgeStore.load(activeCanvasId);
+    void loadActiveCanvas(activeCanvasId);
   });
 
   $effect(() => {
@@ -416,7 +456,7 @@
 
   function queueNodePositionUpdates(updates: NodePositionUpdate[]) {
     nodeMoveQueue = nodeMoveQueue
-      .then(() => nodeStore.updateNodePositions(updates))
+      .then(() => nodeStore.updateNodePositions(updates).then(() => undefined))
       .catch((error) => {
         console.error(error);
       });
@@ -568,13 +608,63 @@
     }
   }
 
+  async function applyPreparedGraph(
+    graph: { nodes: Node[]; edges: Edge[] },
+    onSuccess?: () => void
+  ) {
+    if (!activeCanvasId || graph.nodes.length === 0) {
+      return false;
+    }
+
+    const previousNodes = [...nodes];
+    const previousEdges = [...edges];
+    const previousSelection = [...selectedNodeIds];
+    const previousFocusedNodeId = focusedNodeId;
+    const nextNodes = [...previousNodes, ...graph.nodes];
+    const nextEdges = [...previousEdges, ...graph.edges];
+
+    nodeStore.hydrate(nextNodes, activeCanvasId);
+    edgeStore.hydrate(nextEdges, activeCanvasId);
+    selectionStore.setSelection(graph.nodes.map((node) => node.id));
+    focusedNodeId = graph.nodes[0]?.id ?? null;
+    nodeUiStore.clear();
+
+    try {
+      const response = await fetch('/api/graph-fragments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'paste',
+          canvasId: activeCanvasId,
+          nodes: graph.nodes,
+          edges: graph.edges
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Paste graph fragment failed with ${response.status}`);
+      }
+
+      onSuccess?.();
+      return true;
+    } catch (error) {
+      nodeStore.hydrate(previousNodes, activeCanvasId);
+      edgeStore.hydrate(previousEdges, activeCanvasId);
+      selectionStore.setSelection(previousSelection);
+      focusedNodeId = previousFocusedNodeId;
+      console.error(error);
+      return false;
+    }
+  }
+
   async function commitPastedGraph(
     fragment: ClipboardFragmentV1,
     pasteIndex: number,
+    historyLabel = 'Paste nodes',
     onSuccess?: () => void
   ) {
     if (!activeCanvasId || fragment.nodes.length === 0) {
-      return;
+      return false;
     }
 
     const pastedGraph = buildPastedGraph(
@@ -586,46 +676,23 @@
     );
 
     if (pastedGraph.nodes.length === 0) {
-      return;
+      return false;
     }
 
-    const previousNodes = [...nodes];
-    const previousEdges = [...edges];
-    const previousSelection = [...selectedNodeIds];
-    const previousFocusedNodeId = focusedNodeId;
-    const nextNodes = [...previousNodes, ...pastedGraph.nodes];
-    const nextEdges = [...previousEdges, ...pastedGraph.edges];
+    const success = await applyPreparedGraph(pastedGraph, onSuccess);
 
-    nodeStore.hydrate(nextNodes, activeCanvasId);
-    edgeStore.hydrate(nextEdges, activeCanvasId);
-    selectionStore.setSelection(pastedGraph.nodes.map((node) => node.id));
-    focusedNodeId = pastedGraph.nodes[0]?.id ?? null;
-    nodeUiStore.clear();
+    if (success && !historyStore.isReplaying()) {
+      const pastedNodeIds = pastedGraph.nodes.map((node) => node.id);
+      const pastedEdgeIds = pastedGraph.edges.map((edge) => edge.id);
 
-    try {
-      const response = await fetch('/api/graph-fragments', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'paste',
-          canvasId: activeCanvasId,
-          nodes: pastedGraph.nodes,
-          edges: pastedGraph.edges
-        })
+      historyStore.record({
+        label: historyLabel,
+        undo: async () => deleteGraphSelection(pastedNodeIds, pastedEdgeIds),
+        redo: async () => applyPreparedGraph(pastedGraph)
       });
-
-      if (!response.ok) {
-        throw new Error(`Paste graph fragment failed with ${response.status}`);
-      }
-
-      onSuccess?.();
-    } catch (error) {
-      nodeStore.hydrate(previousNodes, activeCanvasId);
-      edgeStore.hydrate(previousEdges, activeCanvasId);
-      selectionStore.setSelection(previousSelection);
-      focusedNodeId = previousFocusedNodeId;
-      console.error(error);
     }
+
+    return success;
   }
 
   async function cutSelection() {
@@ -649,7 +716,7 @@
       return;
     }
 
-    await commitPastedGraph(fragment, duplicateCount, () => {
+    await commitPastedGraph(fragment, duplicateCount, 'Duplicate nodes', () => {
       duplicateCount += 1;
     });
   }
@@ -661,14 +728,14 @@
       return;
     }
 
-    await commitPastedGraph(fragment, duplicateCount, () => {
+    await commitPastedGraph(fragment, duplicateCount, 'Duplicate subtree', () => {
       duplicateCount += 1;
     });
   }
 
   async function deleteGraphSelection(nodeIds: string[], edgeIds: string[]) {
     if (!activeCanvasId) {
-      return;
+      return false;
     }
 
     const uniqueNodeIds = Array.from(new Set(nodeIds));
@@ -681,6 +748,8 @@
     const deletedNodeIdSet = new Set(uniqueNodeIds);
     const autoEdgeIds = getConnectedEdgeIds(edges, uniqueNodeIds);
     const deletedEdgeIds = Array.from(new Set([...uniqueEdgeIds, ...autoEdgeIds]));
+    const deletedNodes = previousNodes.filter((node) => deletedNodeIdSet.has(node.id));
+    const deletedEdges = previousEdges.filter((edge) => deletedEdgeIds.includes(edge.id));
 
     nodeStore.hydrate(
       previousNodes.filter((node) => !deletedNodeIdSet.has(node.id)),
@@ -718,7 +787,18 @@
       selectionStore.setSelection(previousSelection);
       focusedNodeId = previousFocusedNodeId;
       console.error(error);
+      return false;
     }
+
+    if (!historyStore.isReplaying()) {
+      historyStore.record({
+        label: 'Delete nodes',
+        undo: async () => applyPreparedGraph({ nodes: deletedNodes, edges: deletedEdges }),
+        redo: async () => deleteGraphSelection(uniqueNodeIds, uniqueEdgeIds)
+      });
+    }
+
+    return true;
   }
 
   function handleSelectionChange(nodeIds: string[]) {
@@ -759,9 +839,21 @@
       return;
     }
 
-    await commitPastedGraph(clipboardFragment, clipboardPasteCount, () => {
+    await commitPastedGraph(clipboardFragment, clipboardPasteCount, 'Paste nodes', () => {
       clipboardStore.incrementPasteCount();
     });
+  }
+
+  async function undoHistory() {
+    await historyStore.undo();
+  }
+
+  async function redoHistory() {
+    await historyStore.redo();
+  }
+
+  async function loadActiveCanvas(canvasId: string) {
+    await Promise.all([nodeStore.load(canvasId), edgeStore.load(canvasId)]);
   }
 </script>
 
@@ -794,7 +886,9 @@
         }}
         onSelectionChange={handleSelectionChange}
         onPaneClick={handlePaneClick}
-        onDelete={deleteGraphSelection}
+        onDelete={(nodeIds, edgeIds) => {
+          void deleteGraphSelection(nodeIds, edgeIds);
+        }}
         onApiReady={(api) => {
           canvasStageApi = api;
         }}
@@ -803,6 +897,36 @@
       {#if selectedNodeIds.length > 0}
         <div class="canvas-hint canvas-hint--selection" aria-live="polite">
           {selectedNodeIds.length} selected
+        </div>
+      {/if}
+
+      <div
+        class="canvas-hint canvas-hint--status"
+        class:canvas-hint--status-loading={mutationPhase === 'loading'}
+        class:canvas-hint--status-syncing={mutationPhase === 'syncing'}
+        class:canvas-hint--status-failed={mutationPhase === 'failed'}
+        aria-live="polite"
+      >
+        {canvasStatusLabel}
+      </div>
+
+      {#if showCanvasLoadingState}
+        <div class="canvas-empty-state" role="status" aria-live="polite">
+          <h3>Loading canvas</h3>
+          <p>Restoring the selected map.</p>
+        </div>
+      {:else if showCanvasErrorState}
+        <div class="canvas-empty-state canvas-empty-state--error" role="alert">
+          <h3>Could not refresh this canvas</h3>
+          <p>{mutationError ?? 'Showing cached data if available.'}</p>
+          <button class="button" type="button" onclick={() => activeCanvasId && void loadActiveCanvas(activeCanvasId)}>
+            Retry
+          </button>
+        </div>
+      {:else if showCanvasEmptyState}
+        <div class="canvas-empty-state" role="status" aria-live="polite">
+          <h3>No nodes yet</h3>
+          <p>Press <kbd>N</kbd> to create a node on this canvas.</p>
         </div>
       {/if}
 
@@ -883,6 +1007,12 @@
     }
   }
 
+  .canvas-shell {
+    position: relative;
+    min-width: 0;
+    min-height: 0;
+  }
+
   .canvas-hint {
     position: absolute;
     z-index: 6;
@@ -902,6 +1032,59 @@
   .canvas-hint--selection {
     right: 1rem;
     bottom: 1rem;
+  }
+
+  .canvas-hint--status {
+    left: 1rem;
+    bottom: 1rem;
+  }
+
+  .canvas-hint--status-loading {
+    background: rgba(255, 255, 255, 0.97);
+    color: var(--accent);
+  }
+
+  .canvas-hint--status-syncing {
+    background: rgba(239, 246, 255, 0.97);
+    color: #1d4ed8;
+  }
+
+  .canvas-hint--status-failed {
+    background: rgba(254, 242, 242, 0.97);
+    color: #b91c1c;
+    border-color: rgba(239, 68, 68, 0.4);
+  }
+
+  .canvas-empty-state {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    z-index: 5;
+    display: grid;
+    gap: 0.35rem;
+    min-width: 280px;
+    max-width: min(420px, calc(100% - 2rem));
+    padding: 1rem 1.1rem;
+    border: 1px solid rgba(148, 163, 184, 0.35);
+    border-radius: 1rem;
+    background: rgba(255, 255, 255, 0.96);
+    box-shadow: var(--shadow-soft);
+    transform: translate(-50%, -50%);
+    color: var(--text-main);
+  }
+
+  .canvas-empty-state h3 {
+    margin: 0;
+    font-size: 1rem;
+  }
+
+  .canvas-empty-state p {
+    margin: 0;
+    color: var(--text-muted);
+  }
+
+  .canvas-empty-state--error {
+    border-color: rgba(239, 68, 68, 0.35);
   }
 
   .canvas-search-bar {

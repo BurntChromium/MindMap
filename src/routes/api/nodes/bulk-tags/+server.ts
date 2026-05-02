@@ -1,8 +1,8 @@
 import { json } from '@sveltejs/kit';
 import { db } from '$lib/server/db';
 import { now } from '$lib/server/utils';
-import { normalizeTagList } from '$lib/tagUtils';
 import { replaceNodeTags } from '$lib/server/nodeTags';
+import { isString, toTagList } from '$lib/mutationPayloads';
 
 type BulkTagNodeInput = {
   id?: unknown;
@@ -16,8 +16,8 @@ export async function POST({ request }) {
 
   const updates = nodes
     .map((entry) => ({
-      id: typeof entry?.id === 'string' ? entry.id : '',
-      tags: Array.isArray(entry?.tags) ? normalizeTagList(entry.tags) : []
+      id: isString(entry?.id) ? entry.id : '',
+      tags: toTagList(entry?.tags)
     }))
     .filter((entry): entry is { id: string; tags: string[] } => Boolean(entry.id));
 
@@ -32,5 +32,5 @@ export async function POST({ request }) {
 
   tx();
 
-  return json({ success: true });
+  return json({ success: true, count: updates.length });
 }

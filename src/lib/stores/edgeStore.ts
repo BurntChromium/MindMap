@@ -1,4 +1,7 @@
 import { get, writable } from 'svelte/store';
+import { buildEdgeCreateBody } from '$lib/mutationPayloads';
+import { historyStore } from '$lib/stores/historyStore';
+import { mutationStateStore } from '$lib/stores/mutationStateStore';
 
 export type Edge = {
   id: string;
@@ -70,6 +73,7 @@ function createEdgeStore() {
       const current = get(store);
       const cached = cacheByCanvasId.get(canvasId);
       const requestToken = ++loadToken;
+      mutationStateStore.beginLoad();
 
       if (current.activeCanvasId && current.activeCanvasId !== canvasId) {
         cacheByCanvasId.set(current.activeCanvasId, snapshotEdges(current.edges));
@@ -92,7 +96,8 @@ function createEdgeStore() {
         const data: Edge[] = await res.json();
 
         if (requestToken !== loadToken) {
-          return;
+          mutationStateStore.finishLoad(true);
+          return false;
         }
 
         cacheByCanvasId.set(canvasId, data.map(cloneEdge));
@@ -100,19 +105,25 @@ function createEdgeStore() {
           edges: edgesToMap(data),
           activeCanvasId: canvasId
         });
+        mutationStateStore.finishLoad(true);
+        return true;
       } catch {
         if (requestToken !== loadToken) {
-          return;
+          mutationStateStore.finishLoad(true);
+          return false;
         }
 
         if (!cached && current.activeCanvasId === canvasId) {
           syncCache();
         }
+
+        mutationStateStore.finishLoad(false, `Failed to load edges for ${canvasId}`);
+        return false;
       }
     },
 
-    async create(canvasId: string, source: string, target: string) {
-      const id = `e-${source}-${target}`;
+    async create(canvasId: string, source: string, target: string, providedId?: string) {
+      const id = providedId ?? `e-${source}-${target}`;
       const newEdge: Edge = {
         id,
         canvas_id: canvasId,
@@ -120,6 +131,7 @@ function createEdgeStore() {
         target_node_id: target
       };
       const previous = snapshotState();
+      mutationStateStore.beginWrite();
 
       update((state) => {
         state.edges.set(id, newEdge);
@@ -132,22 +144,36 @@ function createEdgeStore() {
         const res = await fetch('/api/edges', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id, canvasId, source, target })
+          body: JSON.stringify(buildEdgeCreateBody({ id, canvasId, source, target }))
         });
 
         if (!res.ok) {
           throw new Error(`Create edge failed with ${res.status}`);
         }
+
+        if (!historyStore.isReplaying()) {
+          historyStore.record({
+            label: 'Create edge',
+            undo: async () => edgeStore.remove(id),
+            redo: async () => edgeStore.create(canvasId, source, target, id)
+          });
+        }
+
+        mutationStateStore.finishWrite(true);
+        return true;
       } catch (error) {
         set(previous);
         syncCache(previous);
+        mutationStateStore.finishWrite(false, `Create edge failed with ${String(error)}`);
         console.error(error);
-        return;
+        return false;
       }
     },
 
     async remove(id: string) {
       const previous = snapshotState();
+      const removedEdge = previous.edges.get(id);
+      mutationStateStore.beginWrite();
 
       update((state) => {
         state.edges.delete(id);
@@ -162,10 +188,29 @@ function createEdgeStore() {
         if (!res.ok) {
           throw new Error(`Delete edge failed with ${res.status}`);
         }
+
+        if (removedEdge && !historyStore.isReplaying()) {
+          historyStore.record({
+            label: 'Delete edge',
+            undo: async () =>
+              edgeStore.create(
+                removedEdge.canvas_id,
+                removedEdge.source_node_id,
+                removedEdge.target_node_id,
+                removedEdge.id
+              ),
+            redo: async () => edgeStore.remove(removedEdge.id)
+          });
+        }
+
+        mutationStateStore.finishWrite(true);
+        return true;
       } catch (error) {
         set(previous);
         syncCache(previous);
+        mutationStateStore.finishWrite(false, `Delete edge failed with ${String(error)}`);
         console.error(error);
+        return false;
       }
     }
   };

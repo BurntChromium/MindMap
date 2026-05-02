@@ -1,5 +1,8 @@
 import { get, writable } from 'svelte/store';
 import { createClientId } from '$lib/clientId';
+import { buildBulkPositionsBody, buildBulkTagsBody, buildNodeCreateBody, buildNodePatchBody } from '$lib/mutationPayloads';
+import { historyStore } from '$lib/stores/historyStore';
+import { mutationStateStore } from '$lib/stores/mutationStateStore';
 
 export type Node = {
   id: string;
@@ -93,6 +96,7 @@ function createNodeStore() {
       const current = get(store);
       const cached = cacheByCanvasId.get(canvasId);
       const requestToken = ++loadToken;
+      mutationStateStore.beginLoad();
 
       if (current.activeCanvasId && current.activeCanvasId !== canvasId) {
         cacheByCanvasId.set(current.activeCanvasId, snapshotNodes(current.nodes));
@@ -115,7 +119,8 @@ function createNodeStore() {
         const data: Array<Node & { tags?: unknown }> = await res.json();
 
         if (requestToken !== loadToken) {
-          return;
+          mutationStateStore.finishLoad(true);
+          return false;
         }
 
         const normalized = data.map((node) => ({
@@ -128,43 +133,64 @@ function createNodeStore() {
           nodes: nodesToMap(normalized),
           activeCanvasId: canvasId
         });
+        mutationStateStore.finishLoad(true);
+        return true;
       } catch {
         if (requestToken !== loadToken) {
-          return;
+          mutationStateStore.finishLoad(true);
+          return false;
         }
 
         if (!cached && current.activeCanvasId === canvasId) {
           syncCache();
         }
+
+        mutationStateStore.finishLoad(false, `Failed to load nodes for ${canvasId}`);
+        return false;
       }
     },
 
-    async create(canvasId: string, x = 0, y = 0) {
-      const id = createClientId('node');
+    async create(
+      canvasId: string,
+      x = 0,
+      y = 0,
+      options?: Partial<Pick<Node, 'id' | 'title' | 'body' | 'tags' | 'collapsed'>>
+    ) {
+      const id = options?.id ?? createClientId('node');
       const newNode: Node = {
         id,
         canvas_id: canvasId,
-        title: 'New Node',
-        body: '',
-        tags: [],
+        title: options?.title ?? 'New Node',
+        body: options?.body ?? '',
+        tags: Array.isArray(options?.tags) ? [...options.tags] : [],
         x,
         y,
-        collapsed: 0
+        collapsed: options?.collapsed ?? 0
       };
       const previous = snapshotState();
+      mutationStateStore.beginWrite();
 
       update((state) => {
         state.nodes.set(id, newNode);
         state.activeCanvasId = canvasId;
         return state;
       });
-      syncCache();
-
       try {
         const res = await fetch('/api/nodes', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id, canvasId, x, y })
+          body: JSON.stringify(
+            buildNodeCreateBody({
+              id,
+              canvasId,
+              x,
+              y,
+              title: newNode.title,
+              body: newNode.body,
+              tags: newNode.tags,
+              collapsed: newNode.collapsed
+            })
+          )
         });
 
         if (!res.ok) {
@@ -172,16 +198,36 @@ function createNodeStore() {
         }
 
         cacheByCanvasId.set(canvasId, snapshotNodes(get(store).nodes));
+        if (!historyStore.isReplaying()) {
+          historyStore.record({
+            label: 'Create node',
+            undo: async () => nodeStore.remove(id),
+            redo: async () =>
+              nodeStore.create(canvasId, newNode.x, newNode.y, {
+                id,
+                title: newNode.title,
+                body: newNode.body,
+                tags: [...newNode.tags],
+                collapsed: newNode.collapsed
+              })
+          });
+        }
+        mutationStateStore.finishWrite(true);
+        return true;
       } catch (error) {
         set(previous);
         syncCache(previous);
+        mutationStateStore.finishWrite(false, `Create node failed with ${String(error)}`);
         console.error(error);
-        return;
+        return false;
       }
     },
 
     async updateNode(partial: Partial<Node> & { id: string }) {
       const previous = snapshotState();
+      const before = previous.nodes.get(partial.id);
+      const nextNode = before ? { ...before, ...partial } : null;
+      mutationStateStore.beginWrite();
 
       update((state) => {
         const existing = state.nodes.get(partial.id);
@@ -195,29 +241,62 @@ function createNodeStore() {
         const response = await fetch('/api/nodes', {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(partial)
+          body: JSON.stringify(buildNodePatchBody(partial))
         });
 
         if (!response.ok) {
           throw new Error(`Update node failed with ${response.status}`);
         }
+
+        if (before && nextNode && !historyStore.isReplaying()) {
+          historyStore.record({
+            label: 'Update node',
+            undo: async () =>
+              nodeStore.updateNode({
+                id: before.id,
+                title: before.title,
+                body: before.body,
+                x: before.x,
+                y: before.y,
+                collapsed: before.collapsed,
+                tags: [...before.tags]
+              }),
+            redo: async () =>
+              nodeStore.updateNode({
+                id: nextNode.id,
+                title: nextNode.title,
+                body: nextNode.body,
+                x: nextNode.x,
+                y: nextNode.y,
+                collapsed: nextNode.collapsed,
+                tags: [...nextNode.tags]
+              })
+          });
+        }
+
+        mutationStateStore.finishWrite(true);
+        return true;
       } catch (error) {
         set(previous);
         syncCache(previous);
+        mutationStateStore.finishWrite(false, `Update node failed with ${String(error)}`);
         console.error(error);
-        return;
+        return false;
       }
 
-      syncCache();
     },
 
     async updateNodeTags(updates: NodeTagUpdate[]) {
       if (!updates.length) {
-        return;
+        return true;
       }
 
       const previous = snapshotState();
       const nextTagsById = new Map(updates.map((update) => [update.id, [...update.tags]]));
+      const previousTagsById = new Map(
+        updates.map((update) => [update.id, previous.nodes.get(update.id)?.tags ? [...previous.nodes.get(update.id)!.tags] : []])
+      );
+      mutationStateStore.beginWrite();
 
       update((state) => {
         for (const [id, tags] of nextTagsById) {
@@ -233,40 +312,63 @@ function createNodeStore() {
 
         return state;
       });
-      syncCache();
-
       try {
         const response = await fetch('/api/nodes/bulk-tags', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            nodes: updates.map((update) => ({
-              id: update.id,
-              tags: update.tags
-            }))
-          })
+          body: JSON.stringify(buildBulkTagsBody(updates))
         });
 
         if (!response.ok) {
           throw new Error(`Bulk tag update failed with ${response.status}`);
         }
+
+        if (!historyStore.isReplaying()) {
+          historyStore.record({
+            label: 'Update tags',
+            undo: async () =>
+              nodeStore.updateNodeTags(
+                updates.map((update) => ({
+                  id: update.id,
+                  tags: previousTagsById.get(update.id) ?? []
+                }))
+              ),
+            redo: async () =>
+              nodeStore.updateNodeTags(
+                updates.map((update) => ({
+                  id: update.id,
+                  tags: [...update.tags]
+                }))
+              )
+          });
+        }
+
+        mutationStateStore.finishWrite(true);
+        return true;
       } catch (error) {
         set(previous);
         syncCache(previous);
+        mutationStateStore.finishWrite(false, `Bulk tag update failed with ${String(error)}`);
         console.error(error);
-        return;
+        return false;
       }
 
-      syncCache();
     },
 
     async updateNodePositions(updates: NodePositionUpdate[]) {
       if (!updates.length) {
-        return;
+        return true;
       }
 
       const previous = snapshotState();
       const nextPositionsById = new Map(updates.map((update) => [update.id, { x: update.x, y: update.y }]));
+      const previousPositionsById = new Map(
+        updates.map((update) => {
+          const node = previous.nodes.get(update.id);
+          return [update.id, node ? { x: node.x, y: node.y } : { x: update.x, y: update.y }];
+        })
+      );
+      mutationStateStore.beginWrite();
 
       update((state) => {
         for (const [id, position] of nextPositionsById) {
@@ -289,30 +391,50 @@ function createNodeStore() {
         const response = await fetch('/api/nodes/bulk-position', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            nodes: updates.map((update) => ({
-              id: update.id,
-              x: update.x,
-              y: update.y
-            }))
-          })
+          body: JSON.stringify(buildBulkPositionsBody(updates))
         });
 
         if (!response.ok) {
           throw new Error(`Bulk node position update failed with ${response.status}`);
         }
+
+        if (!historyStore.isReplaying()) {
+          historyStore.record({
+            label: 'Move nodes',
+            undo: async () =>
+              nodeStore.updateNodePositions(
+                updates.map((update) => ({
+                  id: update.id,
+                  x: previousPositionsById.get(update.id)?.x ?? update.x,
+                  y: previousPositionsById.get(update.id)?.y ?? update.y
+                }))
+              ),
+            redo: async () =>
+              nodeStore.updateNodePositions(
+                updates.map((update) => ({
+                  id: update.id,
+                  x: update.x,
+                  y: update.y
+                }))
+              )
+          });
+        }
+
+        mutationStateStore.finishWrite(true);
+        return true;
       } catch (error) {
         set(previous);
         syncCache(previous);
+        mutationStateStore.finishWrite(false, `Bulk node position update failed with ${String(error)}`);
         console.error(error);
-        return;
+        return false;
       }
-
-      syncCache();
     },
 
     async remove(id: string) {
       const previous = snapshotState();
+      const removedNode = previous.nodes.get(id);
+      mutationStateStore.beginWrite();
 
       update((state) => {
         state.nodes.delete(id);
@@ -327,11 +449,30 @@ function createNodeStore() {
         if (!res.ok) {
           throw new Error(`Delete node failed with ${res.status}`);
         }
+
+        if (removedNode && !historyStore.isReplaying()) {
+          historyStore.record({
+            label: 'Delete node',
+            undo: async () =>
+              nodeStore.create(removedNode.canvas_id, removedNode.x, removedNode.y, {
+                id: removedNode.id,
+                title: removedNode.title,
+                body: removedNode.body,
+                tags: [...removedNode.tags],
+                collapsed: removedNode.collapsed
+              }),
+            redo: async () => nodeStore.remove(removedNode.id)
+          });
+        }
+
+        mutationStateStore.finishWrite(true);
+        return true;
       } catch (error) {
         set(previous);
         syncCache(previous);
+        mutationStateStore.finishWrite(false, `Delete node failed with ${String(error)}`);
         console.error(error);
-        return;
+        return false;
       }
     }
   };

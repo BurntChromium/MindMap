@@ -91,28 +91,30 @@ Plumbing to support it:
 - explicit migration path for stored snapshots
 - consistent IDs or remapping rules during import
 
-## Stage 5: Make the Editor Trustworthy
+## Stage 5: Make the Editor Trustworthy (Done)
 
 User benefit:
 
 - fewer accidental data losses
-- predictable saves
+- predictable saves and recovery
 - confidence using the tool for real projects
 
 Feature work:
 
-- undo/redo
-- clearer save indicators when writes are in flight or failed
-    - A simple "synced" badge in the canvas could solve this (or "syncing", "synced", "failed" or whatever)
+- undo/redo for common client-side mutations
+- clearer mutation state indicators when writes are in flight, synced, or failed
+    - a simple "synced" badge in the canvas could solve this, but the important part is making the state explicit
 - ~~stronger keyboard shortcuts~~ (Already done!)
-- better empty, loading, and error states
+- better empty, loading, cached, and error states
+- shared validation for client and server payloads
+- more consistent API responses across CRUD endpoints
 
 Plumbing to support it:
 
-- a mutation log or action history
-- shared validation for client and server payloads
-- API response consistency across CRUD endpoints
-- tests for stores, adapters, and server routes
+- a mutation log or action history that can support undo/redo
+- shared schemas or validators for client and server payloads
+- consistent response shapes across CRUD endpoints
+- tests for stores, adapters, route handlers, and recovery states
 
 ## Stage 6: Make It Fast Enough
 

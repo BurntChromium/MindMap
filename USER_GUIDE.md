@@ -21,6 +21,8 @@ Mindmap is a Svelte and SQLite app for building mind maps and linked notebooks o
 - `Cmd/Ctrl+C`: copy the current selection
 - `Cmd/Ctrl+X`: cut the current selection
 - `Cmd/Ctrl+V`: paste the copied fragment
+- `Cmd/Ctrl+Z`: undo the last canvas mutation
+- `Cmd/Ctrl+Shift+Z`: redo the last undone canvas mutation
 - `Cmd/Ctrl+D`: duplicate the current selection
 - `Cmd/Ctrl+Shift+D`: duplicate the selected subtree
 - `/`: open the quick search bar on the canvas

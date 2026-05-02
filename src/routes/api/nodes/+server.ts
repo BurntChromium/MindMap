@@ -1,9 +1,9 @@
 import { json } from '@sveltejs/kit';
 import { db } from '$lib/server/db';
 import { createId, now } from '$lib/server/utils';
-import { normalizeTagList } from '$lib/tagUtils';
 import { getNodesByCanvasId } from '$lib/server/graphData';
 import { replaceNodeTags } from '$lib/server/nodeTags';
+import { isString, toNumber, toTagList } from '$lib/mutationPayloads';
 
 // GET /api/nodes?canvasId=...
 export function GET({ url }) {
@@ -13,9 +13,21 @@ export function GET({ url }) {
 
 // POST /api/nodes
 export async function POST({ request }) {
-  const { id: providedId, canvasId, title, x, y } = await request.json();
+  const payload = await request.json();
+  const providedId = isString(payload?.id) ? payload.id : '';
+  const canvasId = isString(payload?.canvasId) ? payload.canvasId : '';
+  const id = providedId || createId();
+  const title = typeof payload?.title === 'string' ? payload.title : 'New Node';
+  const body = typeof payload?.body === 'string' ? payload.body : '';
+  const tags = toTagList(payload?.tags);
+  const x = toNumber(payload?.x);
+  const y = toNumber(payload?.y);
+  const collapsed = toNumber(payload?.collapsed);
 
-  const id = typeof providedId === 'string' && providedId ? providedId : createId();
+  if (!canvasId) {
+    return json({ success: false, error: 'Missing canvasId' }, { status: 400 });
+  }
+
   const timestamp = now();
 
   db.prepare(`
@@ -25,24 +37,37 @@ export async function POST({ request }) {
   `).run(
     id,
     canvasId,
-    title ?? 'New Node',
-    '',
-    x ?? 0,
-    y ?? 0,
-    0,
+    title,
+    body,
+    x,
+    y,
+    collapsed,
     timestamp,
     timestamp
   );
 
-  return json({ id });
+  if (tags.length > 0) {
+    replaceNodeTags(id, tags);
+  }
+
+  return json({ success: true, id });
 }
 
 // PATCH /api/nodes
 export async function PATCH({ request }) {
   const payload = await request.json();
-  const { id, title, body, x, y, collapsed } = payload;
+  const id = isString(payload?.id) ? payload.id : '';
+  const title = typeof payload?.title === 'string' ? payload.title : undefined;
+  const body = typeof payload?.body === 'string' ? payload.body : undefined;
+  const x = typeof payload?.x === 'number' ? payload.x : undefined;
+  const y = typeof payload?.y === 'number' ? payload.y : undefined;
+  const collapsed = typeof payload?.collapsed === 'number' ? payload.collapsed : undefined;
   const hasTags = Object.prototype.hasOwnProperty.call(payload, 'tags');
-  const tags = hasTags && Array.isArray(payload.tags) ? normalizeTagList(payload.tags) : [];
+  const tags = hasTags ? toTagList(payload?.tags) : [];
+
+  if (!id) {
+    return json({ success: false, error: 'Missing id' }, { status: 400 });
+  }
 
   const updateNode = db.prepare(`
     UPDATE nodes
@@ -66,7 +91,7 @@ export async function PATCH({ request }) {
 
   tx();
 
-  return json({ success: true });
+  return json({ success: true, id });
 }
 
 // DELETE /api/nodes?id=...

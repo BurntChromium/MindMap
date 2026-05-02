@@ -2,6 +2,7 @@ import { json } from '@sveltejs/kit';
 import { db } from '$lib/server/db';
 import { createId, now } from '$lib/server/utils';
 import { getCanvases } from '$lib/server/graphData';
+import { isString } from '$lib/mutationPayloads';
 
 // GET /api/canvases
 export function GET() {
@@ -10,9 +11,10 @@ export function GET() {
 
 // POST /api/canvases
 export async function POST({ request }) {
-  const { id: providedId, name } = await request.json();
-
-  const id = typeof providedId === 'string' && providedId ? providedId : createId();
+  const payload = await request.json();
+  const providedId = isString(payload?.id) ? payload.id : '';
+  const name = typeof payload?.name === 'string' ? payload.name : 'New Canvas';
+  const id = providedId || createId();
   const timestamp = now();
 
   db.prepare(`
@@ -20,12 +22,14 @@ export async function POST({ request }) {
     VALUES (?, ?, ?, ?)
   `).run(id, name, timestamp, timestamp);
 
-  return json({ id, name });
+  return json({ success: true, id, name });
 }
 
 // PATCH /api/canvases
 export async function PATCH({ request }) {
-  const { id, name } = await request.json();
+  const payload = await request.json();
+  const id = isString(payload?.id) ? payload.id : '';
+  const name = typeof payload?.name === 'string' ? payload.name : '';
   const trimmed = typeof name === 'string' ? name.trim() : '';
 
   if (!id || !trimmed) {

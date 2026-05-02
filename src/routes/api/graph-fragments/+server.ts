@@ -1,8 +1,8 @@
 import { json } from '@sveltejs/kit';
 import { db } from '$lib/server/db';
 import { createId, now } from '$lib/server/utils';
-import { normalizeTagList } from '$lib/tagUtils';
 import { replaceNodeTags } from '$lib/server/nodeTags';
+import { isString, toNumber, toStringList, toTagList } from '$lib/mutationPayloads';
 
 type PastedNode = {
   id?: unknown;
@@ -27,22 +27,6 @@ type DeleteGraphPayload = {
   edgeIds?: unknown;
 };
 
-function isString(value: unknown): value is string {
-  return typeof value === 'string' && value.trim().length > 0;
-}
-
-function toNumber(value: unknown, fallback = 0) {
-  return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
-}
-
-function toStringList(value: unknown) {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-
-  return value.filter((entry): entry is string => typeof entry === 'string' && entry.length > 0);
-}
-
 // POST /api/graph-fragments
 export async function POST({ request }) {
   const payload = await request.json();
@@ -61,7 +45,7 @@ export async function POST({ request }) {
         id: isString(node?.id) ? node.id : '',
         title: typeof node?.title === 'string' ? node.title : 'New Node',
         body: typeof node?.body === 'string' ? node.body : '',
-        tags: Array.isArray(node?.tags) ? normalizeTagList(node.tags) : [],
+        tags: toTagList(node?.tags),
         x: toNumber(node?.x),
         y: toNumber(node?.y),
         collapsed: toNumber(node?.collapsed)
@@ -118,7 +102,7 @@ export async function POST({ request }) {
 
     tx();
 
-    return json({ success: true });
+    return json({ success: true, insertedNodes: normalizedNodes.length, insertedEdges: normalizedEdges.length });
   }
 
   if (payload?.action === 'delete') {
@@ -151,7 +135,7 @@ export async function POST({ request }) {
 
     tx();
 
-    return json({ success: true });
+    return json({ success: true, removedNodes: nodeIds.length, removedEdges: edgeIds.length });
   }
 
   return json({ error: 'Unsupported action' }, { status: 400 });
