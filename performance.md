@@ -13,7 +13,7 @@ This checklist tracks the practical work needed to make the app feel faster unde
 
 ## 1. Avoid Unnecessary DB Trips
 
-- [ ] Keep the server search route only if it is needed later for global or cross-canvas search.
+- [ ] Keep the server search route only if we add global or cross-canvas search later.
 
 ## 2. Make Discovery Local First
 
@@ -21,10 +21,9 @@ This checklist tracks the practical work needed to make the app feel faster unde
 
 ## 3. Add the Right Database Indexes
 
-- [ ] Add an index on `node_tags(node_id)`.
-- [ ] Add an index on `node_tags(tag_id)`.
-- [ ] Add an index on `tags(name)`.
+- [ ] Add an index on `node_tags(tag_id)` if query plans show it helps.
 - [ ] Revisit whether SQLite FTS5 is worth it for title/body search if the data set grows.
+- [ ] Prefer query-plan-driven indexes over blanket additions.
 
 ## 4. Reduce Render Churn
 
@@ -40,7 +39,7 @@ This checklist tracks the practical work needed to make the app feel faster unde
 ## 6. Verify With Measurements
 
 - [ ] Capture a baseline for canvas load time.
-- [ ] Capture a baseline for search response time.
+- [ ] Capture a baseline for search/filter latency on the active canvas.
 - [ ] Capture a baseline for large-canvas drag performance.
 - [ ] Re-run the same measurements after each optimization.
 

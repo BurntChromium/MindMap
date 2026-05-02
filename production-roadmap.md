@@ -126,17 +126,23 @@ User benefit:
 
 Feature work:
 
-- graph performance tuning
-- lazy rendering or virtualization where it matters
-- cheaper search/filter updates
-- reduced re-renders in heavy editing sessions
+- reduce graph render churn on larger canvases
+- keep discovery responsive with local-first search/filtering on the active canvas
+- add lazy rendering or virtualization only if profiling shows a real need
+- keep drag and batch edits visually stable under load
 
 Plumbing to support it:
 
-- derived indexes for common lookups
-- less store churn during drag and batch edits
+- client-side derived indexes and caches for common lookups
+- less store churn during drag, paste, duplicate, and bulk edits
 - profiling hooks for bottlenecks
 - load testing against larger datasets
+
+Notes for this stage:
+
+- The app already avoids the old `/api/search` path for normal current-canvas discovery.
+- Database indexes should only be added when a query plan needs them; the current schema already covers `node_tags(node_id)` through the composite primary key and `tags(name)` through the unique constraint.
+- If we later add global or cross-canvas search, the server search route can come back as a dedicated path for that use case.
 
 ## Notes
 
