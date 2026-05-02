@@ -11,6 +11,7 @@ export type Node = {
   canvas_id: string;
   title: string;
   body: string;
+  is_entity: number;
   tags: string[];
   x: number;
   y: number;
@@ -127,6 +128,7 @@ function createNodeStore() {
 
         const normalized = data.map((node) => ({
           ...node,
+          is_entity: typeof node.is_entity === 'number' ? node.is_entity : 1,
           tags: Array.isArray(node.tags) ? node.tags : []
         }));
 
@@ -152,11 +154,11 @@ function createNodeStore() {
       }
     },
 
-    async create(
+  async create(
       canvasId: string,
       x = 0,
       y = 0,
-      options?: Partial<Pick<Node, 'id' | 'title' | 'body' | 'tags' | 'collapsed'>>
+      options?: Partial<Pick<Node, 'id' | 'title' | 'body' | 'tags' | 'collapsed' | 'is_entity'>>
     ) {
       const current = get(store);
       const currentNodes = Array.from(current.nodes.values());
@@ -167,6 +169,7 @@ function createNodeStore() {
         canvas_id: canvasId,
         title,
         body: options?.body ?? '',
+        is_entity: typeof options?.is_entity === 'number' ? options.is_entity : 1,
         tags: Array.isArray(options?.tags) ? [...options.tags] : [],
         x,
         y,
@@ -193,6 +196,7 @@ function createNodeStore() {
               y,
               title: newNode.title,
               body: newNode.body,
+              isEntity: Boolean(newNode.is_entity),
               tags: newNode.tags,
               collapsed: newNode.collapsed
             })
@@ -233,6 +237,7 @@ function createNodeStore() {
                 id,
                 title: finalTitle,
                 body: newNode.body,
+                is_entity: newNode.is_entity,
                 tags: [...newNode.tags],
                 collapsed: newNode.collapsed
               })
@@ -305,6 +310,7 @@ function createNodeStore() {
                 id: before.id,
                 title: before.title,
                 body: before.body,
+                is_entity: before.is_entity,
                 x: before.x,
                 y: before.y,
                 collapsed: before.collapsed,
@@ -315,6 +321,7 @@ function createNodeStore() {
                 id: nextNode.id,
                 title: nextNode.title,
                 body: nextNode.body,
+                is_entity: nextNode.is_entity,
                 x: nextNode.x,
                 y: nextNode.y,
                 collapsed: nextNode.collapsed,

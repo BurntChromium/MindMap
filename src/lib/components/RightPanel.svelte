@@ -118,19 +118,20 @@
   aria-label="Search, tags, and entities"
 >
   <div class="inspector-panel__header">
-    <div class="inspector-panel__title">
-      <h3>
-        {#if collapsed}
-          <Search size={14} aria-hidden="true" />
-        {:else}
-          Inspect
-        {/if}
-      </h3>
-      {#if !collapsed}
-        <p>Search, tags, and entities without leaving the canvas.</p>
+    <button
+      class="icon-button inspector-panel-toggle"
+      type="button"
+      aria-label={collapsed ? 'Expand inspector panel' : 'Collapse inspector panel'}
+      title={collapsed ? 'Expand inspector panel (F)' : 'Collapse inspector panel (F)'}
+      aria-expanded={!collapsed}
+      onclick={() => (collapsed = !collapsed)}
+    >
+      {#if collapsed}
+        <ChevronLeft size={14} aria-hidden="true" />
+      {:else}
+        <ChevronRight size={14} aria-hidden="true" />
       {/if}
-    </div>
-
+    </button>
     <div class="inspector-panel__header-actions">
       {#if !collapsed}
         <div class="panel-tabs" role="tablist" aria-label="Right panel tabs">
@@ -166,21 +167,6 @@
           </button>
         </div>
       {/if}
-
-      <button
-        class="icon-button inspector-panel-toggle"
-        type="button"
-        aria-label={collapsed ? 'Expand inspector panel' : 'Collapse inspector panel'}
-        title={collapsed ? 'Expand inspector panel (F)' : 'Collapse inspector panel (F)'}
-        aria-expanded={!collapsed}
-        onclick={() => (collapsed = !collapsed)}
-      >
-        {#if collapsed}
-          <ChevronLeft size={14} aria-hidden="true" />
-        {:else}
-          <ChevronRight size={14} aria-hidden="true" />
-        {/if}
-      </button>
     </div>
   </div>
 
@@ -518,13 +504,6 @@
     letter-spacing: 0;
     text-transform: none;
     line-height: 1;
-  }
-
-  .inspector-panel__title p {
-    margin: 0.2rem 0 0;
-    color: var(--text-muted);
-    font-size: 0.88rem;
-    line-height: 1.4;
   }
 
   .inspector-panel__header-actions {

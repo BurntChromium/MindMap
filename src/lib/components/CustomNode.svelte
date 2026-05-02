@@ -26,11 +26,13 @@
   let draftBody = $state('');
   let draftTags = $state<string[]>([]);
   let draftTagInput = $state('');
+  let draftIsEntity = $state(true);
   let titleError = $state<string | null>(null);
 
   const isEditing = $derived(nodeMode === 'edit');
   const isExpanded = $derived(nodeMode !== 'compact');
   const bodyText = $derived(data.body ?? '');
+  const isEntityPage = $derived(Boolean(data.is_entity ?? 1));
   const nodeTags = $derived(Array.isArray(data.tags) ? data.tags : []);
   const isSearchHit = $derived(Boolean(data.isSearchHit));
   const activeTagName = $derived(normalizeTagName(data.activeTag ?? ''));
@@ -58,6 +60,7 @@
       draftBody = bodyText;
       draftTags = normalizeTagList(nodeTags);
       draftTagInput = '';
+      draftIsEntity = isEntityPage;
       titleError = null;
     }
   });
@@ -67,6 +70,7 @@
     draftBody = bodyText;
     draftTags = normalizeTagList(nodeTags);
     draftTagInput = '';
+    draftIsEntity = isEntityPage;
     titleError = null;
     nodeUiStore.beginEdit(id);
     await tick();
@@ -104,15 +108,18 @@
     const nextTags = normalizeTagList([...draftTags, draftTagInput]);
     const currentTitle = data.label || 'Untitled';
     const titleChanged = normalizeNodeTitle(nextTitle) !== normalizeNodeTitle(currentTitle);
+    const entityChanged = draftIsEntity !== isEntityPage;
     const changed =
       titleChanged ||
       nextBody !== bodyText ||
-      tagKey(nextTags) !== tagKey(nodeTags);
+      tagKey(nextTags) !== tagKey(nodeTags) ||
+      entityChanged;
 
     if (changed) {
       const updatePayload: Parameters<typeof nodeStore.updateNode>[0] = {
         id,
         body: nextBody,
+        is_entity: draftIsEntity ? 1 : 0,
         tags: nextTags
       };
 
@@ -288,6 +295,16 @@
       <p class="title-error" role="alert">{titleError}</p>
     {/if}
 
+    {#if isEditing}
+      <label class="entity-toggle nodrag">
+        <input
+          type="checkbox"
+          bind:checked={draftIsEntity}
+        />
+        <span>Treat as entity page</span>
+      </label>
+    {/if}
+
     {#if isEditing || nodeTags.length}
       <div class="tags-area" class:tags-area--compact={nodeMode === 'compact'}>
         {#if isEditing}
@@ -422,6 +439,20 @@
     color: #b42318;
     font-size: 0.75rem;
     line-height: 1.35;
+  }
+
+  .entity-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    margin: 6px 0 8px;
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    line-height: 1.2;
+  }
+
+  .entity-toggle input {
+    margin: 0;
   }
 
   .header-actions {

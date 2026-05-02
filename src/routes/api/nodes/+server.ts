@@ -29,6 +29,7 @@ export async function POST({ request }) {
     typeof payload?.title === 'string' ? payload.title : ''
   );
   const body = typeof payload?.body === 'string' ? payload.body : '';
+  const isEntity = typeof payload?.isEntity === 'boolean' ? payload.isEntity : true;
   const tags = toTagList(payload?.tags);
   const x = toNumber(payload?.x);
   const y = toNumber(payload?.y);
@@ -42,8 +43,8 @@ export async function POST({ request }) {
 
   const insertNode = db.prepare(`
     INSERT INTO nodes (
-      id, canvas_id, title, body, x, y, collapsed, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      id, canvas_id, title, body, is_entity, x, y, collapsed, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
   const tx = db.transaction(() => {
@@ -52,6 +53,7 @@ export async function POST({ request }) {
       canvasId,
       title,
       body,
+      isEntity ? 1 : 0,
       x,
       y,
       collapsed,
@@ -77,6 +79,7 @@ export async function PATCH({ request }) {
   const id = isString(payload?.id) ? payload.id : '';
   const title = typeof payload?.title === 'string' ? payload.title : undefined;
   const body = typeof payload?.body === 'string' ? payload.body : undefined;
+  const isEntity = typeof payload?.isEntity === 'boolean' ? payload.isEntity : undefined;
   const x = typeof payload?.x === 'number' ? payload.x : undefined;
   const y = typeof payload?.y === 'number' ? payload.y : undefined;
   const collapsed = typeof payload?.collapsed === 'number' ? payload.collapsed : undefined;
@@ -139,6 +142,7 @@ export async function PATCH({ request }) {
     SET
       title = COALESCE(?, title),
       body = COALESCE(?, body),
+      is_entity = COALESCE(?, is_entity),
       x = COALESCE(?, x),
       y = COALESCE(?, y),
       collapsed = COALESCE(?, collapsed),
@@ -157,7 +161,7 @@ export async function PATCH({ request }) {
       ).run(entry.body, now(), entry.id);
     }
 
-    updateNode.run(title, nextBody, x, y, collapsed, now(), id);
+    updateNode.run(title, nextBody, typeof isEntity === 'boolean' ? (isEntity ? 1 : 0) : undefined, x, y, collapsed, now(), id);
 
     if (hasTags) {
       replaceNodeTags(id, tags);

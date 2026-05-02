@@ -53,14 +53,21 @@ export function buildNodeCreateBody(input: {
   y: number;
   title?: string;
   body?: string;
+  isEntity?: boolean;
+  is_entity?: boolean | number;
   tags?: string[];
   collapsed?: number;
 }) {
+  const isEntity = typeof input.isEntity === 'boolean' ? input.isEntity : input.is_entity;
+  const normalizedIsEntity =
+    typeof isEntity === 'boolean' ? isEntity : typeof isEntity === 'number' ? isEntity !== 0 : true;
+
   return {
     id: input.id,
     canvasId: input.canvasId,
     title: input.title ?? 'New Node',
     body: input.body ?? '',
+    isEntity: normalizedIsEntity,
     tags: Array.isArray(input.tags) ? normalizeTagList(input.tags) : [],
     x: input.x,
     y: input.y,
@@ -72,15 +79,22 @@ export function buildNodePatchBody(input: {
   id: string;
   title?: string;
   body?: string;
+  isEntity?: boolean;
+  is_entity?: boolean | number;
   x?: number;
   y?: number;
   collapsed?: number;
   tags?: string[];
 }) {
+  const isEntity = typeof input.isEntity === 'boolean' ? input.isEntity : input.is_entity;
+  const normalizedIsEntity =
+    typeof isEntity === 'boolean' ? isEntity : typeof isEntity === 'number' ? isEntity !== 0 : undefined;
+
   return {
     id: input.id,
     title: input.title,
     body: input.body,
+    isEntity: normalizedIsEntity,
     x: input.x,
     y: input.y,
     collapsed: input.collapsed,

@@ -8,6 +8,7 @@ export type ClipboardNode = {
   id: string;
   title: string;
   body: string;
+  is_entity: number;
   tags: string[];
   x: number;
   y: number;
@@ -62,6 +63,7 @@ function buildFragmentFromNodeIds(
       id: node.id,
       title: node.title,
       body: node.body,
+      is_entity: node.is_entity,
       tags: cloneTags(node.tags),
       x: node.x,
       y: node.y,
@@ -167,6 +169,7 @@ export function buildPastedGraph(
       canvas_id: canvasId,
       title: titleAllocator.nextCopyTitle(node.title),
       body: node.body,
+      is_entity: node.is_entity,
       tags: cloneTags(node.tags),
       x: node.x + offset,
       y: node.y + offset,

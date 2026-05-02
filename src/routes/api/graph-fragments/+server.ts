@@ -12,6 +12,7 @@ type PastedNode = {
   canvas_id?: unknown;
   title?: unknown;
   body?: unknown;
+  is_entity?: unknown;
   tags?: unknown;
   x?: unknown;
   y?: unknown;
@@ -48,6 +49,7 @@ export async function POST({ request }) {
         id: isString(node?.id) ? node.id : '',
         title: typeof node?.title === 'string' ? node.title : '',
         body: typeof node?.body === 'string' ? node.body : '',
+        is_entity: typeof node?.is_entity === 'number' ? node.is_entity : 1,
         tags: toTagList(node?.tags),
         x: toNumber(node?.x),
         y: toNumber(node?.y),
@@ -78,8 +80,8 @@ export async function POST({ request }) {
 
     const insertNode = db.prepare(`
       INSERT INTO nodes (
-        id, canvas_id, title, body, x, y, collapsed, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        id, canvas_id, title, body, is_entity, x, y, collapsed, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     const insertEdge = db.prepare(`
       INSERT INTO edges (id, canvas_id, source_node_id, target_node_id)
@@ -95,6 +97,7 @@ export async function POST({ request }) {
           canvasId,
           node.title,
           node.body,
+          node.is_entity,
           node.x,
           node.y,
           node.collapsed,

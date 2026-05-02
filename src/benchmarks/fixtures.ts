@@ -72,6 +72,7 @@ function buildAppNodes(canvasId: string, nodeCount: number, tags: string[], vari
       body: isKeywordHit
         ? `The dragon keeps the treasure for node ${index}.`
         : `Body ${index} referencing ${primaryTag} and ${secondaryTag}.`,
+      is_entity: 1,
       tags: [primaryTag, secondaryTag],
       x: index * 12,
       y: index * 8,

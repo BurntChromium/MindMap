@@ -11,9 +11,9 @@ describe('clipboard graph helpers', () => {
   it('captures only selected nodes and internal edges', () => {
     const fragment = buildClipboardFragment(
       [
-        { id: 'node-1', canvas_id: 'canvas-1', title: 'A', body: 'Body A', tags: ['lore'], x: 10, y: 20, collapsed: 0 },
-        { id: 'node-2', canvas_id: 'canvas-1', title: 'B', body: 'Body B', tags: ['npc'], x: 30, y: 40, collapsed: 1 },
-        { id: 'node-3', canvas_id: 'canvas-1', title: 'C', body: 'Body C', tags: [], x: 50, y: 60, collapsed: 0 }
+        { id: 'node-1', canvas_id: 'canvas-1', title: 'A', body: 'Body A', is_entity: 1, tags: ['lore'], x: 10, y: 20, collapsed: 0 },
+        { id: 'node-2', canvas_id: 'canvas-1', title: 'B', body: 'Body B', is_entity: 1, tags: ['npc'], x: 30, y: 40, collapsed: 1 },
+        { id: 'node-3', canvas_id: 'canvas-1', title: 'C', body: 'Body C', is_entity: 1, tags: [], x: 50, y: 60, collapsed: 0 }
       ],
       [
         { id: 'edge-1', canvas_id: 'canvas-1', source_node_id: 'node-1', target_node_id: 'node-2' },
@@ -31,6 +31,7 @@ describe('clipboard graph helpers', () => {
           id: 'node-1',
           title: 'A',
           body: 'Body A',
+          is_entity: 1,
           tags: ['lore'],
           x: 10,
           y: 20,
@@ -40,6 +41,7 @@ describe('clipboard graph helpers', () => {
           id: 'node-2',
           title: 'B',
           body: 'Body B',
+          is_entity: 1,
           tags: ['npc'],
           x: 30,
           y: 40,
@@ -60,10 +62,10 @@ describe('clipboard graph helpers', () => {
     expect(
       collectDescendantNodeIds(
         [
-          { id: 'node-1', canvas_id: 'canvas-1', title: 'A', body: '', tags: [], x: 0, y: 0, collapsed: 0 },
-          { id: 'node-2', canvas_id: 'canvas-1', title: 'B', body: '', tags: [], x: 0, y: 0, collapsed: 0 },
-          { id: 'node-3', canvas_id: 'canvas-1', title: 'C', body: '', tags: [], x: 0, y: 0, collapsed: 0 },
-          { id: 'node-4', canvas_id: 'canvas-1', title: 'D', body: '', tags: [], x: 0, y: 0, collapsed: 0 }
+          { id: 'node-1', canvas_id: 'canvas-1', title: 'A', body: '', is_entity: 1, tags: [], x: 0, y: 0, collapsed: 0 },
+          { id: 'node-2', canvas_id: 'canvas-1', title: 'B', body: '', is_entity: 1, tags: [], x: 0, y: 0, collapsed: 0 },
+          { id: 'node-3', canvas_id: 'canvas-1', title: 'C', body: '', is_entity: 1, tags: [], x: 0, y: 0, collapsed: 0 },
+          { id: 'node-4', canvas_id: 'canvas-1', title: 'D', body: '', is_entity: 1, tags: [], x: 0, y: 0, collapsed: 0 }
         ],
         [
           { id: 'edge-1', canvas_id: 'canvas-1', source_node_id: 'node-1', target_node_id: 'node-2' },
@@ -80,10 +82,10 @@ describe('clipboard graph helpers', () => {
     expect(
       buildSubtreeClipboardFragment(
         [
-          { id: 'node-1', canvas_id: 'canvas-1', title: 'A', body: '', tags: ['lore'], x: 10, y: 20, collapsed: 0 },
-          { id: 'node-2', canvas_id: 'canvas-1', title: 'B', body: '', tags: ['npc'], x: 30, y: 40, collapsed: 1 },
-          { id: 'node-3', canvas_id: 'canvas-1', title: 'C', body: '', tags: [], x: 50, y: 60, collapsed: 0 },
-          { id: 'node-4', canvas_id: 'canvas-1', title: 'D', body: '', tags: [], x: 70, y: 80, collapsed: 0 }
+          { id: 'node-1', canvas_id: 'canvas-1', title: 'A', body: '', is_entity: 1, tags: ['lore'], x: 10, y: 20, collapsed: 0 },
+          { id: 'node-2', canvas_id: 'canvas-1', title: 'B', body: '', is_entity: 1, tags: ['npc'], x: 30, y: 40, collapsed: 1 },
+          { id: 'node-3', canvas_id: 'canvas-1', title: 'C', body: '', is_entity: 1, tags: [], x: 50, y: 60, collapsed: 0 },
+          { id: 'node-4', canvas_id: 'canvas-1', title: 'D', body: '', is_entity: 1, tags: [], x: 70, y: 80, collapsed: 0 }
         ],
         [
           { id: 'edge-1', canvas_id: 'canvas-1', source_node_id: 'node-1', target_node_id: 'node-2' },
@@ -101,6 +103,7 @@ describe('clipboard graph helpers', () => {
           id: 'node-1',
           title: 'A',
           body: '',
+          is_entity: 1,
           tags: ['lore'],
           x: 10,
           y: 20,
@@ -110,6 +113,7 @@ describe('clipboard graph helpers', () => {
           id: 'node-2',
           title: 'B',
           body: '',
+          is_entity: 1,
           tags: ['npc'],
           x: 30,
           y: 40,
@@ -119,6 +123,7 @@ describe('clipboard graph helpers', () => {
           id: 'node-3',
           title: 'C',
           body: '',
+          is_entity: 1,
           tags: [],
           x: 50,
           y: 60,
@@ -149,6 +154,7 @@ describe('clipboard graph helpers', () => {
           id: 'node-1',
           title: 'A',
           body: 'Body A',
+          is_entity: 1,
           tags: ['lore'],
           x: 10,
           y: 20,
@@ -158,6 +164,7 @@ describe('clipboard graph helpers', () => {
           id: 'node-2',
           title: 'B',
           body: 'Body B',
+          is_entity: 1,
           tags: ['npc'],
           x: 50,
           y: 70,
@@ -248,6 +255,7 @@ describe('clipboard graph helpers', () => {
           id: 'node-1',
           title: 'Smaug',
           body: '',
+          is_entity: 1,
           tags: [],
           x: 10,
           y: 20,
@@ -257,6 +265,7 @@ describe('clipboard graph helpers', () => {
           id: 'node-2',
           title: 'Smaug',
           body: '',
+          is_entity: 1,
           tags: [],
           x: 50,
           y: 70,

@@ -247,6 +247,56 @@ describe('API integration', () => {
     ]);
   });
 
+  it('lets a node opt out of being the primary entity page', async () => {
+    const canvas = await canvasesApi.POST({
+      request: request({ id: 'canvas-1', name: 'Entity Toggle' })
+    } as any);
+    const { id: canvasId } = await canvas.json();
+
+    const entityNode = await nodesApi.POST({
+      request: request({ id: 'node-1', canvasId, x: 0, y: 0, title: 'Smaug' })
+    } as any);
+    const noteNode = await nodesApi.POST({
+      request: request({
+        id: 'node-2',
+        canvasId,
+        x: 120,
+        y: 120,
+        title: 'Note',
+        body: '[[Smaug]]'
+      })
+    } as any);
+
+    const { id: entityNodeId } = await entityNode.json();
+    const { id: noteNodeId } = await noteNode.json();
+
+    await nodesApi.PATCH({
+      request: request({
+        id: entityNodeId,
+        isEntity: false
+      })
+    } as any);
+
+    const entityRows = db.prepare(`
+      SELECT title, title_key, primary_node_id
+      FROM entities
+      ORDER BY title_key
+    `).all();
+
+    expect(entityRows).toEqual([
+      expect.objectContaining({
+        title: 'Note',
+        title_key: 'note',
+        primary_node_id: noteNodeId
+      }),
+      expect.objectContaining({
+        title: 'Smaug',
+        title_key: 'smaug',
+        primary_node_id: null
+      })
+    ]);
+  });
+
   it('returns entity rows and mentions through the entities api', async () => {
     const canvas = await canvasesApi.POST({
       request: request({ id: 'canvas-1', name: 'Entities API' })

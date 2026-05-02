@@ -49,6 +49,7 @@ export type NodeEntitySource = {
   canvas_id: string;
   title: string;
   body: string;
+  is_entity: number;
 };
 
 function escapeRegExp(value: string) {
@@ -107,7 +108,7 @@ function parseNodes(canvasId: string) {
   return db
     .prepare(
       `
-        SELECT id, canvas_id, title, body
+        SELECT id, canvas_id, title, body, is_entity
         FROM nodes
         WHERE canvas_id = ?
         ORDER BY created_at ASC
@@ -144,6 +145,10 @@ export function rebuildEntitiesForCanvasId(canvasId: string | null) {
   const referencesByNodeId = new Map<string, EntityReference[]>();
 
   for (const node of nodes) {
+    if (!node.is_entity) {
+      continue;
+    }
+
     const title = normalizeEntityTitle(node.title);
 
     if (!title) {

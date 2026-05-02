@@ -15,6 +15,7 @@ export type NodeRow = {
   canvas_id: string;
   title: string;
   body: string;
+  is_entity: number;
   tags: string[];
   x: number;
   y: number;

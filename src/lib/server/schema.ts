@@ -14,6 +14,7 @@ export function initSchema() {
       canvas_id TEXT,
       title TEXT,
       body TEXT,
+      is_entity INTEGER DEFAULT 1,
       x REAL,
       y REAL,
       collapsed INTEGER,
@@ -101,4 +102,13 @@ export function initSchema() {
     CREATE INDEX IF NOT EXISTS idx_entity_mentions_node_id
       ON entity_mentions(node_id);
   `);
+
+  const nodeColumns = db.prepare(`PRAGMA table_info(nodes)`).all() as Array<{ name: string }>;
+  const hasEntityColumn = nodeColumns.some((column) => column.name === 'is_entity');
+
+  if (!hasEntityColumn) {
+    db.exec(`
+      ALTER TABLE nodes ADD COLUMN is_entity INTEGER DEFAULT 1;
+    `);
+  }
 }

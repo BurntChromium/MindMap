@@ -35,6 +35,7 @@ describe('nodeStore', () => {
           canvas_id: 'canvas-1',
           title: 'Alpha',
           body: 'Body',
+          is_entity: 1,
           tags: ['lore'],
           x: 10,
           y: 20,
@@ -61,6 +62,7 @@ describe('nodeStore', () => {
           canvas_id: 'canvas-1',
           title: 'Cached',
           body: '',
+          is_entity: 1,
           tags: ['lore'],
           x: 1,
           y: 2,
@@ -77,6 +79,7 @@ describe('nodeStore', () => {
           canvas_id: 'canvas-2',
           title: 'Fresh',
           body: '',
+          is_entity: 1,
           tags: [],
           x: 10,
           y: 20,
@@ -110,6 +113,7 @@ describe('nodeStore', () => {
           canvas_id: 'canvas-1',
           title: 'Cached',
           body: '',
+          is_entity: 1,
           tags: ['lore'],
           x: 1,
           y: 2,
@@ -142,6 +146,7 @@ describe('nodeStore', () => {
       id: body.id,
       canvas_id: 'canvas-1',
       title: 'Node 1',
+      is_entity: 1,
       tags: [],
       x: 50,
       y: 75
@@ -150,6 +155,7 @@ describe('nodeStore', () => {
       id: expect.any(String),
       canvasId: 'canvas-1',
       title: 'Node 1',
+      isEntity: true,
       x: 50,
       y: 75
     });
@@ -164,6 +170,7 @@ describe('nodeStore', () => {
             canvas_id: 'canvas-1',
             title: 'Old',
             body: '',
+            is_entity: 1,
             tags: [],
             x: 0,
             y: 0,
@@ -192,29 +199,64 @@ describe('nodeStore', () => {
     expect(fetch).toHaveBeenLastCalledWith('/api/entities?canvasId=canvas-1');
   });
 
+  it('sends an entity toggle in the node patch payload', async () => {
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(
+        jsonResponse([
+          {
+            id: 'node-3',
+            canvas_id: 'canvas-1',
+            title: 'Alpha',
+            body: '',
+            is_entity: 1,
+            tags: [],
+            x: 0,
+            y: 0,
+            collapsed: 0
+          }
+        ])
+      )
+      .mockResolvedValueOnce(jsonResponse({ success: true }))
+      .mockResolvedValueOnce(jsonResponse({ entities: [], mentions: [] }));
+
+    await nodeStore.load('canvas-1');
+    await nodeStore.updateNode({ id: 'node-3', is_entity: 0 });
+
+    expect(fetch).toHaveBeenNthCalledWith(
+      2,
+      '/api/nodes',
+      expect.objectContaining({
+        method: 'PATCH',
+        body: JSON.stringify({ id: 'node-3', isEntity: false })
+      })
+    );
+  });
+
   it('blocks duplicate titles before sending a patch request', async () => {
     vi.mocked(fetch).mockResolvedValueOnce(
-      jsonResponse([
-        {
-          id: 'node-3',
-          canvas_id: 'canvas-1',
-          title: 'Alpha',
-          body: '',
-          tags: [],
-          x: 0,
-          y: 0,
-          collapsed: 0
-        },
-        {
-          id: 'node-4',
-          canvas_id: 'canvas-1',
-          title: 'Beta',
-          body: '',
-          tags: [],
-          x: 0,
-          y: 0,
-          collapsed: 0
-        }
+        jsonResponse([
+          {
+            id: 'node-3',
+            canvas_id: 'canvas-1',
+            title: 'Alpha',
+            body: '',
+            is_entity: 1,
+            tags: [],
+            x: 0,
+            y: 0,
+            collapsed: 0
+          },
+          {
+            id: 'node-4',
+            canvas_id: 'canvas-1',
+            title: 'Beta',
+            body: '',
+            is_entity: 1,
+            tags: [],
+            x: 0,
+            y: 0,
+            collapsed: 0
+          }
       ])
     );
 
@@ -237,6 +279,7 @@ describe('nodeStore', () => {
             canvas_id: 'canvas-1',
             title: 'Old',
             body: '',
+            is_entity: 1,
             tags: ['lore'],
             x: 0,
             y: 0,
@@ -247,6 +290,7 @@ describe('nodeStore', () => {
             canvas_id: 'canvas-1',
             title: 'Other',
             body: '',
+            is_entity: 1,
             tags: ['npc'],
             x: 10,
             y: 20,
@@ -291,6 +335,7 @@ describe('nodeStore', () => {
             canvas_id: 'canvas-1',
             title: 'Mover',
             body: '',
+            is_entity: 1,
             tags: [],
             x: 0,
             y: 0,
@@ -301,6 +346,7 @@ describe('nodeStore', () => {
             canvas_id: 'canvas-1',
             title: 'Other',
             body: '',
+            is_entity: 1,
             tags: [],
             x: 10,
             y: 20,
