@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, tick } from 'svelte';
   import type { Connection } from '@xyflow/svelte';
   import { Search, X } from 'lucide-svelte';
   import type { PageData } from './$types';
@@ -76,6 +76,7 @@
   let activeAssociativeEdgeId = $state<string | null>(null);
   let focusedNodeId = $state<string | null>(null);
   let editingNodeId = $state<string | null>(null);
+  let previousEditingNodeId: string | null = null;
   let sidebarCollapsed = $state(false);
   let discoveryCollapsed = $state(false);
   let quickSearchOpen = $state(false);
@@ -332,6 +333,22 @@
         return;
       }
 
+      if (
+        event.key.toLowerCase() === 'w' &&
+        !event.metaKey &&
+        !event.ctrlKey &&
+        !event.altKey &&
+        !event.shiftKey
+      ) {
+        if (!editingNodeId) {
+          return;
+        }
+
+        event.preventDefault();
+        void focusEditingNodeTitle();
+        return;
+      }
+
       const direction = getCanvasDirectionFromKey(event.key);
 
       if (direction) {
@@ -435,6 +452,16 @@
     activeEntityId = null;
     focusedNodeId = null;
     void loadActiveCanvas(activeCanvasId);
+  });
+
+  $effect(() => {
+    if (previousEditingNodeId && !editingNodeId) {
+      queueMicrotask(() => {
+        canvasShell?.focus();
+      });
+    }
+
+    previousEditingNodeId = editingNodeId;
   });
 
   $effect(() => {
@@ -697,7 +724,6 @@
     if (!nextNode) {
       return;
     }
-
     focusedNodeId = nodeId;
     selectionStore.selectNode(nodeId);
     nodeUiStore.beginEdit(nodeId);
@@ -706,6 +732,20 @@
       const currentZoom = canvasStageApi.getViewport().zoom;
       void canvasStageApi.setCenter(nextNode.x, nextNode.y, { zoom: currentZoom });
     }
+
+  }
+
+  async function focusEditingNodeTitle() {
+    await tick();
+
+    const titleInput = document.querySelector<HTMLInputElement>('.title-input');
+
+    if (!titleInput) {
+      return;
+    }
+
+    titleInput.focus();
+    titleInput.select();
   }
 
   function focusNearestNode(direction: Direction, extendSelection = false) {

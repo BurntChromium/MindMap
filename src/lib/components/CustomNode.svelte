@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { tick } from 'svelte';
   import { get } from 'svelte/store';
   import { Handle, Position } from '@xyflow/svelte';
   import { Check, ChevronDown, ChevronUp, Pencil } from 'lucide-svelte';
@@ -31,7 +30,6 @@
   let draftTagInput = $state('');
   let draftIsEntity = $state(true);
   let titleError = $state<string | null>(null);
-  let editFocusApplied = $state(false);
 
   const isEditing = $derived(nodeMode === 'edit');
   const isExpanded = $derived(nodeMode !== 'compact');
@@ -62,7 +60,6 @@
 
   $effect(() => {
     if (!isEditing) {
-      editFocusApplied = false;
       draftTitle = data.label || 'Untitled';
       draftBody = bodyText;
       draftTags = normalizeTagList(nodeTags);
@@ -70,31 +67,6 @@
       draftIsEntity = isEntityPage;
       titleError = null;
     }
-  });
-
-  $effect(() => {
-    if (!isEditing || editFocusApplied) {
-      return;
-    }
-
-    editFocusApplied = true;
-
-    let cancelled = false;
-
-    void (async () => {
-      await tick();
-
-      if (cancelled) {
-        return;
-      }
-
-      titleInput?.focus();
-      titleInput?.select();
-    })();
-
-    return () => {
-      cancelled = true;
-    };
   });
 
   async function beginEdit() {

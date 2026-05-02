@@ -27,6 +27,7 @@ Mindmap is a Svelte and SQLite app for building mind maps and linked notebooks o
 - `Cmd/Ctrl+X`: cut the current selection
 - `Cmd/Ctrl+V`: paste the copied fragment
 - `Shift+E`: save and exit node edit mode from a title, body, or tag field
+- `w` in edit mode: focus the title field for the current node
 - `Cmd/Ctrl+Z`: undo the last canvas mutation
 - `Cmd/Ctrl+Shift+Z`: redo the last undone canvas mutation
 - `Cmd/Ctrl+D`: duplicate the current selection
@@ -44,3 +45,5 @@ Mindmap is a Svelte and SQLite app for building mind maps and linked notebooks o
 - `Tab`: cycle focus through visible nodes or search results
 
 Keyboard shortcuts are disabled while typing in text inputs, textareas, selects, and other editable fields.
+
+Note: `w` is a temporary workaround for jumping to the title field from edit mode. It may change as the edit workflow is refined.
