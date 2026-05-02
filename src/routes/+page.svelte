@@ -2,7 +2,6 @@
   import { onMount, tick } from 'svelte';
   import type { Connection } from '@xyflow/svelte';
   import { Search, X } from 'lucide-svelte';
-  import type { PageData } from './$types';
   import { createClientId } from '$lib/clientId';
   import { appDataClient } from '$lib/appDataClient';
   import type { CanvasStageApi } from '$lib/canvasApi';
@@ -54,8 +53,9 @@
     findEntityInspectorEntryByTitle,
     getEntityInspectorNodeIds
   } from '$lib/entityInspector';
+  import type { AppDataPageData } from '$lib/server/appData';
 
-  let { data }: { data: PageData } = $props();
+  let { data }: { data: AppDataPageData } = $props();
 
   let storeCanvases = $state<Canvas[] | null>(null);
   let storeActiveCanvasId = $state<string | null>(null);

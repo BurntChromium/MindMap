@@ -27,6 +27,7 @@ async function requestJson<T>(input: RequestInfo | URL, init?: RequestInit): Pro
 }
 
 export type AppDataClient = {
+  loadInitialPageData: () => Promise<JsonValue>;
   loadCanvases: () => Promise<JsonValue>;
   createCanvas: (input: { id: string; name: string }) => Promise<JsonValue>;
   renameCanvas: (input: { id: string; name: string }) => Promise<JsonValue>;
@@ -54,6 +55,7 @@ export type AppDataIpcBridge = {
 
 function createFetchClient(): AppDataClient {
   return {
+    loadInitialPageData: () => requestJson('/api/page-data'),
     loadCanvases: () => requestJson('/api/canvases'),
     createCanvas: (input) =>
       requestJson('/api/canvases', {
@@ -119,6 +121,8 @@ function createFetchClient(): AppDataClient {
 
 export function createIpcAppDataClient(bridge: AppDataIpcBridge): AppDataClient {
   return {
+    loadInitialPageData: () =>
+      bridge.invoke('mindmap:app-data', { method: 'loadInitialPageData' }),
     loadCanvases: () => bridge.invoke('mindmap:app-data', { method: 'loadCanvases' }),
     createCanvas: (input) =>
       bridge.invoke('mindmap:app-data', { method: 'createCanvas', payload: input }),
@@ -151,7 +155,15 @@ export function createIpcAppDataClient(bridge: AppDataIpcBridge): AppDataClient 
   };
 }
 
-let activeClient: AppDataClient = createFetchClient();
+function createDefaultClient() {
+  if (typeof window !== 'undefined' && window.mindmapDesktop) {
+    return createIpcAppDataClient(window.mindmapDesktop);
+  }
+
+  return createFetchClient();
+}
+
+let activeClient: AppDataClient = createDefaultClient();
 
 export function getAppDataClient() {
   return activeClient;
@@ -162,6 +174,7 @@ export function setAppDataClient(client: AppDataClient) {
 }
 
 export const appDataClient = {
+  loadInitialPageData: () => activeClient.loadInitialPageData(),
   loadCanvases: () => activeClient.loadCanvases(),
   createCanvas: (input: { id: string; name: string }) => activeClient.createCanvas(input),
   renameCanvas: (input: { id: string; name: string }) => activeClient.renameCanvas(input),

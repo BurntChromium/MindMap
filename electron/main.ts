@@ -34,6 +34,8 @@ async function handleAppData(request: AppDataRequest) {
   switch (request.method) {
     case 'loadCanvases':
       return backend.getCanvases();
+    case 'loadInitialPageData':
+      return backend.getInitialPageData();
     case 'createCanvas':
       return backend.createCanvas(request.payload as Parameters<typeof backend.createCanvas>[0]);
     case 'renameCanvas':
@@ -81,7 +83,7 @@ function createWindow() {
     width: 1440,
     height: 960,
     webPreferences: {
-      preload: join(app.getAppPath(), 'electron/preload.js')
+      preload: join(app.getAppPath(), 'dist-electron/preload.js')
     }
   });
 
@@ -90,7 +92,7 @@ function createWindow() {
     return;
   }
 
-  void window.loadFile(join(app.getAppPath(), 'build/index.html'));
+  void window.loadFile(join(app.getAppPath(), 'build/desktop/200.html'));
 }
 
 app.whenReady().then(() => {
