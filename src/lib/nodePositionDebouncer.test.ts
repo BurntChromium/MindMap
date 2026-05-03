@@ -13,7 +13,8 @@ afterEach(() => {
 describe('createNodePositionDebouncer', () => {
   it('keeps the latest position for each node until the debounce flushes', async () => {
     const applyUpdates = vi.fn().mockResolvedValue(undefined);
-    const debouncer = createNodePositionDebouncer(applyUpdates, 100);
+    const onFlushSettled = vi.fn();
+    const debouncer = createNodePositionDebouncer(applyUpdates, 100, onFlushSettled);
 
     debouncer.queue([{ id: 'node-1', x: 10, y: 20 }]);
     debouncer.queue([
@@ -29,6 +30,10 @@ describe('createNodePositionDebouncer', () => {
 
     expect(applyUpdates).toHaveBeenCalledTimes(1);
     expect(applyUpdates).toHaveBeenCalledWith([
+      { id: 'node-1', x: 34, y: 48 },
+      { id: 'node-2', x: 5, y: 6 }
+    ]);
+    expect(onFlushSettled).toHaveBeenCalledWith([
       { id: 'node-1', x: 34, y: 48 },
       { id: 'node-2', x: 5, y: 6 }
     ]);

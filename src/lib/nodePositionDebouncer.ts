@@ -7,10 +7,12 @@ export type NodePositionUpdate = {
 type PositionLike = Pick<NodePositionUpdate, 'x' | 'y'>;
 
 type ApplyUpdates = (updates: NodePositionUpdate[]) => Promise<unknown> | unknown;
+type FlushListener = (updates: NodePositionUpdate[]) => void;
 
 export function createNodePositionDebouncer(
   applyUpdates: ApplyUpdates,
-  delayMs = 150
+  delayMs = 150,
+  onFlushSettled?: FlushListener
 ) {
   const pendingPositionsById = new Map<string, PositionLike>();
   let timeoutId: ReturnType<typeof setTimeout> | null = null;
@@ -49,6 +51,13 @@ export function createNodePositionDebouncer(
       .then(() => undefined)
       .catch((error) => {
         console.error(error);
+      })
+      .finally(() => {
+        try {
+          onFlushSettled?.(updates);
+        } catch (error) {
+          console.error(error);
+        }
       });
 
     return flushQueue;

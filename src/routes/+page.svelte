@@ -90,8 +90,11 @@
   let quickSearchInputRef = $state<HTMLInputElement | undefined>(undefined);
   let exportNotice = $state<{ title: string; detail: string } | null>(null);
   let exportNoticeTimeout: ReturnType<typeof setTimeout> | null = null;
-  const nodePositionDebouncer = createNodePositionDebouncer((updates) =>
-    nodeStore.updateNodePositions(updates)
+  let pendingNodePositionOverrides = $state<Record<string, { x: number; y: number }>>({});
+  const nodePositionDebouncer = createNodePositionDebouncer(
+    (updates) => nodeStore.updateNodePositions(updates),
+    150,
+    clearFlushedPendingNodePositionOverrides
   );
 
   const initialCanvases = $derived.by(() => data.canvases);
@@ -134,6 +137,7 @@
       activeTag,
       searchHitIds,
       tagColors: tagColorMap,
+      positionOverrides: pendingNodePositionOverrides,
       onTagClick: toggleTagFilter,
       onEntityClick: focusEntityReference
     })
@@ -482,6 +486,7 @@
   $effect(() => {
     if (!initialHydrationDone || !activeCanvasId || activeCanvasId === loadedCanvasId) return;
     loadedCanvasId = activeCanvasId;
+    pendingNodePositionOverrides = {};
 
     nodeUiStore.clear();
     selectionStore.clear();
@@ -690,7 +695,44 @@
   }
 
   function queueNodePositionUpdates(updates: NodePositionUpdate[]) {
+    setPendingNodePositionOverrides(updates);
     nodePositionDebouncer.queue(updates);
+  }
+
+  function setPendingNodePositionOverrides(updates: NodePositionUpdate[]) {
+    if (!updates.length) {
+      return;
+    }
+
+    const nextOverrides = { ...pendingNodePositionOverrides };
+
+    for (const update of updates) {
+      nextOverrides[update.id] = { x: update.x, y: update.y };
+    }
+
+    pendingNodePositionOverrides = nextOverrides;
+  }
+
+  function clearFlushedPendingNodePositionOverrides(updates: NodePositionUpdate[]) {
+    if (!updates.length) {
+      return;
+    }
+
+    const nextOverrides = { ...pendingNodePositionOverrides };
+    let changed = false;
+
+    for (const update of updates) {
+      const current = nextOverrides[update.id];
+
+      if (current && current.x === update.x && current.y === update.y) {
+        delete nextOverrides[update.id];
+        changed = true;
+      }
+    }
+
+    if (changed) {
+      pendingNodePositionOverrides = nextOverrides;
+    }
   }
 
   function moveSelectedNodes(direction: Direction, accelerate = false) {

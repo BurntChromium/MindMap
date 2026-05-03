@@ -53,6 +53,7 @@ describe('graphAdapter', () => {
           label: 'First',
           body: 'Body',
           tags: ['lore'],
+          is_entity: 1,
           tagColors: {},
           activeTag: null,
           activeTagColor: null,
@@ -64,6 +65,93 @@ describe('graphAdapter', () => {
         draggable: false
       }
     ]);
+  });
+
+  it('reprojects nodes when entity state changes', () => {
+    const options = {
+      editingNodeId: null,
+      selectedNodeIds: [],
+      activeTag: null,
+      searchHitIds: new Set<string>(),
+      tagColors: {},
+      onTagClick: vi.fn()
+    };
+
+    const firstNodes = toFlowNodes(
+      [
+        {
+          id: '1',
+          canvas_id: 'canvas-1',
+          title: 'First',
+          body: 'Body',
+          is_entity: 0,
+          tags: [],
+          x: 1,
+          y: 2,
+          collapsed: 0
+        }
+      ],
+      options
+    );
+    const secondNodes = toFlowNodes(
+      [
+        {
+          id: '1',
+          canvas_id: 'canvas-1',
+          title: 'First',
+          body: 'Body',
+          is_entity: 1,
+          tags: [],
+          x: 1,
+          y: 2,
+          collapsed: 0
+        }
+      ],
+      options
+    );
+
+    expect(secondNodes[0]).not.toBe(firstNodes[0]);
+    expect(secondNodes[0]).toMatchObject({
+      position: { x: 1, y: 2 },
+      data: {
+        is_entity: 1
+      }
+    });
+  });
+
+  it('uses pending position overrides when projecting nodes', () => {
+    const options = {
+      editingNodeId: null,
+      selectedNodeIds: [],
+      activeTag: null,
+      searchHitIds: new Set<string>(),
+      tagColors: {},
+      positionOverrides: {
+        '1': { x: 20, y: 30 }
+      },
+      onTagClick: vi.fn()
+    };
+
+    const flowNodes = toFlowNodes(
+      [
+        {
+          id: '1',
+          canvas_id: 'canvas-1',
+          title: 'First',
+          body: 'Body',
+          is_entity: 0,
+          tags: [],
+          x: 1,
+          y: 2,
+          collapsed: 0
+        }
+      ],
+      options
+    );
+
+    expect(flowNodes[0]).toMatchObject({
+      position: { x: 20, y: 30 }
+    });
   });
 
   it('builds associative flow edges with shared entity metadata', () => {

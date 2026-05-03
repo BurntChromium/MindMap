@@ -10,6 +10,7 @@ export type FlowNodeOptions = {
   activeTag?: string | null;
   searchHitIds?: Set<string>;
   tagColors?: Record<string, string>;
+  positionOverrides?: Record<string, Pick<AppNode, 'x' | 'y'>>;
   onTagClick?: (tag: string) => void;
   onEntityClick?: (title: string) => void;
 };
@@ -35,6 +36,7 @@ type CachedFlowNode = {
   title: string;
   body: string;
   tagsKey: string;
+  isEntity: number;
   x: number;
   y: number;
   selected: boolean;
@@ -60,6 +62,7 @@ const flowEdgeCache = new Map<string, CachedFlowEdge>();
 function buildFlowNode(
   n: AppNode,
   options: {
+    positionOverrides?: Record<string, Pick<AppNode, 'x' | 'y'>>;
     selected: boolean;
     draggable: boolean;
     isFocused: boolean;
@@ -71,14 +74,17 @@ function buildFlowNode(
     onEntityClick?: (title: string) => void;
   }
 ) {
+  const position = options.positionOverrides?.[n.id] ?? n;
+
   return {
     id: n.id,
-    position: { x: n.x, y: n.y },
+    position: { x: position.x, y: position.y },
     selected: options.selected,
     data: {
       label: n.title || 'Untitled',
       body: n.body ?? '',
       tags: n.tags ?? [],
+      is_entity: n.is_entity,
       tagColors: options.tagColors,
       activeTag: options.activeTag,
       activeTagColor: options.activeTagColor,
@@ -136,6 +142,7 @@ export function toFlowNodes(nodes: AppNode[], options: FlowNodeOptions) {
     activeTag = null,
     searchHitIds = new Set<string>(),
     tagColors = {},
+    positionOverrides = {},
     onTagClick,
     onEntityClick
   } = options;
@@ -151,6 +158,7 @@ export function toFlowNodes(nodes: AppNode[], options: FlowNodeOptions) {
     const isFocused = focusedNodeId === n.id;
     const isSearchHit = hasSearchFilter ? searchHitIds.has(n.id) : false;
     const tagsKey = (n.tags ?? []).join('\u0000');
+    const resolvedPosition = positionOverrides[n.id] ?? n;
     const cached = flowNodeCache.get(n.id);
 
     if (
@@ -159,8 +167,9 @@ export function toFlowNodes(nodes: AppNode[], options: FlowNodeOptions) {
       cached.title === n.title &&
       cached.body === (n.body ?? '') &&
       cached.tagsKey === tagsKey &&
-      cached.x === n.x &&
-      cached.y === n.y &&
+      cached.isEntity === n.is_entity &&
+      cached.x === resolvedPosition.x &&
+      cached.y === resolvedPosition.y &&
       cached.selected === selected &&
       cached.draggable === draggable &&
       cached.isFocused === isFocused &&
@@ -182,6 +191,7 @@ export function toFlowNodes(nodes: AppNode[], options: FlowNodeOptions) {
       activeTag,
       activeTagColor,
       tagColors,
+      positionOverrides,
       onTagClick,
       onEntityClick
     });
@@ -191,8 +201,9 @@ export function toFlowNodes(nodes: AppNode[], options: FlowNodeOptions) {
       title: n.title,
       body: n.body ?? '',
       tagsKey,
-      x: n.x,
-      y: n.y,
+      isEntity: n.is_entity,
+      x: resolvedPosition.x,
+      y: resolvedPosition.y,
       selected,
       draggable,
       isFocused,
