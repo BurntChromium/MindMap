@@ -155,29 +155,30 @@ function createFetchClient(): AppDataClient {
 }
 
 function createTauriClient(bridge: AppDataTauriBridge): AppDataClient {
+  const invokeWithInput = <T>(command: string, input: unknown) =>
+    bridge.core.invoke<T>(command, { input });
+
   return {
     loadInitialPageData: () => bridge.core.invoke('load_initial_page_data'),
     loadCanvases: () => bridge.core.invoke('load_canvases'),
-    createCanvas: (input) => bridge.core.invoke('create_canvas', input),
-    renameCanvas: (input) => bridge.core.invoke('rename_canvas', input),
-    deleteCanvas: (input) => bridge.core.invoke('delete_canvas', input),
+    createCanvas: (input) => invokeWithInput('create_canvas', input),
+    renameCanvas: (input) => invokeWithInput('rename_canvas', input),
+    deleteCanvas: (input) => invokeWithInput('delete_canvas', input),
 
-    loadNodes: (canvasId) => bridge.core.invoke('load_nodes', { canvasId }),
-    createNode: (input) => bridge.core.invoke('create_node', input),
-    updateNode: (input) => bridge.core.invoke('update_node', input),
-    deleteNode: (input) => bridge.core.invoke('delete_node', input),
-    bulkUpdateNodeTags: (input) =>
-      bridge.core.invoke('bulk_update_node_tags', input),
-    bulkUpdateNodePositions: (input) =>
-      bridge.core.invoke('bulk_update_node_positions', input),
+    loadNodes: (canvasId) => invokeWithInput('load_nodes', { canvasId }),
+    createNode: (input) => invokeWithInput('create_node', input),
+    updateNode: (input) => invokeWithInput('update_node', input),
+    deleteNode: (input) => invokeWithInput('delete_node', input),
+    bulkUpdateNodeTags: (input) => invokeWithInput('bulk_update_node_tags', input),
+    bulkUpdateNodePositions: (input) => invokeWithInput('bulk_update_node_positions', input),
 
-    loadEdges: (canvasId) => bridge.core.invoke('load_edges', { canvasId }),
-    createEdge: (input) => bridge.core.invoke('create_edge', input),
-    deleteEdge: (input) => bridge.core.invoke('delete_edge', input),
+    loadEdges: (canvasId) => invokeWithInput('load_edges', { canvasId }),
+    createEdge: (input) => invokeWithInput('create_edge', input),
+    deleteEdge: (input) => invokeWithInput('delete_edge', input),
 
-    loadEntities: (canvasId) => bridge.core.invoke('load_entities', { canvasId }),
-    searchNodes: (input) => bridge.core.invoke('search_nodes', input),
-    mutateGraphFragment: (input) => bridge.core.invoke('mutate_graph_fragment', input),
+    loadEntities: (canvasId) => invokeWithInput('load_entities', { canvasId }),
+    searchNodes: (input) => invokeWithInput('search_nodes', input),
+    mutateGraphFragment: (input) => invokeWithInput('mutate_graph_fragment', input),
     exportDatabase: () => bridge.core.invoke('export_database'),
     importDatabase: (input) => bridge.core.invoke('import_database', input)
   };
