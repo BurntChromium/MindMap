@@ -40,6 +40,7 @@
     type Node,
     type NodePositionUpdate
   } from '$lib/stores/nodeStore';
+  import { createNodePositionDebouncer } from '$lib/nodePositionDebouncer';
   import { entityStore, type Entity, type EntityMention } from '$lib/stores/entityStore';
   import { historyStore } from '$lib/stores/historyStore';
   import { mutationStateStore } from '$lib/stores/mutationStateStore';
@@ -84,11 +85,13 @@
   let loadedCanvasId = $state<string | null>(null);
   let initialHydrationDone = $state(false);
   let canvasStageApi = $state<CanvasStageApi | null>(null);
-  let nodeMoveQueue = Promise.resolve();
   let canvasShell: HTMLDivElement | undefined;
   let quickSearchInputRef = $state<HTMLInputElement | undefined>(undefined);
   let exportNotice = $state<{ title: string; detail: string } | null>(null);
   let exportNoticeTimeout: ReturnType<typeof setTimeout> | null = null;
+  const nodePositionDebouncer = createNodePositionDebouncer((updates) =>
+    nodeStore.updateNodePositions(updates)
+  );
 
   const initialCanvases = $derived.by(() => data.canvases);
   const initialActiveCanvasId = $derived.by(() => data.activeCanvasId);
@@ -187,6 +190,7 @@
 
   onDestroy(() => {
     clearExportNoticeTimer();
+    void nodePositionDebouncer.destroy();
   });
 
   onMount(() => {
@@ -686,11 +690,7 @@
   }
 
   function queueNodePositionUpdates(updates: NodePositionUpdate[]) {
-    nodeMoveQueue = nodeMoveQueue
-      .then(() => nodeStore.updateNodePositions(updates).then(() => undefined))
-      .catch((error) => {
-        console.error(error);
-      });
+    nodePositionDebouncer.queue(updates);
   }
 
   function moveSelectedNodes(direction: Direction, accelerate = false) {
@@ -713,11 +713,18 @@
             : { x: 0, y: flowStep };
 
     queueNodePositionUpdates(
-      nodesToMove.map((node) => ({
-        id: node.id,
-        x: node.x + delta.x,
-        y: node.y + delta.y
-      }))
+      nodesToMove.map((node) => {
+        const currentPosition = nodePositionDebouncer.getPendingPosition(node.id, {
+          x: node.x,
+          y: node.y
+        });
+
+        return {
+          id: node.id,
+          x: currentPosition.x + delta.x,
+          y: currentPosition.y + delta.y
+        };
+      })
     );
   }
 
