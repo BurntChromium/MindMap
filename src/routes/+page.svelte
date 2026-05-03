@@ -44,7 +44,7 @@
   import { entityStore, type Entity, type EntityMention } from '$lib/stores/entityStore';
   import { historyStore } from '$lib/stores/historyStore';
   import { mutationStateStore } from '$lib/stores/mutationStateStore';
-  import { nodeUiStore } from '$lib/stores/nodeUiStore';
+  import { nodeUiStore, getNodeMode, type NodeUiState } from '$lib/stores/nodeUiStore';
   import { clipboardStore } from '$lib/stores/clipboardStore';
   import { toFlowEdges, toFlowNodes } from '$lib/graph/graphAdapter';
   import { buildAssociativeFlowEdges } from '$lib/graph/associativeEdges';
@@ -54,7 +54,7 @@
     findEntityInspectorEntryByTitle,
     getEntityInspectorNodeIds
   } from '$lib/entityInspector';
-  import { getCanvasBoundsCenter } from '$lib/canvasCenter';
+  import { getNodeFocusPoint, type NodeFocusMode } from '$lib/canvasCenter';
   import type { AppDataPageData } from '$lib/server/appData';
 
   let { data }: { data: AppDataPageData } = $props();
@@ -91,6 +91,10 @@
   let exportNotice = $state<{ title: string; detail: string } | null>(null);
   let exportNoticeTimeout: ReturnType<typeof setTimeout> | null = null;
   let pendingNodePositionOverrides = $state<Record<string, { x: number; y: number }>>({});
+  let nodeUiState = $state<NodeUiState>({
+    editingNodeId: null,
+    expandedNodeIds: {}
+  });
   const nodePositionDebouncer = createNodePositionDebouncer(
     (updates) => nodeStore.updateNodePositions(updates),
     150,
@@ -447,6 +451,7 @@
 
     const unsubNodeUi = nodeUiStore.subscribe((v) => {
       editingNodeId = v.editingNodeId;
+      nodeUiState = v;
     });
 
     const unsubSelection = selectionStore.subscribe((value) => {
@@ -612,7 +617,7 @@
     const nextNode = nodes.find((node) => node.id === nodeId);
 
     if (nextNode && canvasStageApi) {
-      void centerCanvasOnNode(nodeId);
+      void centerCanvasOnNode(nextNode, getNodeMode(nodeUiState, nodeId));
     }
   }
 
@@ -810,11 +815,12 @@
     }
     focusedNodeId = nodeId;
     selectionStore.selectNode(nodeId);
-    nodeUiStore.beginEdit(nodeId);
 
     if (canvasStageApi) {
-      await centerCanvasOnNode(nodeId);
+      void centerCanvasOnNode(nextNode, 'edit');
     }
+
+    nodeUiStore.beginEdit(nodeId);
   }
 
   async function focusEditingNodeTitle() {
@@ -854,7 +860,7 @@
     const nextNode = nodes.find((node) => node.id === nextNodeId);
 
     if (nextNode && canvasStageApi) {
-      void centerCanvasOnNode(nextNodeId);
+      void centerCanvasOnNode(nextNode, getNodeMode(nodeUiState, nextNodeId));
     }
   }
 
@@ -889,19 +895,16 @@
     selectionStore.selectNode(nextNodeId);
 
     if (canvasStageApi) {
-      void centerCanvasOnNode(nextNodeId);
+      void centerCanvasOnNode(nextNode, getNodeMode(nodeUiState, nextNodeId));
     }
   }
 
-  async function centerCanvasOnNode(nodeId: string) {
+  function centerCanvasOnNode(node: Node, mode: NodeFocusMode) {
     if (!canvasStageApi) {
       return;
     }
 
-    await tick();
-    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
-
-    const center = getCanvasBoundsCenter(canvasStageApi.getNodesBounds([nodeId]));
+    const center = getNodeFocusPoint(node, mode);
     const currentZoom = canvasStageApi.getViewport().zoom;
 
     void canvasStageApi.setCenter(center.x, center.y, { zoom: currentZoom });
