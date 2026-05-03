@@ -12,3 +12,16 @@ See [USER_GUIDE.md](./USER_GUIDE.md) for the app layout and keyboard shortcuts.
 - `npm run build:desktop`: build the static frontend used by Tauri
 - `npm run tauri build`: bundle the Tauri desktop app for release
 The generated desktop build outputs are ignored by git, so you can rebuild locally without polluting the working tree.
+
+## Desktop Prerequisites
+
+To build the desktop app you generally need:
+
+- Node.js and npm for the frontend build and package scripts
+- Rust and Cargo for the Tauri backend in `src-tauri`
+- Platform-specific native tooling required by Tauri:
+  - Windows: Microsoft C++ Build Tools and WebView2
+  - macOS: Xcode, or Xcode Command Line Tools for desktop-only builds
+  - Linux: WebKitGTK plus the native libraries Tauri requires for your distro
+
+The repo uses bundled SQLite libraries, so you do not need a separate system SQLite install for the normal desktop build path.
