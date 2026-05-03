@@ -16,6 +16,7 @@
   } from '$lib/tagUtils';
   import { hasNodeTitleConflict, normalizeNodeTitle } from '$lib/nodeTitles';
   import { parseInlineContent } from '$lib/inlineContent';
+  import { isSaveAndExitEditShortcut } from '$lib/shortcutUtils';
   import { getTagColor, getTagColorWithAlpha, rgbaFromHex } from '$lib/tagColors';
 
   let { id, data, selected } = $props();
@@ -202,7 +203,7 @@
       return;
     }
 
-    if (e.shiftKey && !e.metaKey && !e.ctrlKey && !e.altKey && e.key.toLowerCase() === 'e') {
+    if (isSaveAndExitEditShortcut(e)) {
       e.preventDefault();
       void saveAndLock();
       return;
@@ -221,7 +222,7 @@
       return;
     }
 
-    if (e.shiftKey && !e.metaKey && !e.ctrlKey && !e.altKey && e.key.toLowerCase() === 'e') {
+    if (isSaveAndExitEditShortcut(e)) {
       e.preventDefault();
       void saveAndLock();
       return;
@@ -240,7 +241,7 @@
       return;
     }
 
-    if (e.shiftKey && !e.metaKey && !e.ctrlKey && !e.altKey && e.key.toLowerCase() === 'e') {
+    if (isSaveAndExitEditShortcut(e)) {
       e.preventDefault();
       void saveAndLock();
       return;

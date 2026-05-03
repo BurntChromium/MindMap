@@ -38,6 +38,18 @@ export function isZoomInShortcut(event: KeyboardEvent) {
   return isKeyShortcut(event, '=');
 }
 
+export function isSaveAndExitEditShortcut(event: KeyboardEvent) {
+  if (event.defaultPrevented) {
+    return false;
+  }
+
+  if (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) {
+    return false;
+  }
+
+  return event.key === 'Escape';
+}
+
 function isKeyShortcut(event: KeyboardEvent, key: string) {
   if (event.defaultPrevented) {
     return false;

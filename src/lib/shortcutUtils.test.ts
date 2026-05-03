@@ -3,6 +3,7 @@ import {
   isCanvasToggleShortcut,
   isCreateNodeShortcut,
   isDiscoveryToggleShortcut,
+  isSaveAndExitEditShortcut,
   isZoomInShortcut,
   isZoomOutShortcut,
   isTextInputElement
@@ -72,6 +73,19 @@ describe('shortcutUtils', () => {
     ).toBe(true);
   });
 
+  it('recognizes the edit save-and-exit key', () => {
+    expect(
+      isSaveAndExitEditShortcut({
+        key: 'Escape',
+        metaKey: false,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: false,
+        defaultPrevented: false
+      } as KeyboardEvent)
+    ).toBe(true);
+  });
+
   it('ignores modifier combinations', () => {
     const event = {
       key: 'n',
@@ -83,6 +97,16 @@ describe('shortcutUtils', () => {
     } as KeyboardEvent;
 
     expect(isCreateNodeShortcut(event)).toBe(false);
+    expect(
+      isSaveAndExitEditShortcut({
+        key: 'Escape',
+        metaKey: false,
+        ctrlKey: true,
+        altKey: false,
+        shiftKey: false,
+        defaultPrevented: false
+      } as KeyboardEvent)
+    ).toBe(false);
   });
 
   it('recognizes text entry targets', () => {
