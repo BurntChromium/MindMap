@@ -4,7 +4,9 @@ A Svelte and SQLite app for building mind maps and linked notebooks on a shared 
 
 See [USER_GUIDE.md](./USER_GUIDE.md) for the app layout and keyboard shortcuts.
 
-## Build Commands
+## Build
+
+### Commands
 
 - `npm run dev`: run the web app in the browser
 - `npm run tauri dev`: run the desktop app in Tauri for development
@@ -13,7 +15,7 @@ See [USER_GUIDE.md](./USER_GUIDE.md) for the app layout and keyboard shortcuts.
 - `npm run tauri build`: bundle the Tauri desktop app for release
 The generated desktop build outputs are ignored by git, so you can rebuild locally without polluting the working tree.
 
-## Desktop Prerequisites
+### Desktop Prerequisites
 
 To build the desktop app you generally need:
 
