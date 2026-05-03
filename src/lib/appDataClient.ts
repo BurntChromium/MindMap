@@ -169,8 +169,10 @@ function createTauriClient(bridge: AppDataTauriBridge): AppDataClient {
     createNode: (input) => invokeWithInput('create_node', input),
     updateNode: (input) => invokeWithInput('update_node', input),
     deleteNode: (input) => invokeWithInput('delete_node', input),
-    bulkUpdateNodeTags: (input) => invokeWithInput('bulk_update_node_tags', input),
-    bulkUpdateNodePositions: (input) => invokeWithInput('bulk_update_node_positions', input),
+    bulkUpdateNodeTags: (input) =>
+      invokeWithInput('bulk_update_node_tags', { nodes: input }),
+    bulkUpdateNodePositions: (input) =>
+      invokeWithInput('bulk_update_node_positions', { nodes: input }),
 
     loadEdges: (canvasId) => invokeWithInput('load_edges', { canvasId }),
     createEdge: (input) => invokeWithInput('create_edge', input),
