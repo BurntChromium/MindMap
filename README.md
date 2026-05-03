@@ -1,11 +1,21 @@
 # Mindmap
 
+This repository builds software that serves as a mix of a notebook and a knowledge graph. You create pages and link them together to create a mind map. You can create entities within pages (or even as notes), and the system will track and link all of your entities for you as well.
+
+![A screenshot of the application](./docs/img/Screenshot-v0.1.0-alpha.png)
+
+The application has strong keyboard support (most actions can be taken with just the keyboard - but it's early so things aren't perfect!). 
+
+### Tech Stack
+
 A Svelte and SQLite app for building mind maps and linked notebooks on a shared canvas.
 
 See [USER_GUIDE.md](./USER_GUIDE.md) for the app layout and keyboard shortcuts.
 See [CHANGELOG.md](./CHANGELOG.md) for release notes.
 
 ## Build
+
+This program can be built as either a web app or a desktop app.
 
 ### Commands
 
