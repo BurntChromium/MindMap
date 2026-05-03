@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { onMount, tick } from 'svelte';
+  import { onDestroy, onMount, tick } from 'svelte';
   import type { Connection } from '@xyflow/svelte';
-  import { Search, X } from 'lucide-svelte';
+  import { Check, Search, X } from 'lucide-svelte';
   import { createClientId } from '$lib/clientId';
   import { appDataClient } from '$lib/appDataClient';
   import type { CanvasStageApi } from '$lib/canvasApi';
@@ -87,6 +87,8 @@
   let nodeMoveQueue = Promise.resolve();
   let canvasShell: HTMLDivElement | undefined;
   let quickSearchInputRef = $state<HTMLInputElement | undefined>(undefined);
+  let exportNotice = $state<{ title: string; detail: string } | null>(null);
+  let exportNoticeTimeout: ReturnType<typeof setTimeout> | null = null;
 
   const initialCanvases = $derived.by(() => data.canvases);
   const initialActiveCanvasId = $derived.by(() => data.activeCanvasId);
@@ -158,6 +160,34 @@
     Boolean(activeCanvasId) && !canvasHasNodes && canvasIsLoading
   );
   const showCanvasErrorState = $derived(Boolean(activeCanvasId) && !canvasHasNodes && canvasIsFailed);
+
+  function clearExportNoticeTimer() {
+    if (exportNoticeTimeout) {
+      clearTimeout(exportNoticeTimeout);
+      exportNoticeTimeout = null;
+    }
+  }
+
+  function dismissExportNotice() {
+    clearExportNoticeTimer();
+    exportNotice = null;
+  }
+
+  function showExportNotice(destinationLabel: string) {
+    clearExportNoticeTimer();
+    exportNotice = {
+      title: 'Database exported',
+      detail: destinationLabel
+    };
+    exportNoticeTimeout = setTimeout(() => {
+      exportNotice = null;
+      exportNoticeTimeout = null;
+    }, 4500);
+  }
+
+  onDestroy(() => {
+    clearExportNoticeTimer();
+  });
 
   onMount(() => {
     canvasStore.hydrate(initialCanvases, initialActiveCanvasId);
@@ -1121,7 +1151,11 @@
 </script>
 
 <div class="app-shell" class:app-shell--sidebar-collapsed={sidebarCollapsed}>
-  <CanvasSidebar bind:collapsed={sidebarCollapsed} canvases={canvases} />
+  <CanvasSidebar
+    bind:collapsed={sidebarCollapsed}
+    canvases={canvases}
+    onExportSuccess={showExportNotice}
+  />
 
   <main class="workspace">
     <div
@@ -1162,6 +1196,27 @@
       {#if selectedNodeIds.length > 0}
         <div class="canvas-hint canvas-hint--selection" aria-live="polite">
           {selectedNodeIds.length} selected
+        </div>
+      {/if}
+
+      {#if exportNotice}
+        <div class="canvas-toast" role="status" aria-live="polite" aria-atomic="true">
+          <div class="canvas-toast__icon" aria-hidden="true">
+            <Check size={14} />
+          </div>
+          <div class="canvas-toast__body">
+            <strong class="canvas-toast__title">{exportNotice.title}</strong>
+            <span class="canvas-toast__detail">{exportNotice.detail}</span>
+          </div>
+          <button
+            class="icon-button canvas-toast__dismiss"
+            type="button"
+            aria-label="Dismiss export notification"
+            title="Dismiss export notification"
+            onclick={dismissExportNotice}
+          >
+            <X size={12} aria-hidden="true" />
+          </button>
         </div>
       {/if}
 
@@ -1306,6 +1361,62 @@
   .canvas-hint--selection {
     right: 1rem;
     bottom: 1rem;
+  }
+
+  .canvas-toast {
+    position: absolute;
+    right: 1rem;
+    top: 1rem;
+    z-index: 7;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.7rem;
+    min-width: min(320px, calc(100% - 2rem));
+    max-width: min(420px, calc(100% - 2rem));
+    padding: 0.85rem 0.95rem;
+    border: 1px solid rgba(34, 197, 94, 0.34);
+    border-radius: 1rem;
+    background: rgba(240, 253, 244, 0.97);
+    box-shadow: var(--shadow-soft);
+    color: #166534;
+    backdrop-filter: blur(8px);
+  }
+
+  .canvas-toast__icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+    width: 1.35rem;
+    height: 1.35rem;
+    border-radius: 999px;
+    background: rgba(34, 197, 94, 0.14);
+    color: #166534;
+  }
+
+  .canvas-toast__body {
+    display: grid;
+    gap: 0.15rem;
+    min-width: 0;
+    flex: 1;
+  }
+
+  .canvas-toast__title {
+    font-size: 0.92rem;
+    line-height: 1.2;
+  }
+
+  .canvas-toast__detail {
+    font-size: 0.82rem;
+    line-height: 1.35;
+    color: rgba(22, 101, 52, 0.82);
+    word-break: break-word;
+  }
+
+  .canvas-toast__dismiss {
+    flex: none;
+    margin-left: auto;
+    color: #166534;
   }
 
   .canvas-hint--status {

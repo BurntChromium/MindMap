@@ -17,9 +17,10 @@
   interface Props {
     canvases: Canvas[];
     collapsed: boolean;
+    onExportSuccess?: (destinationLabel: string) => void;
   }
 
-  let { canvases, collapsed = $bindable(false) }: Props = $props();
+  let { canvases, collapsed = $bindable(false), onExportSuccess }: Props = $props();
 
   let name = $state('');
   let editingCanvasId = $state<string | null>(null);
@@ -56,7 +57,8 @@
 
     try {
       const bytes = await appDataClient.exportDatabase();
-      await saveBytesToFile(bytes, 'mindmap.db');
+      const result = await saveBytesToFile(bytes, 'mindmap.db');
+      onExportSuccess?.(result.destinationLabel);
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') {
         return;

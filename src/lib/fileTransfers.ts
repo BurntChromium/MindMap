@@ -1,4 +1,23 @@
-export async function saveBytesToFile(bytes: ArrayBuffer, suggestedName: string) {
+export type ExportSaveResult = {
+  destinationLabel: string;
+};
+
+export function getDatabaseExportDestinationLabel(
+  usedFilePicker: boolean,
+  suggestedName: string,
+  fileName?: string
+) {
+  if (usedFilePicker) {
+    return `Saved as ${fileName ?? suggestedName}`;
+  }
+
+  return 'Saved to Downloads';
+}
+
+export async function saveBytesToFile(
+  bytes: ArrayBuffer,
+  suggestedName: string
+): Promise<ExportSaveResult> {
   if (typeof window !== 'undefined' && 'showSaveFilePicker' in window) {
     const picker = window as Window & {
       showSaveFilePicker: (options?: {
@@ -26,7 +45,9 @@ export async function saveBytesToFile(bytes: ArrayBuffer, suggestedName: string)
     const writable = await handle.createWritable();
     await writable.write(bytes);
     await writable.close();
-    return;
+    return {
+      destinationLabel: getDatabaseExportDestinationLabel(true, suggestedName, handle.name)
+    };
   }
 
   const blob = new Blob([bytes], { type: 'application/x-sqlite3' });
@@ -43,4 +64,8 @@ export async function saveBytesToFile(bytes: ArrayBuffer, suggestedName: string)
   link.remove();
 
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+  return {
+    destinationLabel: getDatabaseExportDestinationLabel(false, suggestedName)
+  };
 }
