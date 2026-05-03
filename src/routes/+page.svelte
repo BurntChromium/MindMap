@@ -54,6 +54,7 @@
     findEntityInspectorEntryByTitle,
     getEntityInspectorNodeIds
   } from '$lib/entityInspector';
+  import { getCanvasBoundsCenter } from '$lib/canvasCenter';
   import type { AppDataPageData } from '$lib/server/appData';
 
   let { data }: { data: AppDataPageData } = $props();
@@ -606,8 +607,7 @@
     const nextNode = nodes.find((node) => node.id === nodeId);
 
     if (nextNode && canvasStageApi) {
-      const currentZoom = canvasStageApi.getViewport().zoom;
-      void canvasStageApi.setCenter(nextNode.x, nextNode.y, { zoom: currentZoom });
+      void centerCanvasOnNode(nodeId);
     }
   }
 
@@ -771,10 +771,8 @@
     nodeUiStore.beginEdit(nodeId);
 
     if (canvasStageApi) {
-      const currentZoom = canvasStageApi.getViewport().zoom;
-      void canvasStageApi.setCenter(nextNode.x, nextNode.y, { zoom: currentZoom });
+      await centerCanvasOnNode(nodeId);
     }
-
   }
 
   async function focusEditingNodeTitle() {
@@ -814,8 +812,7 @@
     const nextNode = nodes.find((node) => node.id === nextNodeId);
 
     if (nextNode && canvasStageApi) {
-      const currentZoom = canvasStageApi.getViewport().zoom;
-      void canvasStageApi.setCenter(nextNode.x, nextNode.y, { zoom: currentZoom });
+      void centerCanvasOnNode(nextNodeId);
     }
   }
 
@@ -850,9 +847,22 @@
     selectionStore.selectNode(nextNodeId);
 
     if (canvasStageApi) {
-      const currentZoom = canvasStageApi.getViewport().zoom;
-      void canvasStageApi.setCenter(nextNode.x, nextNode.y, { zoom: currentZoom });
+      void centerCanvasOnNode(nextNodeId);
     }
+  }
+
+  async function centerCanvasOnNode(nodeId: string) {
+    if (!canvasStageApi) {
+      return;
+    }
+
+    await tick();
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+
+    const center = getCanvasBoundsCenter(canvasStageApi.getNodesBounds([nodeId]));
+    const currentZoom = canvasStageApi.getViewport().zoom;
+
+    void canvasStageApi.setCenter(center.x, center.y, { zoom: currentZoom });
   }
 
   function toggleFocusedNodeSelection() {

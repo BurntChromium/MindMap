@@ -12,6 +12,7 @@
   const flow = useSvelteFlow();
   const api: CanvasStageApi = {
     getViewport: () => flow.getViewport(),
+    getNodesBounds: (nodes) => flow.getNodesBounds(nodes),
     setViewport: (viewport) => flow.setViewport(viewport),
     zoomIn: () => flow.zoomIn(),
     zoomOut: () => flow.zoomOut(),

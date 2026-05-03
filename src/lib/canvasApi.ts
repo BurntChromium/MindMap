@@ -6,6 +6,7 @@ export type CanvasViewport = {
 
 export type CanvasStageApi = {
   getViewport: () => CanvasViewport;
+  getNodesBounds: (nodes: string[]) => { x: number; y: number; width: number; height: number };
   setViewport: (viewport: CanvasViewport) => Promise<boolean>;
   zoomIn: () => Promise<boolean>;
   zoomOut: () => Promise<boolean>;
