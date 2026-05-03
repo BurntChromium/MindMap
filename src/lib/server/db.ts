@@ -1,6 +1,8 @@
 import { openDatabase } from './sqlite';
 
-export const dbPath = process.env.MINDMAP_DB_PATH ?? 'dev.db';
+const defaultDbPath = import.meta.env.DEV ? 'dev.db' : 'mindmap.db';
+
+export const dbPath = process.env.MINDMAP_DB_PATH ?? defaultDbPath;
 
 export let db = openDatabase(dbPath);
 

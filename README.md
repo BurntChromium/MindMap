@@ -27,3 +27,9 @@ To build the desktop app you generally need:
   - Linux: WebKitGTK plus the native libraries Tauri requires for your distro
 
 The repo uses bundled SQLite libraries, so you do not need a separate system SQLite install for the normal desktop build path.
+
+### Database Paths
+
+- `npm run dev` uses `dev.db`
+- `npm run build` plus `npm run preview` uses `mindmap.db`
+- `MINDMAP_DB_PATH` overrides either default when set
