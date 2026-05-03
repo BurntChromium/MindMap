@@ -427,6 +427,10 @@
     loadedCanvasId = data.activeCanvasId;
     initialHydrationDone = true;
 
+    if (typeof window !== 'undefined' && window.__TAURI__) {
+      void canvasStore.load();
+    }
+
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
       unsubCanvas();

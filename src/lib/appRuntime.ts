@@ -1,10 +1,7 @@
-import { createIpcAppDataClient, setAppDataClient } from '$lib/appDataClient';
-
 export function configureAppDataTransport() {
-  if (typeof window === 'undefined' || !window.mindmapDesktop) {
+  if (typeof window === 'undefined' || !window.__TAURI__) {
     return false;
   }
 
-  setAppDataClient(createIpcAppDataClient(window.mindmapDesktop));
   return true;
 }

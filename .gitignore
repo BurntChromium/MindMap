@@ -9,6 +9,7 @@ node_modules
 /build
 /dist-electron
 /release
+/src-tauri/target
 
 # OS
 .DS_Store

@@ -1,0 +1,28 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Mindmap",
+  "version": "0.0.1",
+  "identifier": "com.burntchrome.mindmap",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build:desktop",
+    "devUrl": "http://localhost:5173",
+    "frontendDist": "../build/desktop"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "title": "Mindmap",
+        "width": 1440,
+        "height": 960,
+        "resizable": true
+      }
+    ]
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all"
+  }
+}
+

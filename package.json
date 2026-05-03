@@ -3,13 +3,12 @@
 	"private": true,
 	"version": "0.0.1",
 	"type": "module",
-	"main": "dist-electron/main.js",
 	"scripts": {
 		"dev": "vite dev",
 		"build": "vite build",
-		"build:desktop": "node scripts/build-desktop.mjs",
-		"build:electron": "vite build --config vite.electron.config.ts",
+		"build:desktop": "MINDMAP_DESKTOP_BUILD=1 VITE_DESKTOP_BUILD=1 vite build",
 		"preview": "vite preview",
+		"tauri": "tauri",
 		"prepare": "svelte-kit sync || echo ''",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
@@ -17,20 +16,16 @@
 		"bench:baseline": "node scripts/bench.mjs baseline",
 		"bench:compare": "node scripts/bench.mjs compare",
 		"test": "vitest run",
-		"test:watch": "vitest",
-		"electron:run": "electron .",
-		"electron:package": "npm run build:desktop && electron-builder",
-		"electron:package:win": "node scripts/package-win-docker.mjs",
-		"electron:package:win:portable": "node scripts/package-win-docker.mjs --target portable"
+		"test:watch": "vitest"
 	},
 	"devDependencies": {
+		"@tauri-apps/api": "^2.10.0",
+		"@tauri-apps/cli": "^2.10.0",
 		"@sveltejs/adapter-auto": "^7.0.1",
 		"@sveltejs/adapter-static": "^3.0.8",
 		"@sveltejs/kit": "^2.57.0",
 		"@sveltejs/vite-plugin-svelte": "^7.0.0",
 		"@types/better-sqlite3": "^7.6.13",
-		"electron": "^36.2.1",
-		"electron-builder": "^26.0.12",
 		"svelte": "^5.55.2",
 		"svelte-check": "^4.4.6",
 		"typescript": "^6.0.2",
@@ -42,21 +37,5 @@
 		"better-sqlite3": "^12.9.0",
 		"lucide-svelte": "^1.0.1",
 		"uuid": "^14.0.0"
-	},
-	"build": {
-		"appId": "com.burntchrome.mindmap",
-		"productName": "Mindmap",
-		"asar": true,
-		"win": {
-			"signAndEditExecutable": false
-		},
-		"directories": {
-			"output": "release"
-		},
-		"files": [
-			"dist-electron/**",
-			"build/desktop/**",
-			"package.json"
-		]
 	}
 }

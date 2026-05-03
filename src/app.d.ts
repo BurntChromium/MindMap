@@ -10,8 +10,10 @@ declare global {
 	}
 
 	interface Window {
-		mindmapDesktop?: {
-			invoke: <T>(channel: string, request: { method: string; payload?: unknown }) => Promise<T>;
+		__TAURI__?: {
+			core: {
+				invoke: <T>(command: string, args?: unknown) => Promise<T>;
+			};
 		};
 	}
 }

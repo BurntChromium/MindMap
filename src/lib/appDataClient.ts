@@ -75,8 +75,10 @@ export type AppDataClient = {
   importDatabase: (input: BinaryValue) => Promise<JsonValue>;
 };
 
-export type AppDataIpcBridge = {
-  invoke: <T>(channel: string, request: { method: string; payload?: unknown }) => Promise<T>;
+export type AppDataTauriBridge = {
+  core: {
+    invoke: <T>(command: string, args?: unknown) => Promise<T>;
+  };
 };
 
 function createFetchClient(): AppDataClient {
@@ -152,85 +154,101 @@ function createFetchClient(): AppDataClient {
   };
 }
 
-export function createIpcAppDataClient(bridge: AppDataIpcBridge): AppDataClient {
+function createTauriClient(bridge: AppDataTauriBridge): AppDataClient {
   return {
-    loadInitialPageData: () =>
-      bridge.invoke('mindmap:app-data', { method: 'loadInitialPageData' }),
-    loadCanvases: () => bridge.invoke('mindmap:app-data', { method: 'loadCanvases' }),
-    createCanvas: (input) =>
-      bridge.invoke('mindmap:app-data', { method: 'createCanvas', payload: input }),
-    renameCanvas: (input) =>
-      bridge.invoke('mindmap:app-data', { method: 'renameCanvas', payload: input }),
-    deleteCanvas: (input) =>
-      bridge.invoke('mindmap:app-data', { method: 'deleteCanvas', payload: input }),
+    loadInitialPageData: () => bridge.core.invoke('load_initial_page_data'),
+    loadCanvases: () => bridge.core.invoke('load_canvases'),
+    createCanvas: (input) => bridge.core.invoke('create_canvas', input),
+    renameCanvas: (input) => bridge.core.invoke('rename_canvas', input),
+    deleteCanvas: (input) => bridge.core.invoke('delete_canvas', input),
 
-    loadNodes: (canvasId) =>
-      bridge.invoke('mindmap:app-data', { method: 'loadNodes', payload: { canvasId } }),
-    createNode: (input) => bridge.invoke('mindmap:app-data', { method: 'createNode', payload: input }),
-    updateNode: (input) => bridge.invoke('mindmap:app-data', { method: 'updateNode', payload: input }),
-    deleteNode: (input) => bridge.invoke('mindmap:app-data', { method: 'deleteNode', payload: input }),
+    loadNodes: (canvasId) => bridge.core.invoke('load_nodes', { canvasId }),
+    createNode: (input) => bridge.core.invoke('create_node', input),
+    updateNode: (input) => bridge.core.invoke('update_node', input),
+    deleteNode: (input) => bridge.core.invoke('delete_node', input),
     bulkUpdateNodeTags: (input) =>
-      bridge.invoke('mindmap:app-data', { method: 'bulkUpdateNodeTags', payload: input }),
+      bridge.core.invoke('bulk_update_node_tags', input),
     bulkUpdateNodePositions: (input) =>
-      bridge.invoke('mindmap:app-data', { method: 'bulkUpdateNodePositions', payload: input }),
+      bridge.core.invoke('bulk_update_node_positions', input),
 
-    loadEdges: (canvasId) =>
-      bridge.invoke('mindmap:app-data', { method: 'loadEdges', payload: { canvasId } }),
-    createEdge: (input) => bridge.invoke('mindmap:app-data', { method: 'createEdge', payload: input }),
-    deleteEdge: (input) => bridge.invoke('mindmap:app-data', { method: 'deleteEdge', payload: input }),
+    loadEdges: (canvasId) => bridge.core.invoke('load_edges', { canvasId }),
+    createEdge: (input) => bridge.core.invoke('create_edge', input),
+    deleteEdge: (input) => bridge.core.invoke('delete_edge', input),
 
-    loadEntities: (canvasId) =>
-      bridge.invoke('mindmap:app-data', { method: 'loadEntities', payload: { canvasId } }),
-    searchNodes: (input) =>
-      bridge.invoke('mindmap:app-data', { method: 'searchNodes', payload: input }),
-    mutateGraphFragment: (input) =>
-      bridge.invoke('mindmap:app-data', { method: 'mutateGraphFragment', payload: input }),
-    exportDatabase: () => bridge.invoke('mindmap:app-data', { method: 'exportDatabase' }),
-    importDatabase: (input) =>
-      bridge.invoke('mindmap:app-data', { method: 'importDatabase', payload: input })
+    loadEntities: (canvasId) => bridge.core.invoke('load_entities', { canvasId }),
+    searchNodes: (input) => bridge.core.invoke('search_nodes', input),
+    mutateGraphFragment: (input) => bridge.core.invoke('mutate_graph_fragment', input),
+    exportDatabase: () => bridge.core.invoke('export_database'),
+    importDatabase: (input) => bridge.core.invoke('import_database', input)
   };
 }
 
+function getTauriBridge() {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  return window.__TAURI__ ?? null;
+}
+
 function createDefaultClient() {
-  if (typeof window !== 'undefined' && window.mindmapDesktop) {
-    return createIpcAppDataClient(window.mindmapDesktop);
+  const bridge = getTauriBridge();
+
+  if (bridge) {
+    return createTauriClient(bridge);
   }
 
   return createFetchClient();
 }
 
 let activeClient: AppDataClient = createDefaultClient();
+let activeClientIsDefault = true;
+
+function syncRuntimeClient() {
+  if (!activeClientIsDefault) {
+    return activeClient;
+  }
+
+  const nextClient = createDefaultClient();
+
+  if (nextClient !== activeClient) {
+    activeClient = nextClient;
+  }
+
+  return activeClient;
+}
 
 export function getAppDataClient() {
-  return activeClient;
+  return syncRuntimeClient();
 }
 
 export function setAppDataClient(client: AppDataClient) {
   activeClient = client;
+  activeClientIsDefault = false;
 }
 
 export const appDataClient = {
-  loadInitialPageData: (fetchImpl?: typeof fetch) => activeClient.loadInitialPageData(fetchImpl),
-  loadCanvases: () => activeClient.loadCanvases(),
-  createCanvas: (input: { id: string; name: string }) => activeClient.createCanvas(input),
-  renameCanvas: (input: { id: string; name: string }) => activeClient.renameCanvas(input),
-  deleteCanvas: (input: { id: string }) => activeClient.deleteCanvas(input),
-  loadNodes: (canvasId: string) => activeClient.loadNodes(canvasId),
-  createNode: (input: Parameters<typeof buildNodeCreateBody>[0]) => activeClient.createNode(input),
-  updateNode: (input: Parameters<typeof buildNodePatchBody>[0]) => activeClient.updateNode(input),
-  deleteNode: (input: { id: string }) => activeClient.deleteNode(input),
+  loadInitialPageData: (fetchImpl?: typeof fetch) => syncRuntimeClient().loadInitialPageData(fetchImpl),
+  loadCanvases: () => syncRuntimeClient().loadCanvases(),
+  createCanvas: (input: { id: string; name: string }) => syncRuntimeClient().createCanvas(input),
+  renameCanvas: (input: { id: string; name: string }) => syncRuntimeClient().renameCanvas(input),
+  deleteCanvas: (input: { id: string }) => syncRuntimeClient().deleteCanvas(input),
+  loadNodes: (canvasId: string) => syncRuntimeClient().loadNodes(canvasId),
+  createNode: (input: Parameters<typeof buildNodeCreateBody>[0]) => syncRuntimeClient().createNode(input),
+  updateNode: (input: Parameters<typeof buildNodePatchBody>[0]) => syncRuntimeClient().updateNode(input),
+  deleteNode: (input: { id: string }) => syncRuntimeClient().deleteNode(input),
   bulkUpdateNodeTags: (input: Array<{ id: string; tags: string[] }>) =>
-    activeClient.bulkUpdateNodeTags(input),
+    syncRuntimeClient().bulkUpdateNodeTags(input),
   bulkUpdateNodePositions: (input: Array<{ id: string; x: number; y: number }>) =>
-    activeClient.bulkUpdateNodePositions(input),
-  loadEdges: (canvasId: string) => activeClient.loadEdges(canvasId),
-  createEdge: (input: Parameters<typeof buildEdgeCreateBody>[0]) => activeClient.createEdge(input),
-  deleteEdge: (input: { id: string }) => activeClient.deleteEdge(input),
-  loadEntities: (canvasId: string) => activeClient.loadEntities(canvasId),
+    syncRuntimeClient().bulkUpdateNodePositions(input),
+  loadEdges: (canvasId: string) => syncRuntimeClient().loadEdges(canvasId),
+  createEdge: (input: Parameters<typeof buildEdgeCreateBody>[0]) => syncRuntimeClient().createEdge(input),
+  deleteEdge: (input: { id: string }) => syncRuntimeClient().deleteEdge(input),
+  loadEntities: (canvasId: string) => syncRuntimeClient().loadEntities(canvasId),
   searchNodes: (input: { canvasId: string; query: string; tag?: string | null }) =>
-    activeClient.searchNodes(input),
+    syncRuntimeClient().searchNodes(input),
   mutateGraphFragment: (input: Parameters<typeof buildGraphFragmentBody>[0]) =>
-    activeClient.mutateGraphFragment(input),
-  exportDatabase: () => activeClient.exportDatabase(),
-  importDatabase: (input: BinaryValue) => activeClient.importDatabase(input)
+    syncRuntimeClient().mutateGraphFragment(input),
+  exportDatabase: () => syncRuntimeClient().exportDatabase(),
+  importDatabase: (input: BinaryValue) => syncRuntimeClient().importDatabase(input)
 };
