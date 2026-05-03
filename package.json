@@ -6,10 +6,10 @@
 	"scripts": {
 		"dev": "vite dev",
 		"build": "vite build",
-		"build:desktop": "MINDMAP_DESKTOP_BUILD=1 VITE_DESKTOP_BUILD=1 vite build",
+		"build:desktop": "node scripts/build-desktop.mjs",
 		"preview": "vite preview",
 		"tauri": "tauri",
-		"prepare": "svelte-kit sync || echo ''",
+		"prepare": "node scripts/prepare.mjs",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"bench": "vitest bench",
