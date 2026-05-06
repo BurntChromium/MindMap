@@ -108,7 +108,12 @@ import {
   const initialCanvases = $derived.by(() => data.canvases);
   const initialActiveCanvasId = $derived.by(() => data.activeCanvasId);
   const initialDatabaseFileName = $derived.by(() => data.databaseFileName);
-  const initialNodes = $derived.by(() => data.nodes);
+  const initialNodes = $derived.by(() =>
+    data.nodes.map((node) => ({
+      ...node,
+      tags: [...node.tags]
+    }))
+  );
   const initialEdges = $derived.by(() => data.edges);
   const initialEntities = $derived.by(() => data.entities);
   const initialEntityMentions = $derived.by(() => data.entityMentions);
