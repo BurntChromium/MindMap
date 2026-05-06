@@ -31,6 +31,22 @@ The generated desktop build outputs are ignored by git, so you can rebuild local
 
 Playwright uses a temporary SQLite database for each run, so the E2E suite does not touch `dev.db` or `mindmap.db`.
 
+### Release Workflow
+
+Releases are started manually from your local machine through GitHub Actions.
+
+Before releasing, bump the version in both `package.json` and `src-tauri/tauri.conf.json` to the same value.
+
+Then run:
+
+- `npm run release -- --version <version>`
+
+That command uses the GitHub CLI to dispatch the `Release` workflow with the version you pass in.
+The workflow then runs `npm run check`, `npm test`, and the Playwright suite in headless mode.
+If those checks pass, it builds Linux and Windows artifacts and uploads them to a draft GitHub Release.
+
+You can publish the draft release from GitHub after reviewing the assets.
+
 ### Desktop Prerequisites
 
 To build the desktop app you generally need:

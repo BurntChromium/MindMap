@@ -10,6 +10,7 @@
 		"preview": "vite preview",
 		"tauri": "tauri",
 		"prepare": "node scripts/prepare.mjs",
+		"release": "node scripts/release.mjs",
 		"test:e2e": "node scripts/run-playwright.mjs built",
 		"test:e2e:dev": "node scripts/run-playwright.mjs dev",
 		"test:e2e:headed": "node scripts/run-playwright.mjs built --headed",
