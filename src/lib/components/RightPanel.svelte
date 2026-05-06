@@ -127,13 +127,13 @@
 </script>
 
 <aside
-  class="inspector-panel"
-  class:inspector-panel--collapsed={collapsed}
+  class="panel-shell panel-shell--right"
+  class:panel-shell--collapsed={collapsed}
   aria-label="Search, tags, and entities"
 >
-  <div class="inspector-panel__header">
+  <div class="panel-shell__header">
     <button
-      class="icon-button inspector-panel-toggle"
+      class="icon-button"
       type="button"
       aria-label={collapsed ? 'Expand inspector panel' : 'Collapse inspector panel'}
       title={collapsed ? 'Expand inspector panel (F)' : 'Collapse inspector panel (F)'}
@@ -147,12 +147,12 @@
         <ChevronRight size={14} aria-hidden="true" />
       {/if}
     </button>
-    <div class="inspector-panel__header-actions">
+    <div class="panel-shell__header-actions">
       {#if !collapsed}
-        <div class="panel-tabs" role="tablist" aria-label="Right panel tabs">
+        <div class="panel-shell__tablist" role="tablist" aria-label="Right panel tabs">
           <button
-            class="panel-tab"
-            class:panel-tab--active={activeTab === 'search'}
+            class="panel-shell__tab"
+            class:panel-shell__tab--active={activeTab === 'search'}
             type="button"
             role="tab"
             aria-selected={activeTab === 'search'}
@@ -162,8 +162,8 @@
             Search
           </button>
           <button
-            class="panel-tab"
-            class:panel-tab--active={activeTab === 'tags'}
+            class="panel-shell__tab"
+            class:panel-shell__tab--active={activeTab === 'tags'}
             type="button"
             role="tab"
             aria-selected={activeTab === 'tags'}
@@ -173,8 +173,8 @@
             Tags
           </button>
           <button
-            class="panel-tab"
-            class:panel-tab--active={activeTab === 'entities'}
+            class="panel-shell__tab"
+            class:panel-shell__tab--active={activeTab === 'entities'}
             type="button"
             role="tab"
             aria-selected={activeTab === 'entities'}
@@ -189,21 +189,21 @@
   </div>
 
   {#if !collapsed}
-    <div class="panel-tabpanels">
+    <div class="panel-shell__content">
       {#if activeTab === 'search'}
-        <div class="panel-section" role="tabpanel" aria-label="Search">
-          <label class="panel-search">
+        <div class="panel-shell__section" role="tabpanel" aria-label="Search">
+          <label class="panel-shell__search">
             <span>Keyword search</span>
-            <div class="panel-search-field">
+            <div class="panel-shell__search-field">
               <input
                 bind:value={searchQuery}
-                class="sidebar-input panel-search-input"
+                class="sidebar-input panel-shell__search-input"
                 placeholder="Search titles or body"
                 aria-label="Search nodes by keyword"
                 data-testid="panel-search-input"
               />
               <button
-                class="icon-button panel-search-clear"
+                class="icon-button"
                 type="button"
                 aria-label="Clear search and tag filters"
                 title="Clear search and tag filters"
@@ -216,35 +216,35 @@
             </div>
           </label>
 
-          <div class="panel-section__header">
+          <div class="panel-shell__section-header">
             <h4>Matches</h4>
             <span>{activeFilterLabel}</span>
           </div>
 
           {#if !searchQuery.trim() && !activeTag}
-            <p class="panel-empty">Type a keyword or click a tag to see matches.</p>
+            <p class="panel-shell__empty">Type a keyword or click a tag to see matches.</p>
           {:else if searchResults.length === 0}
-            <p class="panel-empty">No nodes match the current filters.</p>
+            <p class="panel-shell__empty">No nodes match the current filters.</p>
           {:else}
-            <div class="search-results">
+            <div class="panel-shell__result-list">
               {#each searchResults as node}
                 <button
                   type="button"
-                  class="search-result"
-                  class:search-result--focused={focusedNodeId === node.id}
+                  class="panel-shell__result"
+                  class:panel-shell__result--focused={focusedNodeId === node.id}
                   data-testid={`search-result-${node.id}`}
                   onclick={() => onFocusSearchResult(node.id)}
                 >
-                  <span class="search-result__title">{node.title || 'Untitled'}</span>
+                  <span class="panel-shell__result-title">{node.title || 'Untitled'}</span>
                   {#if node.body}
-                    <span class="search-result__body">
+                    <span class="panel-shell__result-body">
                       {node.body.length > 96 ? `${node.body.slice(0, 96).trim()}…` : node.body}
                     </span>
                   {/if}
                   {#if node.tags?.length}
-                    <span class="search-result__tags">
+                    <span class="panel-shell__result-tags">
                       {#each node.tags.slice(0, 4) as tag}
-                        <span class="search-result__tag">{formatTagLabel(tag)}</span>
+                        <span class="panel-shell__result-tag">{formatTagLabel(tag)}</span>
                       {/each}
                     </span>
                   {/if}
@@ -256,45 +256,45 @@
       {/if}
 
       {#if activeTab === 'tags'}
-        <div class="panel-section" role="tabpanel" aria-label="Tags">
-          <div class="panel-section__header">
+        <div class="panel-shell__section" role="tabpanel" aria-label="Tags">
+          <div class="panel-shell__section-header">
             <h4>Tags</h4>
             <span>{tagSummaries.length} total</span>
           </div>
 
           {#if tagSummaries.length}
-            <div class="tag-filter-list">
+            <div class="panel-shell__chip-list">
               {#each tagSummaries as tag}
                 <button
                   type="button"
-                  class="tag-filter-chip"
-                  class:tag-filter-chip--active={activeTag === tag.name}
+                  class="panel-shell__chip"
+                  class:panel-shell__chip--active={activeTag === tag.name}
                   style={`--tag-color: ${tag.color};`}
                   data-testid={`tag-filter-${tag.name}`}
                   onclick={() => onToggleTagFilter(tag.name)}
                 >
                   <span>{formatTagLabel(tag.name)}</span>
-                  <span class="tag-filter-chip__count">{tag.count}</span>
+                  <span class="panel-shell__chip-count">{tag.count}</span>
                 </button>
               {/each}
             </div>
           {:else}
-            <p class="panel-empty">No tags yet. Add tags to make them easy to find.</p>
+            <p class="panel-shell__empty">No tags yet. Add tags to make them easy to find.</p>
           {/if}
 
-          <div class="panel-section__header panel-section__header--spaced">
+          <div class="panel-shell__section-header panel-shell__section-header--spaced">
             <h4>Bulk edit</h4>
             <span>{selectedNodeCount} selected</span>
           </div>
 
           {#if selectedNodeCount}
-            <label class="panel-search">
+            <label class="panel-shell__search">
               <span>Add tag to selection</span>
-              <div class="panel-search-field">
+              <div class="panel-shell__search-field">
                 <input
                   bind:this={selectedTagInputRef}
                   bind:value={selectedTagInput}
-                  class="sidebar-input panel-search-input"
+                  class="sidebar-input panel-shell__search-input"
                   placeholder="Add tag to selected nodes"
                   aria-label="Add tag to selected nodes"
                   data-testid="bulk-tag-input"
@@ -312,7 +312,7 @@
                   }}
                 />
                 <button
-                  class="button panel-bulk-add"
+                  class="button"
                   type="button"
                   data-testid="bulk-tag-add"
                   onclick={handleAddSelectedTag}
@@ -324,34 +324,34 @@
             </label>
 
             {#if selectedTagSummaries.length}
-              <div class="tag-filter-list">
+              <div class="panel-shell__chip-list">
                 {#each selectedTagSummaries as tag}
                   <button
                     type="button"
-                    class="tag-filter-chip tag-filter-chip--selected"
+                    class="panel-shell__chip panel-shell__chip--selected"
                     style={`--tag-color: ${tag.color};`}
                     data-testid={`selected-tag-${tag.name}`}
                     onclick={() => onRemoveSelectedTag(tag.name)}
                     title={`Remove ${formatTagLabel(tag.name)} from selected nodes`}
                   >
                     <span>{formatTagLabel(tag.name)}</span>
-                    <span class="tag-filter-chip__count">{tag.count}</span>
+                    <span class="panel-shell__chip-count">{tag.count}</span>
                     <X size={12} aria-hidden="true" />
                   </button>
                 {/each}
               </div>
             {:else}
-              <p class="panel-empty">Selected nodes have no tags yet.</p>
+              <p class="panel-shell__empty">Selected nodes have no tags yet.</p>
             {/if}
           {:else}
-            <p class="panel-empty">Select one or more nodes to edit their tags in bulk.</p>
+            <p class="panel-shell__empty">Select one or more nodes to edit their tags in bulk.</p>
           {/if}
         </div>
       {/if}
 
       {#if activeTab === 'entities'}
-        <div class="panel-section" role="tabpanel" aria-label="Entities">
-          <div class="panel-section__header">
+        <div class="panel-shell__section" role="tabpanel" aria-label="Entities">
+          <div class="panel-shell__section-header">
             <h4>Entities</h4>
             <span>{entityEntries.length} total</span>
           </div>
@@ -497,7 +497,7 @@
                               {/each}
                             </div>
                           {:else}
-                            <p class="panel-empty">No other nodes mention this entity yet.</p>
+                            <p class="panel-shell__empty">No other nodes mention this entity yet.</p>
                           {/if}
                         </div>
                       {:else}
@@ -523,7 +523,7 @@
                               {/each}
                             </div>
                           {:else}
-                            <p class="panel-empty">No nodes mention this entity yet.</p>
+                            <p class="panel-shell__empty">No nodes mention this entity yet.</p>
                           {/if}
                         </div>
                       {/if}
@@ -533,250 +533,32 @@
               {/each}
             </div>
           {:else}
-            <p class="panel-empty">No entities yet. Add `[[Entity]]` mentions to populate this list.</p>
+            <p class="panel-shell__empty">No entities yet. Add `[[Entity]]` mentions to populate this list.</p>
           {/if}
         </div>
       {/if}
     </div>
 
-    <section class="panel-footer">
-      <div class="panel-section__header panel-section__header--spaced">
+    <section class="panel-shell__footer">
+      <div class="panel-shell__section-header panel-shell__section-header--spaced">
         <h4>Selection</h4>
         <span>{selectedNodeCount} selected</span>
       </div>
 
       {#if selectedNodeCount}
-        <div class="panel-selection-actions">
+        <div class="panel-shell__actions-row">
           <button class="button" type="button" onclick={onClearSelection}>Clear selection</button>
           <button class="button" type="button" onclick={onDuplicateSelection}>Duplicate</button>
           <button class="button" type="button" onclick={onDuplicateSubtree}>Duplicate subtree</button>
         </div>
       {:else}
-        <p class="panel-empty">Select one or more nodes to duplicate or clear them.</p>
+        <p class="panel-shell__empty">Select one or more nodes to duplicate or clear them.</p>
       {/if}
     </section>
   {/if}
 </aside>
 
 <style>
-  .inspector-panel {
-    width: 320px;
-    min-width: 320px;
-    border-left: var(--border-thin);
-    background:
-      linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(244, 246, 248, 0.95)),
-      var(--surface-muted);
-    padding: 1rem;
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-    overflow: auto;
-  }
-
-  .inspector-panel--collapsed {
-    width: 3.5rem;
-    min-width: 3.5rem;
-    padding: 0.75rem 0.35rem;
-    align-items: center;
-  }
-
-  .inspector-panel__header {
-    display: flex;
-    align-items: start;
-    justify-content: space-between;
-    gap: 0.75rem;
-  }
-
-  .panel-section__header h4,
-  .entity-card__section h5 {
-    margin: 0;
-  }
-
-  .inspector-panel__header-actions {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    flex: 0 0 auto;
-  }
-
-  .panel-tabs {
-    display: inline-flex;
-    flex-wrap: wrap;
-    gap: 0.35rem;
-    padding: 0.2rem;
-    border-radius: 999px;
-    background: color-mix(in srgb, var(--surface) 70%, transparent);
-    border: var(--border-thin);
-  }
-
-  .panel-tab {
-    border: 0;
-    border-radius: 999px;
-    padding: 0.3rem 0.65rem;
-    font-size: 0.78rem;
-    color: var(--text-muted);
-    background: transparent;
-  }
-
-  .panel-tab--active {
-    background: var(--surface);
-    color: var(--text-main);
-    box-shadow: var(--shadow-soft);
-  }
-
-  .panel-tabpanels,
-  .panel-footer {
-    display: grid;
-    gap: 0.9rem;
-  }
-
-  .panel-section {
-    display: grid;
-    gap: 0.8rem;
-  }
-
-  .panel-section__header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.75rem;
-  }
-
-  .panel-section__header--spaced {
-    padding-top: 0.6rem;
-    border-top: var(--border-thin);
-  }
-
-  .panel-section__header h4 {
-    font-size: 0.74rem;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--text-muted);
-  }
-
-  .panel-section__header span {
-    font-size: 0.8rem;
-    color: var(--text-muted);
-  }
-
-  .panel-search {
-    display: grid;
-    gap: 0.45rem;
-  }
-
-  .panel-search > span {
-    font-size: 0.72rem;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--text-muted);
-  }
-
-  .panel-search-field {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-  }
-
-  .panel-search-input {
-    width: 100%;
-  }
-
-  .panel-search-clear,
-  .panel-bulk-add {
-    flex: 0 0 auto;
-  }
-
-  .panel-empty {
-    margin: 0;
-    font-size: 0.9rem;
-    line-height: 1.4;
-    color: var(--text-muted);
-  }
-
-  .tag-filter-list {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-  }
-
-  .tag-filter-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    border: 1px solid var(--tag-color);
-    border-radius: 999px;
-    padding: 0.35rem 0.65rem;
-    background: color-mix(in srgb, var(--tag-color) 18%, white);
-    color: var(--text-main);
-    font-size: 0.8rem;
-    line-height: 1;
-    text-align: left;
-  }
-
-  .tag-filter-chip--active {
-    box-shadow: 0 0 0 2px color-mix(in srgb, var(--tag-color) 20%, transparent);
-  }
-
-  .tag-filter-chip--selected {
-    align-items: center;
-  }
-
-  .tag-filter-chip__count {
-    min-width: 1.5rem;
-    padding: 0.1rem 0.35rem;
-    border-radius: 999px;
-    background: color-mix(in srgb, var(--tag-color) 30%, white);
-    color: var(--text-main);
-    font-size: 0.72rem;
-    text-align: center;
-  }
-
-  .search-results {
-    display: grid;
-    gap: 0.5rem;
-  }
-
-  .search-result {
-    display: grid;
-    gap: 0.25rem;
-    padding: 0.75rem;
-    border: 1px solid var(--border-color);
-    border-radius: 0.75rem;
-    background: var(--surface);
-    text-align: left;
-    box-shadow: none;
-  }
-
-  .search-result--focused {
-    border-color: var(--accent);
-    box-shadow: var(--shadow-soft);
-  }
-
-  .search-result__title {
-    font-weight: 600;
-  }
-
-  .search-result__body {
-    color: var(--text-muted);
-    font-size: 0.88rem;
-    line-height: 1.35;
-  }
-
-  .search-result__tags {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.35rem;
-    margin-top: 0.25rem;
-  }
-
-  .search-result__tag {
-    border-radius: 999px;
-    padding: 0.1rem 0.45rem;
-    background: var(--surface-soft);
-    color: var(--text-main);
-    font-size: 0.72rem;
-  }
-
   .entity-list {
     display: grid;
     gap: 0.5rem;
@@ -876,6 +658,7 @@
   }
 
   .entity-card__section h5 {
+    margin: 0;
     font-size: 0.72rem;
     letter-spacing: 0.08em;
     text-transform: uppercase;
@@ -924,25 +707,4 @@
     text-align: left;
   }
 
-  .panel-selection-actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-  }
-
-  @media (max-width: 1180px) {
-    .inspector-panel {
-      width: auto;
-      min-width: 0;
-      border-left: 0;
-      border-top: var(--border-thin);
-      max-height: 40vh;
-    }
-
-    .inspector-panel--collapsed {
-      width: auto;
-      min-width: 0;
-      max-height: none;
-    }
-  }
 </style>

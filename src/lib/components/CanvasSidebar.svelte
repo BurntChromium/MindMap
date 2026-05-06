@@ -152,7 +152,7 @@
   }
 </script>
 
-<div class="sidebar" class:sidebar--collapsed={collapsed}>
+<div class="sidebar panel-shell panel-shell--left" class:panel-shell--collapsed={collapsed}>
   <div class="sidebar-topbar">
     <div class="sidebar-topbar__title">
       <p class="sidebar-brand">{collapsed ? 'M' : 'Mindmap'}</p>
@@ -219,7 +219,7 @@
             />
           {:else}
             <button
-              class="ghost-button sidebar-canvas-button"
+              class="ghost-button"
               type="button"
               data-testid={`sidebar-canvas-select-${canvas.id}`}
               onclick={() => canvasStore.setActive(canvas.id)}
@@ -279,11 +279,11 @@
   </div>
 
   <div class="sidebar-footer">
-    <div class="sidebar-topbar__title sidebar-footer__database">
+    <div class="sidebar-topbar__title">
       <h3>Database</h3>
     </div>
-    <div class="sidebar-row sidebar-footer__database-row">
-      <label class="sidebar-label" for="database-file-name">Name</label>
+    <div class="sidebar-row">
+      <label for="database-file-name">Name</label>
       <input
         id="database-file-name"
         bind:value={databaseFileNameDraft}
@@ -300,7 +300,7 @@
       >
         <span>Apply</span>
       </button>
-      </div>
+    </div>
     <input
       bind:this={importInput}
       class="sidebar-file-input"
@@ -309,13 +309,13 @@
       data-testid="sidebar-import-input"
       onchange={importDatabase}
     />
-      <button
-        class="button sidebar-transfer-button"
-        type="button"
-        disabled={operationState !== 'idle'}
-        data-testid="sidebar-export-db"
-        onclick={exportDatabase}
-      >
+    <button
+      class="button sidebar-transfer-button"
+      type="button"
+      disabled={operationState !== 'idle'}
+      data-testid="sidebar-export-db"
+      onclick={exportDatabase}
+    >
       <Download size={14} aria-hidden="true" />
       <span>{operationState === 'exporting' ? 'Exporting...' : 'Export DB'}</span>
     </button>
