@@ -6,8 +6,23 @@ Mindmap is a Svelte and SQLite app for building mind maps and linked notebooks o
 
 - Left panel: browse, create, rename, switch, and delete canvases.
 - Center canvas: create nodes, connect them with edges, drag them around, and edit node content.
+    - Node cards: compact, view, and edit states, with lock/unlock behavior to prevent accidental edits.
 - Right panel: search by keyword, filter by tag, inspect selected nodes, and apply bulk tag edits.
-- Node cards: compact, view, and edit states, with lock/unlock behavior to prevent accidental edits.
+
+### Quick Guide
+
+When you first download the app:
+1. Create a new canvas in the left-hand panel.
+2. Create a new node (use the button or press `n`)
+3. Give the node a title, maybe a tag or two, and some text for the body. (Very limited Markdown features are supported.)
+    - You can apply **bold** text with asterisks like `**this**`
+    - You can apply _italic_ text with underscores like `_this_`
+    - You can create a hyperlink with brackets and parens like this: `[text to show](http://your-address-here.whatever)`
+    - You can mention an entity with double-brackets like `[[this]]`
+
+Entities are an important concept for linking ideas. Entities are people, places, things, objects, or whatever you want! You can optionally designate individual notes as Entity notes to make them easier to find. Whenever you reference an entity, Mindmap will link those mentions via dashed lines (even if no "root" Entity card exists.)
+
+You can search via free text, tags, or entities from the right-hand panel.
 
 ## Keyboard Commands
 

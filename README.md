@@ -1,21 +1,31 @@
 # Mindmap
 
-This repository builds software that serves as a mix of a notebook and a knowledge graph. You create pages and link them together to create a mind map. You can create entities within pages (or even as notes), and the system will track and link all of your entities for you as well.
+Mindmap is software that is designed to improve how you take notes. You can create multiple notebooks and link notes together in various ways to represent how different ideas are connected. You can download the latest version of the desktop app for Windows or Ubuntu on the [Releases page](https://github.com/BurntChromium/MindMap/releases/tag/app-v0.1.3).
 
 ![A screenshot of the application](./docs/img/Screenshot-v0.1.0-alpha.png)
 
+Mindmap is beta software: it works, but there may be rough edges. Right now, you can:
+- Create notebooks
+- Connect ideas (either directly, or by mentioning entities in `[[brackets]]`)
+- Tag notebooks (like `#this`)
+- Search and filter your notes
+- Apply basic formatting (**bold**, _italics_, or [hyperlinks](#)) via Markdown syntax.
+- Import or export your data as `sqlite` databases.
+
 The application has strong keyboard support (most actions can be taken with just the keyboard - but it's early so things aren't perfect!). 
+
+Mindmap is free and open-source, and has no ads, spyware, telemetry, accounts, subscriptions, or AI features.
 
 ### Tech Stack
 
-A Svelte and SQLite app for building mind maps and linked notebooks on a shared canvas.
+This app uses Svelte and XYFlow on the front-end, and Tauri and SQLite on the back-end.
 
 See [USER_GUIDE.md](./USER_GUIDE.md) for the app layout and keyboard shortcuts.
 See [CHANGELOG.md](./CHANGELOG.md) for release notes.
 
 ## Build
 
-This program can be built as either a web app or a desktop app.
+This program can be built as either a web app or a desktop app. Releases are only for the desktop app (at least for now).
 
 ### Commands
 
@@ -41,15 +51,13 @@ Then run:
 
 - `npm run release -- --version <version>`
 
-That command uses the GitHub CLI to dispatch the `Release` workflow with the version you pass in.
-The workflow then runs `npm run check`, `npm test`, and the Playwright suite in headless mode.
-If those checks pass, it builds Linux and Windows artifacts and uploads them to a draft GitHub Release.
+That command uses the GitHub CLI to dispatch the `Release` workflow with the version you pass in. The workflow then runs `npm run check`, `npm test`, and the Playwright suite in headless mode. If those checks pass, it builds Linux and Windows artifacts and uploads them to a draft GitHub Release.
 
 You can publish the draft release from GitHub after reviewing the assets.
 
 ### Desktop Prerequisites
 
-To build the desktop app you generally need:
+To build the desktop app locally you generally need:
 
 - Node.js and npm for the frontend build and package scripts
 - Rust and Cargo for the Tauri backend in `src-tauri`
