@@ -44,6 +44,7 @@
       type="button"
       aria-label="Add node"
       title="Add node (N)"
+      data-testid="canvas-add-node"
       onclick={onAddNode}
     >
       <Plus size={16} aria-hidden="true" />

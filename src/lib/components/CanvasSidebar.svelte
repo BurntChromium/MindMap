@@ -128,6 +128,7 @@
       aria-label={collapsed ? 'Expand left panel' : 'Collapse left panel'}
       title={collapsed ? 'Expand left panel (C)' : 'Collapse left panel (C)'}
       aria-expanded={!collapsed}
+      data-testid="sidebar-toggle"
       onclick={() => (collapsed = !collapsed)}
     >
       {#if collapsed}
@@ -146,7 +147,7 @@
         placeholder="New canvas"
         aria-label="New canvas name"
       />
-      <button class="button" type="button" onclick={() => canvasStore.create(name)}>
+      <button class="button" type="button" data-testid="sidebar-create-canvas" onclick={() => canvasStore.create(name)}>
         <span>Create</span>
       </button>
     </div>
@@ -184,6 +185,7 @@
             <button
               class="ghost-button sidebar-canvas-button"
               type="button"
+              data-testid={`sidebar-canvas-select-${canvas.id}`}
               onclick={() => canvasStore.setActive(canvas.id)}
             >
               <span>{canvas.name}</span>
@@ -197,6 +199,7 @@
                 type="button"
                 aria-label={`Save canvas name ${canvas.name}`}
                 title={`Save canvas name ${canvas.name}`}
+                data-testid={`sidebar-canvas-save-${canvas.id}`}
                 onclick={() => saveCanvasName(canvas.id)}
               >
                 <Check size={14} aria-hidden="true" />
@@ -206,6 +209,7 @@
                 type="button"
                 aria-label={`Cancel rename for ${canvas.name}`}
                 title={`Cancel rename for ${canvas.name}`}
+                data-testid={`sidebar-canvas-cancel-${canvas.id}`}
                 onclick={cancelRenameCanvas}
               >
                 <X size={14} aria-hidden="true" />
@@ -216,6 +220,7 @@
                 type="button"
                 aria-label={`Rename canvas ${canvas.name}`}
                 title={`Rename canvas ${canvas.name}`}
+                data-testid={`sidebar-canvas-rename-${canvas.id}`}
                 onclick={() => startRenameCanvas(canvas)}
               >
                 <PencilLine size={14} aria-hidden="true" />
@@ -225,6 +230,7 @@
                 type="button"
                 aria-label={`Delete canvas ${canvas.name}`}
                 title={`Delete canvas ${canvas.name}`}
+                data-testid={`sidebar-canvas-delete-${canvas.id}`}
                 onclick={() => canvasStore.remove(canvas.id)}
               >
                 <Trash2 size={14} aria-hidden="true" />
@@ -242,12 +248,14 @@
       class="sidebar-file-input"
       type="file"
       accept=".db,.sqlite,.sqlite3,application/x-sqlite3"
+      data-testid="sidebar-import-input"
       onchange={importDatabase}
     />
     <button
       class="button sidebar-transfer-button"
       type="button"
       disabled={transferState !== 'idle'}
+      data-testid="sidebar-export-db"
       onclick={exportDatabase}
     >
       <Download size={14} aria-hidden="true" />
@@ -257,6 +265,7 @@
       class="button sidebar-transfer-button"
       type="button"
       disabled={transferState !== 'idle'}
+      data-testid="sidebar-import-db"
       onclick={openImportPicker}
     >
       <Upload size={14} aria-hidden="true" />

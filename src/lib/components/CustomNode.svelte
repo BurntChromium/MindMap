@@ -314,6 +314,7 @@
 <div class="node-shell" style={`width: ${nodeWidth};`}>
   <div
     class="node-card"
+    data-testid={`node-card-${id}`}
     style={`border: ${borderColor}; box-shadow: ${boxShadow}; --node-overlay-color: ${overlayColor};`}
   >
     <div class="node-header">
@@ -340,6 +341,7 @@
           disabled={isEditing}
           aria-label={isExpanded ? 'Collapse node preview' : 'Expand node preview'}
           title={isExpanded ? 'Collapse node preview' : 'Expand node preview'}
+          data-testid={`node-expand-toggle-${id}`}
           onclick={handleExpandToggle}
         >
           {#if isExpanded}
@@ -355,6 +357,7 @@
           tabindex={isEditing ? -1 : 0}
           aria-label={isEditing ? 'Save node' : 'Edit node'}
           title={isEditing ? 'Save node' : 'Edit node'}
+          data-testid={isEditing ? `node-save-${id}` : `node-edit-${id}`}
           onclick={handleEditToggle}
         >
           {#if isEditing}
@@ -385,7 +388,7 @@
       <div class="tags-area" class:tags-area--compact={nodeMode === 'compact'}>
         {#if isEditing}
           {#each draftTags as tag}
-            <span class="tag-chip" style={tagChipStyle(tag)}>
+            <span class="tag-chip" data-testid={`node-edit-tag-${id}-${tag}`} style={tagChipStyle(tag)}>
               <span>{formatTagLabel(tag)}</span>
               <button
                 class="tag-remove nodrag"
@@ -393,6 +396,7 @@
                 tabindex={-1}
                 aria-label={`Remove ${formatTagLabel(tag)}`}
                 title={`Remove ${formatTagLabel(tag)}`}
+                data-testid={`node-edit-tag-remove-${id}-${tag}`}
                 onclick={() => removeDraftTag(tag)}
               >
                 ×
@@ -408,6 +412,7 @@
               class="tag-input nodrag"
               aria-label="Add tag"
               placeholder="Add tag"
+              data-testid={`node-tag-input-${id}`}
               onkeydown={handleTagKeyDown}
               onpaste={handleTagPaste}
             />
@@ -421,6 +426,7 @@
               aria-pressed={data.activeTag === tag}
               aria-label={`Filter by ${formatTagLabel(tag)}`}
               title={`Filter by ${formatTagLabel(tag)}`}
+              data-testid={`node-tag-${id}-${tag}`}
               onclick={() => handleReadonlyTagClick(tag)}
             >
               {formatTagLabel(tag)}

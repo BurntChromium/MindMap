@@ -11,9 +11,9 @@ test('creates and edits a node, then persists after reload', async ({ page, requ
 
   await page.goto('/');
 
-  await expect(page.getByRole('button', { name: 'Research', exact: true })).toBeVisible();
+  await expect(page.getByTestId('sidebar-canvas-select-canvas-edit')).toBeVisible();
 
-  await page.getByRole('button', { name: 'Add node' }).click();
+  await page.getByTestId('canvas-add-node').click();
   await page.getByRole('button', { name: 'Edit node' }).click();
 
   await page.getByLabel('Node title').fill('Research note');
@@ -24,10 +24,14 @@ test('creates and edits a node, then persists after reload', async ({ page, requ
   await expect(page.getByText('Research note')).toBeVisible();
   const nodesResponse = await request.get('/api/nodes?canvasId=canvas-edit');
   const nodes = (await nodesResponse.json()) as Array<{
+    id: string;
     title: string;
     body: string;
     tags: string[];
   }>;
+  const createdNode = nodes.find((node) => node.title === 'Research note');
+
+  expect(createdNode).toBeTruthy();
 
   expect(nodes).toEqual(
     expect.arrayContaining([
@@ -42,7 +46,7 @@ test('creates and edits a node, then persists after reload', async ({ page, requ
   await page.reload();
 
   await expect(page.getByText('Research note')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Filter by #strategy' })).toBeVisible();
+  await expect(page.getByTestId(`node-tag-${createdNode!.id}-strategy`)).toBeVisible();
 });
 
 test('filters search results by keyword and tag, then focuses a match', async ({
@@ -68,22 +72,17 @@ test('filters search results by keyword and tag, then focuses a match', async ({
 
   await page.goto('/');
 
-  await page.getByLabel('Search nodes by keyword').fill('sun');
+  await page.getByTestId('panel-search-input').fill('sun');
 
-  const alphaResult = page.locator('.search-result').filter({ hasText: 'Alpha node' });
-  const betaResult = page.locator('.search-result').filter({ hasText: 'Beta node' });
+  const alphaResult = page.getByTestId('search-result-node-alpha');
+  const betaResult = page.getByTestId('search-result-node-beta');
 
   await expect(alphaResult).toBeVisible();
   await expect(betaResult).toBeVisible();
 
-  await page.getByRole('tab', { name: 'Tags' }).click();
-  await page
-    .locator('.panel-tabpanels .tag-filter-chip')
-    .filter({ hasText: '#alpha' })
-    .evaluate((element) => {
-      (element as HTMLButtonElement).click();
-    });
-  await page.getByRole('tab', { name: 'Search' }).click();
+  await page.getByTestId('panel-tab-tags').click();
+  await page.getByTestId('tag-filter-alpha').click();
+  await page.getByTestId('panel-tab-search').click();
 
   await expect(alphaResult).toBeVisible();
   await expect(betaResult).toHaveCount(0);
@@ -99,7 +98,7 @@ test('undoes and redoes a node title change', async ({ page, request }) => {
 
   await page.goto('/');
 
-  await page.getByRole('button', { name: 'Add node' }).click();
+  await page.getByTestId('canvas-add-node').click();
   await page.getByRole('button', { name: 'Edit node' }).click();
   await page.getByLabel('Node title').fill('First title');
   await page.getByRole('button', { name: 'Save node' }).click();
@@ -136,7 +135,7 @@ test('exports and imports the database through the sidebar', async ({ page, requ
 
   const exportPath = testInfo.outputPath('mindmap.db');
   const downloadPromise = page.waitForEvent('download');
-  await page.getByRole('button', { name: 'Export DB' }).click();
+  await page.getByTestId('sidebar-export-db').click();
   const download = await downloadPromise;
   await download.saveAs(exportPath);
 
@@ -146,8 +145,8 @@ test('exports and imports the database through the sidebar', async ({ page, requ
     await dialog.accept();
   });
 
-  await page.locator('input[type="file"]').setInputFiles(exportPath);
+  await page.getByTestId('sidebar-import-input').setInputFiles(exportPath);
 
   await expect(page.getByText('Transfer node')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Filter by #export' })).toBeVisible();
+  await expect(page.getByTestId('node-tag-node-transfer-export')).toBeVisible();
 });

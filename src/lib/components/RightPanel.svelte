@@ -138,6 +138,7 @@
       aria-label={collapsed ? 'Expand inspector panel' : 'Collapse inspector panel'}
       title={collapsed ? 'Expand inspector panel (F)' : 'Collapse inspector panel (F)'}
       aria-expanded={!collapsed}
+      data-testid="inspector-toggle"
       onclick={() => (collapsed = !collapsed)}
     >
       {#if collapsed}
@@ -155,6 +156,7 @@
             type="button"
             role="tab"
             aria-selected={activeTab === 'search'}
+            data-testid="panel-tab-search"
             onclick={() => (activeTab = 'search')}
           >
             Search
@@ -165,6 +167,7 @@
             type="button"
             role="tab"
             aria-selected={activeTab === 'tags'}
+            data-testid="panel-tab-tags"
             onclick={() => (activeTab = 'tags')}
           >
             Tags
@@ -175,6 +178,7 @@
             type="button"
             role="tab"
             aria-selected={activeTab === 'entities'}
+            data-testid="panel-tab-entities"
             onclick={() => (activeTab = 'entities')}
           >
             Entities
@@ -196,12 +200,14 @@
                 class="sidebar-input panel-search-input"
                 placeholder="Search titles or body"
                 aria-label="Search nodes by keyword"
+                data-testid="panel-search-input"
               />
               <button
                 class="icon-button panel-search-clear"
                 type="button"
                 aria-label="Clear search and tag filters"
                 title="Clear search and tag filters"
+                data-testid="panel-search-clear"
                 onclick={onClearFilters}
                 disabled={!searchQuery.trim() && !activeTag}
               >
@@ -226,6 +232,7 @@
                   type="button"
                   class="search-result"
                   class:search-result--focused={focusedNodeId === node.id}
+                  data-testid={`search-result-${node.id}`}
                   onclick={() => onFocusSearchResult(node.id)}
                 >
                   <span class="search-result__title">{node.title || 'Untitled'}</span>
@@ -263,6 +270,7 @@
                   class="tag-filter-chip"
                   class:tag-filter-chip--active={activeTag === tag.name}
                   style={`--tag-color: ${tag.color};`}
+                  data-testid={`tag-filter-${tag.name}`}
                   onclick={() => onToggleTagFilter(tag.name)}
                 >
                   <span>{formatTagLabel(tag.name)}</span>
@@ -289,6 +297,7 @@
                   class="sidebar-input panel-search-input"
                   placeholder="Add tag to selected nodes"
                   aria-label="Add tag to selected nodes"
+                  data-testid="bulk-tag-input"
                   onkeydown={(event) => {
                     if (event.key === 'Enter') {
                       event.preventDefault();
@@ -305,6 +314,7 @@
                 <button
                   class="button panel-bulk-add"
                   type="button"
+                  data-testid="bulk-tag-add"
                   onclick={handleAddSelectedTag}
                   disabled={!selectedTagInput.trim()}
                 >
@@ -320,6 +330,7 @@
                     type="button"
                     class="tag-filter-chip tag-filter-chip--selected"
                     style={`--tag-color: ${tag.color};`}
+                    data-testid={`selected-tag-${tag.name}`}
                     onclick={() => onRemoveSelectedTag(tag.name)}
                     title={`Remove ${formatTagLabel(tag.name)} from selected nodes`}
                   >
@@ -354,6 +365,7 @@
                   type="button"
                   aria-label="Clear associative edge inspection"
                   title="Clear associative edge inspection"
+                  data-testid="associative-edge-clear"
                   onclick={onClearAssociativeEdge}
                 >
                   <X size={12} aria-hidden="true" />
@@ -377,6 +389,7 @@
                   <button
                     type="button"
                     class="entity-node"
+                    data-testid="associative-edge-source-node"
                     onclick={() => onFocusEntityNode(activeAssociativeEdge.data.sourceNodeId)}
                   >
                     <span class="entity-node__title">
@@ -387,6 +400,7 @@
                   <button
                     type="button"
                     class="entity-node"
+                    data-testid="associative-edge-target-node"
                     onclick={() => onFocusEntityNode(activeAssociativeEdge.data.targetNodeId)}
                   >
                     <span class="entity-node__title">
@@ -404,6 +418,7 @@
                     <button
                       type="button"
                       class="entity-edge-chip"
+                      data-testid={`associative-edge-entity-${entity.title}`}
                       onclick={() => onFocusEntityTitle(entity.title)}
                     >
                       <span>{entity.title}</span>
@@ -421,6 +436,7 @@
                   <button
                     type="button"
                     class="entity-card__summary"
+                    data-testid={`entity-summary-${entity.id}`}
                     onclick={() => toggleEntitySelection(entity.id)}
                   >
                     <div class="entity-card__title-row">
@@ -437,13 +453,19 @@
                         <div class="entity-card__section">
                           <div class="entity-card__section-header">
                             <h5>Primary node</h5>
-                            <button class="button entity-card__jump" type="button" onclick={() => onFocusEntityNode(primaryNode.id)}>
+                            <button
+                              class="button entity-card__jump"
+                              type="button"
+                              data-testid={`entity-open-${entity.id}`}
+                              onclick={() => onFocusEntityNode(primaryNode.id)}
+                            >
                               Open
                             </button>
                           </div>
                           <button
                             type="button"
                             class="entity-node"
+                            data-testid={`entity-primary-node-${entity.id}`}
                             onclick={() => onFocusEntityNode(primaryNode.id)}
                           >
                             <span class="entity-node__title">{primaryNode.title}</span>
@@ -461,6 +483,7 @@
                                 <button
                                   type="button"
                                   class="entity-node"
+                                  data-testid={`entity-child-node-${node.id}`}
                                   onclick={() => onFocusEntityNode(node.id)}
                                 >
                                   <span class="entity-node__title">{node.title}</span>
@@ -486,6 +509,7 @@
                                 <button
                                   type="button"
                                   class="entity-node"
+                                  data-testid={`entity-referencing-node-${node.id}`}
                                   onclick={() => onFocusEntityNode(node.id)}
                                 >
                                   <span class="entity-node__title">{node.title}</span>

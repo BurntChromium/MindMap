@@ -25,8 +25,8 @@ test('loads the seeded canvas and supports a basic search', async ({ page, reque
 
   await page.goto('/');
 
-  await expect(page.getByRole('button', { name: 'Discovery', exact: true })).toBeVisible();
-  await page.getByLabel('Search nodes by keyword').fill('sun');
+  await expect(page.getByTestId('sidebar-canvas-select-canvas-dev')).toBeVisible();
+  await page.getByTestId('panel-search-input').fill('sun');
 
-  await expect(page.locator('.search-result').filter({ hasText: 'Beta node' })).toBeVisible();
+  await expect(page.getByTestId('search-result-node-beta')).toBeVisible();
 });
