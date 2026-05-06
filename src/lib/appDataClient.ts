@@ -52,6 +52,7 @@ async function requestBytes(
 
 export type AppDataClient = {
   loadInitialPageData: (fetchImpl?: typeof fetch) => Promise<JsonValue>;
+  updateDatabaseSettings: (input: { databaseFileName: string }) => Promise<JsonValue>;
   loadCanvases: () => Promise<JsonValue>;
   createCanvas: (input: { id: string; name: string }) => Promise<JsonValue>;
   renameCanvas: (input: { id: string; name: string }) => Promise<JsonValue>;
@@ -84,6 +85,12 @@ export type AppDataTauriBridge = {
 function createFetchClient(): AppDataClient {
   return {
     loadInitialPageData: (fetchImpl) => requestJson('/api/page-data', undefined, fetchImpl),
+    updateDatabaseSettings: (input) =>
+      requestJson('/api/database-settings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(input)
+      }),
     loadCanvases: () => requestJson('/api/canvases'),
     createCanvas: (input) =>
       requestJson('/api/canvases', {
@@ -160,6 +167,7 @@ function createTauriClient(bridge: AppDataTauriBridge): AppDataClient {
 
   return {
     loadInitialPageData: () => bridge.core.invoke('load_initial_page_data'),
+    updateDatabaseSettings: (input) => invokeWithInput('update_database_settings', input),
     loadCanvases: () => bridge.core.invoke('load_canvases'),
     createCanvas: (input) => invokeWithInput('create_canvas', input),
     renameCanvas: (input) => invokeWithInput('rename_canvas', input),
@@ -232,6 +240,8 @@ export function setAppDataClient(client: AppDataClient) {
 
 export const appDataClient = {
   loadInitialPageData: (fetchImpl?: typeof fetch) => syncRuntimeClient().loadInitialPageData(fetchImpl),
+  updateDatabaseSettings: (input: { databaseFileName: string }) =>
+    syncRuntimeClient().updateDatabaseSettings(input),
   loadCanvases: () => syncRuntimeClient().loadCanvases(),
   createCanvas: (input: { id: string; name: string }) => syncRuntimeClient().createCanvas(input),
   renameCanvas: (input: { id: string; name: string }) => syncRuntimeClient().renameCanvas(input),

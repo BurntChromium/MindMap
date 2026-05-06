@@ -17,16 +17,29 @@
   interface Props {
     canvases: Canvas[];
     collapsed: boolean;
+    databaseFileName: string;
     onExportSuccess?: (destinationLabel: string) => void;
+    onDatabaseFileNameSave?: (databaseFileName: string) => Promise<void> | void;
   }
 
-  let { canvases, collapsed = $bindable(false), onExportSuccess }: Props = $props();
+  let {
+    canvases,
+    collapsed = $bindable(false),
+    databaseFileName,
+    onExportSuccess,
+    onDatabaseFileNameSave
+  }: Props = $props();
 
   let name = $state('');
   let editingCanvasId = $state<string | null>(null);
   let editingCanvasName = $state('');
   let importInput: HTMLInputElement | null = null;
-  let transferState = $state<'idle' | 'exporting' | 'importing'>('idle');
+  let operationState = $state<'idle' | 'exporting' | 'importing' | 'saving'>('idle');
+  let databaseFileNameDraft = $state('');
+
+  $effect(() => {
+    databaseFileNameDraft = databaseFileName;
+  });
 
   function startRenameCanvas(canvas: Canvas) {
     editingCanvasId = canvas.id;
@@ -49,15 +62,15 @@
   }
 
   async function exportDatabase() {
-    if (transferState !== 'idle') {
+    if (operationState !== 'idle') {
       return;
     }
 
-    transferState = 'exporting';
+    operationState = 'exporting';
 
     try {
       const bytes = await appDataClient.exportDatabase();
-      const result = await saveBytesToFile(bytes, 'mindmap.db');
+      const result = await saveBytesToFile(bytes, databaseFileName || 'mindmap.db');
       onExportSuccess?.(result.destinationLabel);
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') {
@@ -67,12 +80,35 @@
       console.error(error);
       window.alert(`Export failed: ${String(error)}`);
     } finally {
-      transferState = 'idle';
+      operationState = 'idle';
+    }
+  }
+
+  async function saveDatabaseFileName() {
+    const nextFileName = databaseFileNameDraft.trim();
+
+    if (!nextFileName || nextFileName === databaseFileName || operationState !== 'idle') {
+      return;
+    }
+
+    if (!onDatabaseFileNameSave) {
+      return;
+    }
+
+    operationState = 'saving';
+
+    try {
+      await onDatabaseFileNameSave(nextFileName);
+    } catch (error) {
+      console.error(error);
+      window.alert(`Database file update failed: ${String(error)}`);
+    } finally {
+      operationState = 'idle';
     }
   }
 
   async function importDatabase(event: Event) {
-    if (transferState !== 'idle') {
+    if (operationState !== 'idle') {
       return;
     }
 
@@ -92,7 +128,7 @@
       return;
     }
 
-    transferState = 'importing';
+    operationState = 'importing';
 
     try {
       const bytes = await file.arrayBuffer();
@@ -111,7 +147,7 @@
       console.error(error);
       window.alert(`Import failed: ${String(error)}`);
     } finally {
-      transferState = 'idle';
+      operationState = 'idle';
     }
   }
 </script>
@@ -243,6 +279,28 @@
   </div>
 
   <div class="sidebar-footer">
+    <div class="sidebar-topbar__title sidebar-footer__database">
+      <h3>Database</h3>
+    </div>
+    <div class="sidebar-row sidebar-footer__database-row">
+      <label class="sidebar-label" for="database-file-name">Name</label>
+      <input
+        id="database-file-name"
+        bind:value={databaseFileNameDraft}
+        class="sidebar-input"
+        placeholder="mindmap.db"
+        aria-label="Database name"
+      />
+      <button
+        class="button"
+        type="button"
+        disabled={operationState !== 'idle' || databaseFileNameDraft.trim() === databaseFileName}
+        data-testid="sidebar-save-database-file"
+        onclick={saveDatabaseFileName}
+      >
+        <span>Apply</span>
+      </button>
+      </div>
     <input
       bind:this={importInput}
       class="sidebar-file-input"
@@ -251,25 +309,25 @@
       data-testid="sidebar-import-input"
       onchange={importDatabase}
     />
-    <button
-      class="button sidebar-transfer-button"
-      type="button"
-      disabled={transferState !== 'idle'}
-      data-testid="sidebar-export-db"
-      onclick={exportDatabase}
-    >
+      <button
+        class="button sidebar-transfer-button"
+        type="button"
+        disabled={operationState !== 'idle'}
+        data-testid="sidebar-export-db"
+        onclick={exportDatabase}
+      >
       <Download size={14} aria-hidden="true" />
-      <span>{transferState === 'exporting' ? 'Exporting...' : 'Export DB'}</span>
+      <span>{operationState === 'exporting' ? 'Exporting...' : 'Export DB'}</span>
     </button>
     <button
       class="button sidebar-transfer-button"
       type="button"
-      disabled={transferState !== 'idle'}
+      disabled={operationState !== 'idle'}
       data-testid="sidebar-import-db"
       onclick={openImportPicker}
     >
       <Upload size={14} aria-hidden="true" />
-      <span>{transferState === 'importing' ? 'Importing...' : 'Import DB'}</span>
+      <span>{operationState === 'importing' ? 'Importing...' : 'Import DB'}</span>
     </button>
   </div>
 </div>

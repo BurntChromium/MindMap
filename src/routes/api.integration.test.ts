@@ -18,6 +18,7 @@ let entitiesApi: typeof import('./api/entities/+server');
 let edgesApi: typeof import('./api/edges/+server');
 let searchApi: typeof import('./api/search/+server');
 let databaseApi: typeof import('./api/database/+server');
+let databaseSettingsApi: typeof import('./api/database-settings/+server');
 let dbModule: typeof import('$lib/server/db');
 
 beforeAll(async () => {
@@ -33,6 +34,7 @@ beforeAll(async () => {
   edgesApi = await import('./api/edges/+server');
   searchApi = await import('./api/search/+server');
   databaseApi = await import('./api/database/+server');
+  databaseSettingsApi = await import('./api/database-settings/+server');
   dbModule = await import('$lib/server/db');
 });
 
@@ -98,6 +100,27 @@ describe('API integration', () => {
     ]);
 
     exportedDb.close();
+  });
+
+  it('reports and updates the configured database file name', async () => {
+    const pageData = await (await (await import('./api/page-data/+server')).GET()).json();
+
+    expect(pageData.databaseFileName).toBe('test.db');
+
+    const response = await databaseSettingsApi.PATCH({
+      request: new Request('http://localhost/api/database-settings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ databaseFileName: 'renamed.db' })
+      })
+    } as any);
+    const payload = await response.json();
+
+    expect(payload).toEqual({ databaseFileName: 'renamed.db' });
+    expect(dbModule.dbPath).toBe(join(tempDir, 'renamed.db'));
+    expect(dbModule.db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all()).toEqual(
+      expect.arrayContaining([expect.objectContaining({ name: 'canvases' })])
+    );
   });
 
   it('replaces the current database when importing a valid snapshot', async () => {

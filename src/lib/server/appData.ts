@@ -1,5 +1,5 @@
 import Database from 'better-sqlite3';
-import { db } from './db';
+import { db, getDatabaseFileName, setDatabaseFileName } from './db';
 import { createId, now } from './utils';
 import { getTagColor } from '$lib/tagColors';
 import { normalizeTagList, normalizeTagName } from '$lib/tagUtils';
@@ -69,11 +69,16 @@ export type AppDataEntityMention = {
 export type AppDataPageData = {
   canvases: AppDataCanvas[];
   activeCanvasId: string | null;
+  databaseFileName: string;
   nodes: AppDataNode[];
   edges: AppDataEdge[];
   tags: Array<{ id: string; name: string; color: string; node_count: number }>;
   entities: AppDataEntity[];
   entityMentions: AppDataEntityMention[];
+};
+
+export type AppDataDatabaseSettings = {
+  databaseFileName: string;
 };
 
 type NodeEntitySource = {
@@ -490,12 +495,19 @@ export function getInitialPageData(database?: SqliteDatabase): AppDataPageData {
   return {
     canvases,
     activeCanvasId,
+    databaseFileName: getDatabaseFileName(),
     nodes: getNodesByCanvasId(activeCanvasId, database),
     edges: getEdgesByCanvasId(activeCanvasId, database),
     tags: getTagsByCanvasId(activeCanvasId, database),
     entities: getEntitiesByCanvasId(activeCanvasId, database),
     entityMentions: getEntityMentionsByCanvasId(activeCanvasId, database)
   };
+}
+
+export async function updateDatabaseFileName(input: {
+  databaseFileName: string;
+}): Promise<AppDataDatabaseSettings> {
+  return setDatabaseFileName(input.databaseFileName);
 }
 
 export function createCanvas(

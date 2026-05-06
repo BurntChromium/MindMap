@@ -76,6 +76,8 @@ pub struct AppDataPageData {
     pub canvases: Vec<AppDataCanvas>,
     #[serde(rename = "activeCanvasId")]
     pub active_canvas_id: Option<String>,
+    #[serde(rename = "databaseFileName")]
+    pub database_file_name: String,
     pub nodes: Vec<AppDataNode>,
     pub edges: Vec<AppDataEdge>,
     pub tags: Vec<AppDataTagSummary>,
@@ -164,6 +166,12 @@ pub struct AppDataImportResult {
     pub error: Option<String>,
 }
 
+#[derive(Debug, Clone, Serialize)]
+pub struct AppDataDatabaseSettings {
+    #[serde(rename = "databaseFileName")]
+    pub database_file_name: String,
+}
+
 #[derive(Debug, Clone)]
 struct NodeEntitySource {
     id: String,
@@ -202,6 +210,18 @@ struct NodeTitleSource {
 struct CanvasCreateInput {
     id: Option<String>,
     name: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct DatabaseSettingsInput {
+    database_file_name: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+struct DatabaseSettingsFile {
+    database_file_name: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -333,13 +353,71 @@ fn now() -> i64 {
         .as_millis() as i64
 }
 
+fn is_valid_database_file_name(file_name: &str) -> bool {
+    let trimmed = file_name.trim();
+
+    !trimmed.is_empty()
+        && trimmed != "."
+        && trimmed != ".."
+        && !trimmed.contains('/')
+        && !trimmed.contains('\\')
+        && !trimmed.contains('\0')
+}
+
+fn database_settings_path(app: &AppHandle) -> DbResult<PathBuf> {
+    let dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|error| format!("Failed to resolve app data directory: {error}"))?;
+
+    Ok(dir.join("mindmap.config.json"))
+}
+
+fn read_database_file_name(app: &AppHandle) -> DbResult<String> {
+    let path = database_settings_path(app)?;
+
+    if let Ok(contents) = fs::read_to_string(&path) {
+        if let Ok(settings) = serde_json::from_str::<DatabaseSettingsFile>(&contents) {
+            if let Some(file_name) = settings.database_file_name {
+                let trimmed = file_name.trim();
+
+                if is_valid_database_file_name(trimmed) {
+                    return Ok(trimmed.to_string());
+                }
+            }
+        }
+    }
+
+    Ok("mindmap.db".to_string())
+}
+
+fn persist_database_file_name(app: &AppHandle, file_name: &str) -> DbResult<()> {
+    let path = database_settings_path(app)?;
+    let parent = path
+        .parent()
+        .ok_or_else(|| "Failed to resolve database settings directory.".to_string())?;
+
+    fs::create_dir_all(parent)
+        .map_err(|error| format!("Failed to create database settings directory: {error}"))?;
+
+    let payload = DatabaseSettingsFile {
+        database_file_name: Some(file_name.to_string()),
+    };
+    let contents = serde_json::to_string_pretty(&payload)
+        .map_err(|error| format!("Failed to serialize database settings: {error}"))?;
+
+    fs::write(&path, format!("{contents}\n"))
+        .map_err(|error| format!("Failed to write database settings: {error}"))?;
+    Ok(())
+}
+
 fn db_path(app: &AppHandle) -> DbResult<PathBuf> {
     let dir = app
         .path()
         .app_data_dir()
         .map_err(|error| format!("Failed to resolve app data directory: {error}"))?;
 
-    Ok(dir.join("mindmap.db"))
+    Ok(dir.join(read_database_file_name(app)?))
 }
 
 fn open_database(path: &Path) -> DbResult<Connection> {
@@ -1352,6 +1430,7 @@ fn get_initial_page_data(connection: &Connection) -> DbResult<AppDataPageData> {
         Ok(AppDataPageData {
             canvases,
             active_canvas_id,
+            database_file_name: String::new(),
             nodes: load_nodes_by_canvas_id(connection, &canvas_id)?,
             edges: load_edges_by_canvas_id(connection, &canvas_id)?,
             tags: get_tags_by_canvas_id(connection, &canvas_id)?,
@@ -1362,6 +1441,7 @@ fn get_initial_page_data(connection: &Connection) -> DbResult<AppDataPageData> {
         Ok(AppDataPageData {
             canvases,
             active_canvas_id,
+            database_file_name: String::new(),
             nodes: Vec::new(),
             edges: Vec::new(),
             tags: Vec::new(),
@@ -1373,7 +1453,61 @@ fn get_initial_page_data(connection: &Connection) -> DbResult<AppDataPageData> {
 
 #[tauri::command]
 fn load_initial_page_data(app: AppHandle) -> DbResult<AppDataPageData> {
-    with_database(&app, get_initial_page_data)
+    with_database(&app, |connection| {
+        let mut page_data = get_initial_page_data(connection)?;
+        page_data.database_file_name = read_database_file_name(&app)?;
+        Ok(page_data)
+    })
+}
+
+#[tauri::command]
+async fn update_database_settings(
+    app: AppHandle,
+    input: DatabaseSettingsInput,
+) -> DbResult<AppDataDatabaseSettings> {
+    let normalized = input.database_file_name.trim();
+
+    if !is_valid_database_file_name(normalized) {
+        return Err("Database file name must be a simple file name.".to_string());
+    }
+
+    let current_path = db_path(&app)?;
+    let next_path = current_path
+        .parent()
+        .ok_or_else(|| "Failed to resolve database directory.".to_string())?
+        .join(normalized);
+
+    if current_path == next_path {
+        persist_database_file_name(&app, normalized)?;
+        return Ok(AppDataDatabaseSettings {
+            database_file_name: normalized.to_string(),
+        });
+    }
+
+    if next_path.exists() {
+        return Err(format!("Database file \"{}\" already exists.", normalized));
+    }
+
+    let current_existed = current_path.exists();
+    let mut moved = false;
+
+    if current_existed {
+        fs::rename(&current_path, &next_path)
+            .map_err(|error| format!("Failed to rename database file: {error}"))?;
+        moved = true;
+    }
+
+    if let Err(error) = persist_database_file_name(&app, normalized) {
+        if moved {
+            let _ = fs::rename(&next_path, &current_path);
+        }
+
+        return Err(error);
+    }
+
+    Ok(AppDataDatabaseSettings {
+        database_file_name: normalized.to_string(),
+    })
 }
 
 #[tauri::command]
@@ -2175,6 +2309,7 @@ pub fn run() {
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
             load_initial_page_data,
+            update_database_settings,
             load_canvases,
             create_canvas,
             rename_canvas,

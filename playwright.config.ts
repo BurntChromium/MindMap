@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 
 const appMode = process.env.PLAYWRIGHT_APP_MODE ?? 'built';
 const tempDir = mkdtempSync(join(tmpdir(), 'mindmap-playwright-'));
-const port = appMode === 'dev' ? 5184 : 4173;
+const port = appMode === 'dev' ? 5185 : 4174;
 const serverUrl = `http://127.0.0.1:${port}`;
 
 process.env.MINDMAP_DB_PATH = join(tempDir, 'playwright.db');
@@ -32,7 +32,9 @@ export default defineConfig({
   webServer: {
     command: serverCommand,
     url: serverUrl,
-    reuseExistingServer: !process.env.CI,
+    // Never attach to a pre-existing app instance: that can share the caller's
+    // database and make E2E resets destructive outside the temp test DB.
+    reuseExistingServer: false,
     timeout: 120_000
   },
   globalTeardown: './tests/e2e/global-teardown.ts'

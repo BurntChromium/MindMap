@@ -103,6 +103,7 @@
 
   const initialCanvases = $derived.by(() => data.canvases);
   const initialActiveCanvasId = $derived.by(() => data.activeCanvasId);
+  const initialDatabaseFileName = $derived.by(() => data.databaseFileName);
   const initialNodes = $derived.by(() => data.nodes);
   const initialEdges = $derived.by(() => data.edges);
   const initialEntities = $derived.by(() => data.entities);
@@ -110,6 +111,7 @@
 
   const canvases = $derived(storeCanvases ?? initialCanvases);
   const activeCanvasId = $derived(storeActiveCanvasId ?? initialActiveCanvasId);
+  const databaseFileName = $derived(initialDatabaseFileName);
   const nodes = $derived(storeNodes ?? initialNodes);
   const edges = $derived(storeEdges ?? initialEdges);
   const entities = $derived(storeEntities ?? initialEntities);
@@ -133,20 +135,8 @@
   const associativeFlowEdges = $derived(
     buildAssociativeFlowEdges(nodes, entities, entityMentions)
   );
-  const flowNodes = $derived(
-    toFlowNodes(nodes, {
-      editingNodeId,
-      focusedNodeId,
-      selectedNodeIds,
-      activeTag,
-      searchHitIds,
-      tagColors: tagColorMap,
-      positionOverrides: pendingNodePositionOverrides,
-      onTagClick: toggleTagFilter,
-      onEntityClick: focusEntityReference
-    })
-  );
-  const flowEdges = $derived(toFlowEdges(edges, associativeFlowEdges));
+  let flowNodes = $state.raw<ReturnType<typeof toFlowNodes>>([]);
+  let flowEdges = $state.raw<ReturnType<typeof toFlowEdges>>([]);
   const activeAssociativeEdge = $derived(
     activeAssociativeEdgeId
       ? associativeFlowEdges.find((edge) => edge.id === activeAssociativeEdgeId) ?? null
@@ -195,6 +185,14 @@
       exportNotice = null;
       exportNoticeTimeout = null;
     }, 4500);
+  }
+
+  async function updateDatabaseFileName(nextDatabaseFileName: string) {
+    await appDataClient.updateDatabaseSettings({
+      databaseFileName: nextDatabaseFileName
+    });
+
+    window.location.reload();
   }
 
   onDestroy(() => {
@@ -518,6 +516,21 @@
     if (shouldClearFocusedNode(focusedNodeId, searchQuery, activeTag, searchHitIds)) {
       focusedNodeId = null;
     }
+  });
+
+  $effect(() => {
+    flowNodes = toFlowNodes(nodes, {
+      editingNodeId,
+      focusedNodeId,
+      selectedNodeIds,
+      activeTag,
+      searchHitIds,
+      tagColors: tagColorMap,
+      positionOverrides: pendingNodePositionOverrides,
+      onTagClick: toggleTagFilter,
+      onEntityClick: focusEntityReference
+    });
+    flowEdges = toFlowEdges(edges, associativeFlowEdges);
   });
 
   $effect(() => {
@@ -1216,7 +1229,9 @@
   <CanvasSidebar
     bind:collapsed={sidebarCollapsed}
     canvases={canvases}
+    databaseFileName={databaseFileName}
     onExportSuccess={showExportNotice}
+    onDatabaseFileNameSave={updateDatabaseFileName}
   />
 
   <main class="workspace">

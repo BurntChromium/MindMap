@@ -48,4 +48,5 @@ The repo uses bundled SQLite libraries, so you do not need a separate system SQL
 
 - `npm run dev` uses `dev.db`
 - `npm run build` plus `npm run preview` uses `mindmap.db`
-- `MINDMAP_DB_PATH` overrides either default when set
+- The left panel includes a `Database file` field that renames the live SQLite file and persists the choice in a `mindmap.config.json` file alongside the active database directory
+- `MINDMAP_DB_PATH` still overrides either default when set, which is mainly useful for development and tests
