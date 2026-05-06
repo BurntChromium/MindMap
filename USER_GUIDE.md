@@ -19,6 +19,9 @@ When you first download the app:
     - You can apply _italic_ text with underscores like `_this_`
     - You can create a hyperlink with brackets and parens like this: `[text to show](http://your-address-here.whatever)`
     - You can mention an entity with double-brackets like `[[this]]`
+    - _Be aware that your styling won't be visible until you use `view` mode! In edit mode, you'll see the raw text._
+
+Notes are always in one of three states or modes: `preview` mode (small), `view` mode (read with formatting applied), and `edit` mode (make changes).
 
 Entities are an important concept for linking ideas. Entities are people, places, things, objects, or whatever you want! You can optionally designate individual notes as Entity notes to make them easier to find. Whenever you reference an entity, Mindmap will link those mentions via dashed lines (even if no "root" Entity card exists.)
 
