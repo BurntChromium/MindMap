@@ -1,9 +1,9 @@
 import { v4 as uuidv4 } from 'uuid';
 
 export function createId() {
-  return uuidv4();
+	return uuidv4();
 }
 
 export function now() {
-  return Date.now();
+	return Date.now();
 }

@@ -1,7 +1,7 @@
 export function configureAppDataTransport() {
-  if (typeof window === 'undefined' || !window.__TAURI__) {
-    return false;
-  }
+	if (typeof window === 'undefined' || !window.__TAURI__) {
+		return false;
+	}
 
-  return true;
+	return true;
 }

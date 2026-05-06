@@ -1,125 +1,133 @@
 export type NodeTitleSource = {
-  id: string;
-  title: string;
+	id: string;
+	title: string;
 };
 
 export function normalizeNodeTitle(rawTitle: string) {
-  return rawTitle.trim();
+	return rawTitle.trim();
 }
 
 export function canonicalizeNodeTitle(rawTitle: string) {
-  return normalizeNodeTitle(rawTitle).toLowerCase();
+	return normalizeNodeTitle(rawTitle).toLowerCase();
 }
 
 function buildUsedTitleSet(nodes: NodeTitleSource[], excludeId?: string) {
-  const used = new Set<string>();
+	const used = new Set<string>();
 
-  for (const node of nodes) {
-    if (excludeId && node.id === excludeId) {
-      continue;
-    }
+	for (const node of nodes) {
+		if (excludeId && node.id === excludeId) {
+			continue;
+		}
 
-    const normalized = normalizeNodeTitle(node.title);
+		const normalized = normalizeNodeTitle(node.title);
 
-    if (!normalized) {
-      continue;
-    }
+		if (!normalized) {
+			continue;
+		}
 
-    used.add(canonicalizeNodeTitle(normalized));
-  }
+		used.add(canonicalizeNodeTitle(normalized));
+	}
 
-  return used;
+	return used;
 }
 
 function reserveTitle(usedTitles: Set<string>, title: string) {
-  const normalized = normalizeNodeTitle(title);
+	const normalized = normalizeNodeTitle(title);
 
-  if (!normalized) {
-    return;
-  }
+	if (!normalized) {
+		return;
+	}
 
-  usedTitles.add(canonicalizeNodeTitle(normalized));
+	usedTitles.add(canonicalizeNodeTitle(normalized));
 }
 
 export function hasNodeTitleConflict(
-  nodes: NodeTitleSource[],
-  title: string,
-  excludeId?: string
+	nodes: NodeTitleSource[],
+	title: string,
+	excludeId?: string,
 ) {
-  const normalized = normalizeNodeTitle(title);
+	const normalized = normalizeNodeTitle(title);
 
-  if (!normalized) {
-    return false;
-  }
+	if (!normalized) {
+		return false;
+	}
 
-  return buildUsedTitleSet(nodes, excludeId).has(canonicalizeNodeTitle(normalized));
+	return buildUsedTitleSet(nodes, excludeId).has(
+		canonicalizeNodeTitle(normalized),
+	);
 }
 
-export function createNodeTitleAllocator(nodes: NodeTitleSource[], excludeId?: string) {
-  const usedTitles = buildUsedTitleSet(nodes, excludeId);
+export function createNodeTitleAllocator(
+	nodes: NodeTitleSource[],
+	excludeId?: string,
+) {
+	const usedTitles = buildUsedTitleSet(nodes, excludeId);
 
-  function hasTitle(title: string) {
-    const normalized = normalizeNodeTitle(title);
+	function hasTitle(title: string) {
+		const normalized = normalizeNodeTitle(title);
 
-    if (!normalized) {
-      return false;
-    }
+		if (!normalized) {
+			return false;
+		}
 
-    return usedTitles.has(canonicalizeNodeTitle(normalized));
-  }
+		return usedTitles.has(canonicalizeNodeTitle(normalized));
+	}
 
-  function nextEnumeratedTitle(baseTitle = 'Node') {
-    const normalizedBase = normalizeNodeTitle(baseTitle) || 'Node';
-    let suffix = 1;
-    let candidate = `${normalizedBase} ${suffix}`;
+	function nextEnumeratedTitle(baseTitle = 'Node') {
+		const normalizedBase = normalizeNodeTitle(baseTitle) || 'Node';
+		let suffix = 1;
+		let candidate = `${normalizedBase} ${suffix}`;
 
-    while (hasTitle(candidate)) {
-      suffix += 1;
-      candidate = `${normalizedBase} ${suffix}`;
-    }
+		while (hasTitle(candidate)) {
+			suffix += 1;
+			candidate = `${normalizedBase} ${suffix}`;
+		}
 
-    reserveTitle(usedTitles, candidate);
-    return candidate;
-  }
+		reserveTitle(usedTitles, candidate);
+		return candidate;
+	}
 
-  function nextCopyTitle(baseTitle: string) {
-    const normalizedBase = normalizeNodeTitle(baseTitle);
+	function nextCopyTitle(baseTitle: string) {
+		const normalizedBase = normalizeNodeTitle(baseTitle);
 
-    if (!normalizedBase) {
-      return nextEnumeratedTitle('Node');
-    }
+		if (!normalizedBase) {
+			return nextEnumeratedTitle('Node');
+		}
 
-    let candidate = normalizedBase;
-    if (!hasTitle(candidate)) {
-      reserveTitle(usedTitles, candidate);
-      return candidate;
-    }
+		let candidate = normalizedBase;
+		if (!hasTitle(candidate)) {
+			reserveTitle(usedTitles, candidate);
+			return candidate;
+		}
 
-    let suffix = 1;
-    candidate = `${normalizedBase} (${suffix})`;
+		let suffix = 1;
+		candidate = `${normalizedBase} (${suffix})`;
 
-    while (hasTitle(candidate)) {
-      suffix += 1;
-      candidate = `${normalizedBase} (${suffix})`;
-    }
+		while (hasTitle(candidate)) {
+			suffix += 1;
+			candidate = `${normalizedBase} (${suffix})`;
+		}
 
-    reserveTitle(usedTitles, candidate);
-    return candidate;
-  }
+		reserveTitle(usedTitles, candidate);
+		return candidate;
+	}
 
-  return {
-    nextEnumeratedTitle,
-    nextCopyTitle
-  };
+	return {
+		nextEnumeratedTitle,
+		nextCopyTitle,
+	};
 }
 
-export function resolveUniqueNodeTitle(nodes: NodeTitleSource[], requestedTitle = '') {
-  const allocator = createNodeTitleAllocator(nodes);
-  const normalized = normalizeNodeTitle(requestedTitle);
+export function resolveUniqueNodeTitle(
+	nodes: NodeTitleSource[],
+	requestedTitle = '',
+) {
+	const allocator = createNodeTitleAllocator(nodes);
+	const normalized = normalizeNodeTitle(requestedTitle);
 
-  if (!normalized) {
-    return allocator.nextEnumeratedTitle('Node');
-  }
+	if (!normalized) {
+		return allocator.nextEnumeratedTitle('Node');
+	}
 
-  return allocator.nextCopyTitle(normalized);
+	return allocator.nextCopyTitle(normalized);
 }

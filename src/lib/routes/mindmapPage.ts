@@ -1,149 +1,166 @@
 import type { DiscoveryNode, TagSummary } from '$lib/discovery';
-import { formatTagLabel, normalizeTagList, normalizeTagName } from '$lib/tagUtils';
+import {
+	formatTagLabel,
+	normalizeTagList,
+	normalizeTagName,
+} from '$lib/tagUtils';
 
 export type BulkTagMutation = {
-  id: string;
-  tags: string[];
+	id: string;
+	tags: string[];
 };
 
-export function buildTagColorMap(tagSummaries: TagSummary[]): Record<string, string> {
-  return Object.fromEntries(tagSummaries.map((tag) => [tag.name, tag.color])) as Record<
-    string,
-    string
-  >;
+export function buildTagColorMap(
+	tagSummaries: TagSummary[],
+): Record<string, string> {
+	return Object.fromEntries(
+		tagSummaries.map((tag) => [tag.name, tag.color]),
+	) as Record<string, string>;
 }
 
-export function getActiveFilterLabel(searchQuery: string, activeTag: string | null) {
-  const filters: string[] = [];
+export function getActiveFilterLabel(
+	searchQuery: string,
+	activeTag: string | null,
+) {
+	const filters: string[] = [];
 
-  if (searchQuery.trim()) {
-    filters.push(`"${searchQuery.trim()}"`);
-  }
+	if (searchQuery.trim()) {
+		filters.push(`"${searchQuery.trim()}"`);
+	}
 
-  if (activeTag) {
-    filters.push(formatTagLabel(activeTag));
-  }
+	if (activeTag) {
+		filters.push(formatTagLabel(activeTag));
+	}
 
-  return filters.length ? filters.join(' + ') : 'none';
+	return filters.length ? filters.join(' + ') : 'none';
 }
 
-export function toggleActiveTagFilter(currentActiveTag: string | null, tag: string) {
-  const normalizedTag = normalizeTagName(tag);
+export function toggleActiveTagFilter(
+	currentActiveTag: string | null,
+	tag: string,
+) {
+	const normalizedTag = normalizeTagName(tag);
 
-  return currentActiveTag === normalizedTag ? null : normalizedTag;
+	return currentActiveTag === normalizedTag ? null : normalizedTag;
 }
 
 export function shouldClearFocusedNode(
-  focusedNodeId: string | null,
-  searchQuery: string,
-  activeTag: string | null,
-  searchHitIds: Set<string>
+	focusedNodeId: string | null,
+	searchQuery: string,
+	activeTag: string | null,
+	searchHitIds: Set<string>,
 ) {
-  if (!focusedNodeId) {
-    return false;
-  }
+	if (!focusedNodeId) {
+		return false;
+	}
 
-  if (!(searchQuery.trim() || activeTag)) {
-    return false;
-  }
+	if (!(searchQuery.trim() || activeTag)) {
+		return false;
+	}
 
-  return !searchHitIds.has(focusedNodeId);
+	return !searchHitIds.has(focusedNodeId);
 }
 
 export function shouldBlockCreateNodeShortcut(
-  activeElement: Element | null,
-  canvasShell: HTMLElement | undefined,
-  bodyElement: HTMLElement | null = null
+	activeElement: Element | null,
+	canvasShell: HTMLElement | undefined,
+	bodyElement: HTMLElement | null = null,
 ) {
-  return shouldBlockCanvasInteractionShortcut(activeElement, canvasShell, bodyElement);
+	return shouldBlockCanvasInteractionShortcut(
+		activeElement,
+		canvasShell,
+		bodyElement,
+	);
 }
 
 export function shouldBlockCanvasInteractionShortcut(
-  activeElement: Element | null,
-  canvasShell: HTMLElement | undefined,
-  bodyElement: HTMLElement | null = null
+	activeElement: Element | null,
+	canvasShell: HTMLElement | undefined,
+	bodyElement: HTMLElement | null = null,
 ) {
-  const isHTMLElementAvailable = typeof HTMLElement !== 'undefined';
+	const isHTMLElementAvailable = typeof HTMLElement !== 'undefined';
 
-  return (
-    isHTMLElementAvailable &&
-    activeElement instanceof HTMLElement &&
-    !!canvasShell &&
-    !canvasShell.contains(activeElement) &&
-    activeElement !== bodyElement
-  );
+	return (
+		isHTMLElementAvailable &&
+		activeElement instanceof HTMLElement &&
+		!!canvasShell &&
+		!canvasShell.contains(activeElement) &&
+		activeElement !== bodyElement
+	);
 }
 
 export function shouldCommitCanvasRename(relatedTarget: EventTarget | null) {
-  const isHTMLElementAvailable = typeof HTMLElement !== 'undefined';
+	const isHTMLElementAvailable = typeof HTMLElement !== 'undefined';
 
-  return !(
-    isHTMLElementAvailable &&
-    relatedTarget instanceof HTMLElement &&
-    relatedTarget.closest('.sidebar-row-actions') !== null
-  );
+	return !(
+		isHTMLElementAvailable &&
+		relatedTarget instanceof HTMLElement &&
+		relatedTarget.closest('.sidebar-row-actions') !== null
+	);
 }
 
 export function getSearchHitIds(
-  nodes: DiscoveryNode[],
-  searchQuery: string,
-  activeTag: string | null
+	nodes: DiscoveryNode[],
+	searchQuery: string,
+	activeTag: string | null,
 ) {
-  const normalizedQuery = searchQuery.trim().toLowerCase();
-  const normalizedTag = activeTag ? normalizeTagName(activeTag) : null;
+	const normalizedQuery = searchQuery.trim().toLowerCase();
+	const normalizedTag = activeTag ? normalizeTagName(activeTag) : null;
 
-  if (!normalizedQuery && !normalizedTag) {
-    return new Set<string>();
-  }
+	if (!normalizedQuery && !normalizedTag) {
+		return new Set<string>();
+	}
 
-  const result = new Set<string>();
+	const result = new Set<string>();
 
-  for (const node of nodes) {
-    const haystack = `${node.title} ${node.body}`.toLowerCase();
-    const matchesKeyword = !normalizedQuery || haystack.includes(normalizedQuery);
-    const matchesTag = !normalizedTag || node.tags.map(normalizeTagName).includes(normalizedTag);
+	for (const node of nodes) {
+		const haystack = `${node.title} ${node.body}`.toLowerCase();
+		const matchesKeyword =
+			!normalizedQuery || haystack.includes(normalizedQuery);
+		const matchesTag =
+			!normalizedTag || node.tags.map(normalizeTagName).includes(normalizedTag);
 
-    if (matchesKeyword && matchesTag) {
-      result.add(node.id);
-    }
-  }
+		if (matchesKeyword && matchesTag) {
+			result.add(node.id);
+		}
+	}
 
-  return result;
+	return result;
 }
 
 export function buildBulkTagMutations(
-  nodes: Pick<DiscoveryNode, 'id' | 'tags'>[],
-  selectedNodeIds: string[],
-  tag: string,
-  mode: 'add' | 'remove'
+	nodes: Pick<DiscoveryNode, 'id' | 'tags'>[],
+	selectedNodeIds: string[],
+	tag: string,
+	mode: 'add' | 'remove',
 ) {
-  const normalizedTag = normalizeTagName(tag);
+	const normalizedTag = normalizeTagName(tag);
 
-  if (!normalizedTag || selectedNodeIds.length === 0) {
-    return [];
-  }
+	if (!normalizedTag || selectedNodeIds.length === 0) {
+		return [];
+	}
 
-  const selectedIds = new Set(selectedNodeIds);
-  const mutations: BulkTagMutation[] = [];
+	const selectedIds = new Set(selectedNodeIds);
+	const mutations: BulkTagMutation[] = [];
 
-  for (const node of nodes) {
-    if (!selectedIds.has(node.id)) {
-      continue;
-    }
+	for (const node of nodes) {
+		if (!selectedIds.has(node.id)) {
+			continue;
+		}
 
-    const currentTags = normalizeTagList(node.tags);
-    const nextTags =
-      mode === 'add'
-        ? normalizeTagList([...currentTags, normalizedTag])
-        : currentTags.filter((currentTag) => currentTag !== normalizedTag);
+		const currentTags = normalizeTagList(node.tags);
+		const nextTags =
+			mode === 'add'
+				? normalizeTagList([...currentTags, normalizedTag])
+				: currentTags.filter((currentTag) => currentTag !== normalizedTag);
 
-    if (currentTags.join('\u0000') !== nextTags.join('\u0000')) {
-      mutations.push({
-        id: node.id,
-        tags: nextTags
-      });
-    }
-  }
+		if (currentTags.join('\u0000') !== nextTags.join('\u0000')) {
+			mutations.push({
+				id: node.id,
+				tags: nextTags,
+			});
+		}
+	}
 
-  return mutations;
+	return mutations;
 }

@@ -1,53 +1,53 @@
 import { writable } from 'svelte/store';
 
 function normalizeIds(ids: Iterable<string>) {
-  const seen = new Set<string>();
-  const normalized: string[] = [];
+	const seen = new Set<string>();
+	const normalized: string[] = [];
 
-  for (const id of ids) {
-    if (!id || seen.has(id)) {
-      continue;
-    }
+	for (const id of ids) {
+		if (!id || seen.has(id)) {
+			continue;
+		}
 
-    seen.add(id);
-    normalized.push(id);
-  }
+		seen.add(id);
+		normalized.push(id);
+	}
 
-  return normalized;
+	return normalized;
 }
 
 function createSelectionStore() {
-  const { subscribe, set, update } = writable<string[]>([]);
+	const { subscribe, set, update } = writable<string[]>([]);
 
-  return {
-    subscribe,
+	return {
+		subscribe,
 
-    setSelection(ids: Iterable<string>) {
-      set(normalizeIds(ids));
-    },
+		setSelection(ids: Iterable<string>) {
+			set(normalizeIds(ids));
+		},
 
-    selectNode(id: string) {
-      set(id ? [id] : []);
-    },
+		selectNode(id: string) {
+			set(id ? [id] : []);
+		},
 
-    toggleNode(id: string) {
-      update((selectedIds) => {
-        const next = selectedIds.includes(id)
-          ? selectedIds.filter((currentId) => currentId !== id)
-          : [...selectedIds, id];
+		toggleNode(id: string) {
+			update((selectedIds) => {
+				const next = selectedIds.includes(id)
+					? selectedIds.filter((currentId) => currentId !== id)
+					: [...selectedIds, id];
 
-        return normalizeIds(next);
-      });
-    },
+				return normalizeIds(next);
+			});
+		},
 
-    selectAll(ids: Iterable<string>) {
-      set(normalizeIds(ids));
-    },
+		selectAll(ids: Iterable<string>) {
+			set(normalizeIds(ids));
+		},
 
-    clear() {
-      set([]);
-    }
-  };
+		clear() {
+			set([]);
+		},
+	};
 }
 
 export const selectionStore = createSelectionStore();
