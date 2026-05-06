@@ -175,7 +175,6 @@ pub struct AppDataDatabaseSettings {
 #[derive(Debug, Clone)]
 struct NodeEntitySource {
     id: String,
-    canvas_id: String,
     title: String,
     body: String,
     is_entity: i64,
@@ -327,19 +326,6 @@ struct GraphFragmentDeletionResult {
     success: bool,
     removed_nodes: usize,
     removed_edges: usize,
-}
-
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct GraphFragmentPasteResult {
-    success: bool,
-    inserted_nodes: Vec<AppDataInsertNode>,
-    inserted_edges: usize,
-}
-
-#[derive(Debug, Serialize)]
-struct SuccessResponse {
-    success: bool,
 }
 
 fn create_id() -> String {
@@ -1229,7 +1215,6 @@ fn rebuild_entities_for_canvas_id(connection: &Connection, canvas_id: &str) -> D
         .query_map(params![canvas_id], |row| {
             Ok(NodeEntitySource {
                 id: row.get(0)?,
-                canvas_id: row.get(1)?,
                 title: row.get(2)?,
                 body: row.get::<_, Option<String>>(3)?.unwrap_or_default(),
                 is_entity: row.get::<_, Option<i64>>(4)?.unwrap_or(0),
@@ -1976,7 +1961,7 @@ fn parse_node_value(
 fn mutate_graph_fragment(
     app: AppHandle,
     input: GraphFragmentInput,
-) -> DbResult<GraphFragmentPasteResult> {
+) -> DbResult<AppDataPasteGraphResult> {
     let GraphFragmentInput {
         action,
         canvas_id,
@@ -2105,7 +2090,7 @@ fn mutate_graph_fragment(
 
             rebuild_entities_for_canvas_id(connection, canvas_id)?;
 
-            Ok(GraphFragmentPasteResult {
+            Ok(AppDataPasteGraphResult {
                 success: true,
                 inserted_nodes: resolved_nodes
                     .into_iter()
@@ -2121,7 +2106,7 @@ fn mutate_graph_fragment(
 
     if action == "delete" {
         let Some(node_ids) = node_ids else {
-            return Ok(GraphFragmentPasteResult {
+            return Ok(AppDataPasteGraphResult {
                 success: true,
                 inserted_nodes: Vec::new(),
                 inserted_edges: 0,
@@ -2132,7 +2117,7 @@ fn mutate_graph_fragment(
         let deleted =
             delete_graph_fragment(app, GraphFragmentDeletionInput { node_ids, edge_ids })?;
 
-        return Ok(GraphFragmentPasteResult {
+        return Ok(AppDataPasteGraphResult {
             success: deleted.success,
             inserted_nodes: Vec::new(),
             inserted_edges: 0,
