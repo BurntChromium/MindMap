@@ -24,7 +24,12 @@ This program can be built as either a web app or a desktop app.
 - `npm run build`: build the web app for production
 - `npm run build:desktop`: build the static frontend used by Tauri
 - `npm run tauri build`: bundle the Tauri desktop app for release
+- `npm run test:e2e`: run the full Playwright suite against the built app via `vite preview`
+- `npm run test:e2e:dev`: run the quick Playwright smoke spec against `npm run dev`
+- `npm run test:e2e:headed`: run the Playwright suite in headed mode
 The generated desktop build outputs are ignored by git, so you can rebuild locally without polluting the working tree.
+
+Playwright uses a temporary SQLite database for each run, so the E2E suite does not touch `dev.db` or `mindmap.db`.
 
 ### Desktop Prerequisites
 

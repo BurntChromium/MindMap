@@ -31,3 +31,6 @@ vite.config.ts.timestamp-*
 # Dev stuff
 dev.db
 mindmap.db
+test-results
+playwright-report
+blob-report
