@@ -54,7 +54,11 @@
     findEntityInspectorEntryByTitle,
     getEntityInspectorNodeIds
   } from '$lib/entityInspector';
-  import { getNodeFocusPoint, type NodeFocusMode } from '$lib/canvasCenter';
+import {
+  getNodeFocusPoint,
+  getNodeOriginForFocusPoint,
+  type NodeFocusMode
+} from '$lib/canvasCenter';
   import type { AppDataPageData } from '$lib/server/appData';
 
   let { data }: { data: AppDataPageData } = $props();
@@ -135,8 +139,20 @@
   const associativeFlowEdges = $derived(
     buildAssociativeFlowEdges(nodes, entities, entityMentions)
   );
-  let flowNodes = $state.raw<ReturnType<typeof toFlowNodes>>([]);
-  let flowEdges = $state.raw<ReturnType<typeof toFlowEdges>>([]);
+  const flowNodes = $derived(
+    toFlowNodes(nodes, {
+      editingNodeId,
+      focusedNodeId,
+      selectedNodeIds,
+      activeTag,
+      searchHitIds,
+      tagColors: tagColorMap,
+      positionOverrides: pendingNodePositionOverrides,
+      onTagClick: toggleTagFilter,
+      onEntityClick: focusEntityReference
+    })
+  );
+  const flowEdges = $derived(toFlowEdges(edges, associativeFlowEdges));
   const activeAssociativeEdge = $derived(
     activeAssociativeEdgeId
       ? associativeFlowEdges.find((edge) => edge.id === activeAssociativeEdgeId) ?? null
@@ -519,21 +535,6 @@
   });
 
   $effect(() => {
-    flowNodes = toFlowNodes(nodes, {
-      editingNodeId,
-      focusedNodeId,
-      selectedNodeIds,
-      activeTag,
-      searchHitIds,
-      tagColors: tagColorMap,
-      positionOverrides: pendingNodePositionOverrides,
-      onTagClick: toggleTagFilter,
-      onEntityClick: focusEntityReference
-    });
-    flowEdges = toFlowEdges(edges, associativeFlowEdges);
-  });
-
-  $effect(() => {
     if (selectedNodeIds.length === 0) {
       focusedNodeId = null;
       return;
@@ -565,9 +566,28 @@
   });
 
   function addNode() {
-    if (!activeCanvasId) return;
+    if (!activeCanvasId || !canvasStageApi || !canvasShell) return;
 
-    nodeStore.create(activeCanvasId, 100, 100);
+    const viewport = canvasStageApi.getViewport();
+    const rect = canvasShell.getBoundingClientRect();
+    const viewportCenter = {
+      x: (rect.width / 2 - viewport.x) / viewport.zoom,
+      y: (rect.height / 2 - viewport.y) / viewport.zoom
+    };
+    const spawnPosition = getNodeOriginForFocusPoint(viewportCenter, 'edit');
+    const nodeId = createClientId('node');
+
+    void (async () => {
+      const created = await nodeStore.create(activeCanvasId, spawnPosition.x, spawnPosition.y, {
+        id: nodeId
+      });
+
+      if (!created) {
+        return;
+      }
+
+      await beginEditingNode(nodeId);
+    })();
   }
 
   function selectAllNodes() {

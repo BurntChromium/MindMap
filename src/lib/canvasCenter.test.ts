@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { getCanvasBoundsCenter, getNodeFocusPoint } from './canvasCenter';
+import {
+  getCanvasBoundsCenter,
+  getNodeFocusPoint,
+  getNodeOriginForFocusPoint
+} from './canvasCenter';
 
 describe('getCanvasBoundsCenter', () => {
   it('returns the midpoint of a rectangular node bounds box', () => {
@@ -22,6 +26,15 @@ describe('getNodeFocusPoint', () => {
     expect(getNodeFocusPoint({ x: 120, y: 80 }, 'edit')).toEqual({
       x: 420,
       y: 188
+    });
+  });
+});
+
+describe('getNodeOriginForFocusPoint', () => {
+  it('inverts the edit focus point heuristic', () => {
+    expect(getNodeOriginForFocusPoint({ x: 420, y: 188 }, 'edit')).toEqual({
+      x: 120,
+      y: 80
     });
   });
 });

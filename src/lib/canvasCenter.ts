@@ -50,3 +50,15 @@ export function getNodeFocusPoint(position: Pick<CanvasBounds, 'x' | 'y'>, mode:
     y: position.y + layout.height * layout.anchorY
   };
 }
+
+export function getNodeOriginForFocusPoint(
+  focusPoint: Pick<CanvasBounds, 'x' | 'y'>,
+  mode: NodeFocusMode
+) {
+  const layout = NODE_FOCUS_LAYOUT[mode];
+
+  return {
+    x: focusPoint.x - layout.width * layout.anchorX,
+    y: focusPoint.y - layout.height * layout.anchorY
+  };
+}

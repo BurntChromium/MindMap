@@ -14,7 +14,7 @@ test('creates and edits a node, then persists after reload', async ({ page, requ
   await expect(page.getByTestId('sidebar-canvas-select-canvas-edit')).toBeVisible();
 
   await page.getByTestId('canvas-add-node').click();
-  await page.getByRole('button', { name: 'Edit node' }).click();
+  await expect(page.getByRole('button', { name: 'Save node' })).toBeVisible();
 
   await page.getByLabel('Node title').fill('Research note');
   await page.getByLabel('Add tag').fill('strategy');
@@ -99,7 +99,7 @@ test('undoes and redoes a node title change', async ({ page, request }) => {
   await page.goto('/');
 
   await page.getByTestId('canvas-add-node').click();
-  await page.getByRole('button', { name: 'Edit node' }).click();
+  await expect(page.getByRole('button', { name: 'Save node' })).toBeVisible();
   await page.getByLabel('Node title').fill('First title');
   await page.getByRole('button', { name: 'Save node' }).click();
 
