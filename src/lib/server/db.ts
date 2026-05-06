@@ -1,6 +1,7 @@
 import { existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 import { openDatabase } from './sqlite';
+import { initSchema } from './schema';
 
 const defaultDbFileName = import.meta.env.DEV ? 'dev.db' : 'mindmap.db';
 const defaultDbPath = process.env.MINDMAP_DB_PATH ?? defaultDbFileName;
@@ -102,8 +103,6 @@ export async function setDatabaseFileName(fileName: string) {
 
 		dbPath = nextPath;
 		db = openDatabase(dbPath);
-
-		const { initSchema } = await import('./schema');
 		initSchema(db);
 
 		persistDatabaseFileName(normalized);
