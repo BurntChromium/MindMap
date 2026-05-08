@@ -49,6 +49,56 @@ test('creates and edits a node, then persists after reload', async ({ page, requ
   await expect(page.getByTestId(`node-tag-${createdNode!.id}-strategy`)).toBeVisible();
 });
 
+test('toggles the entity checkbox and persists the flag after reload', async ({
+  page,
+  request
+}) => {
+  await resetDatabase(request);
+  await seedCanvas(request, { id: 'canvas-entity', name: 'Entities' });
+  await seedNode(request, {
+    id: 'node-entity',
+    canvasId: 'canvas-entity',
+    title: 'Aeon',
+    body: 'A note about aeons.'
+  });
+
+  await page.goto('/');
+
+  const nodeCard = page.getByTestId('node-card-node-entity');
+  await expect(nodeCard).toBeVisible();
+  await nodeCard.click();
+  await page.getByRole('button', { name: 'Edit node' }).click();
+  await expect(page.getByRole('button', { name: 'Save node' })).toBeVisible();
+
+  const entityToggle = nodeCard.getByLabel('Treat as entity page');
+  await expect(entityToggle).not.toBeChecked();
+  await entityToggle.focus();
+  await page.keyboard.press('Space');
+  await expect(entityToggle).toBeChecked();
+
+  await page.getByRole('button', { name: 'Save node' }).click();
+
+  const nodesResponse = await request.get('/api/nodes?canvasId=canvas-entity');
+  const nodes = (await nodesResponse.json()) as Array<{
+    id: string;
+    title: string;
+    is_entity: number;
+  }>;
+  const updatedNode = nodes.find((node) => node.id === 'node-entity');
+
+  expect(updatedNode).toMatchObject({
+    title: 'Aeon',
+    is_entity: 1
+  });
+
+  await page.reload();
+
+  await expect(nodeCard).toBeVisible();
+  await nodeCard.click();
+  await page.getByRole('button', { name: 'Edit node' }).click();
+  await expect(nodeCard.getByLabel('Treat as entity page')).toBeChecked();
+});
+
 test('filters search results by keyword and tag, then focuses a match', async ({
   page,
   request

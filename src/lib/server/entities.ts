@@ -1,3 +1,4 @@
+import Database from 'better-sqlite3';
 import { db } from './db';
 import { createId, now } from './utils';
 import { canonicalizeNodeTitle, normalizeNodeTitle } from '$lib/nodeTitles';
@@ -56,6 +57,8 @@ export type NodeEntitySource = {
 	is_entity: number | null;
 };
 
+type SqliteDatabase = InstanceType<typeof Database>;
+
 function escapeRegExp(value: string) {
 	return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
@@ -102,8 +105,12 @@ export function replaceEntityReferences(
 	return body.replace(pattern, `[[${to}]]`);
 }
 
-function parseNodes(canvasId: string) {
-	return db
+function getDb(database?: SqliteDatabase) {
+	return database ?? db;
+}
+
+function parseNodes(canvasId: string, database?: SqliteDatabase) {
+	return getDb(database)
 		.prepare(
 			`
         SELECT id, canvas_id, title, body, is_entity
@@ -115,14 +122,18 @@ function parseNodes(canvasId: string) {
 		.all(canvasId) as NodeEntitySource[];
 }
 
-export function rebuildEntitiesForCanvasId(canvasId: string | null) {
+export function rebuildEntitiesForCanvasId(
+	canvasId: string | null,
+	database?: SqliteDatabase,
+) {
 	if (!canvasId) {
 		return;
 	}
 
+	const currentDb = getDb(database);
 	const timestamp = now();
-	const nodes = parseNodes(canvasId);
-	const existingEntities = db
+	const nodes = parseNodes(canvasId, database);
+	const existingEntities = currentDb
 		.prepare(
 			`
         SELECT id, title, title_key, primary_node_id, created_at
@@ -187,16 +198,16 @@ export function rebuildEntitiesForCanvasId(canvasId: string | null) {
 		}
 	}
 
-	const deleteMentions = db.prepare(
+	const deleteMentions = currentDb.prepare(
 		'DELETE FROM entity_mentions WHERE canvas_id = ?',
 	);
-	const deleteEntities = db.prepare('DELETE FROM entities WHERE canvas_id = ?');
-	const insertEntity = db.prepare(`
+	const deleteEntities = currentDb.prepare('DELETE FROM entities WHERE canvas_id = ?');
+	const insertEntity = currentDb.prepare(`
     INSERT INTO entities (
       id, canvas_id, title, title_key, primary_node_id, created_at, updated_at
     ) VALUES (?, ?, ?, ?, ?, ?, ?)
   `);
-	const insertMention = db.prepare(`
+	const insertMention = currentDb.prepare(`
     INSERT INTO entity_mentions (
       id, canvas_id, entity_id, node_id, reference_text, title, title_key,
       start_index, end_index, created_at, updated_at
