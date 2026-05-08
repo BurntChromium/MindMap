@@ -521,6 +521,176 @@ describe('API integration', () => {
 		]);
 	});
 
+	it('keeps entity primary-node links stable when toggling isEntity on and off', async () => {
+		const canvas = await canvasesApi.POST({
+			request: request({ id: 'canvas-1', name: 'Entity Toggle Round Trip' }),
+		} as any);
+		const { id: canvasId } = await canvas.json();
+
+		const aeon = await nodesApi.POST({
+			request: request({
+				id: 'node-1',
+				canvasId,
+				x: 0,
+				y: 0,
+				title: 'Aeon',
+				isEntity: true,
+			}),
+		} as any);
+		const valentinism = await nodesApi.POST({
+			request: request({
+				id: 'node-2',
+				canvasId,
+				x: 120,
+				y: 120,
+				title: 'Valentinism',
+				isEntity: true,
+				body: 'School of [[Aeon]].',
+			}),
+		} as any);
+
+		const { id: aeonId } = await aeon.json();
+		const { id: valentinismId } = await valentinism.json();
+
+		const listedBeforeToggle = await nodesApi.GET({
+			url: new URL(`http://localhost/api/nodes?canvasId=${canvasId}`),
+		} as any);
+		const nodesBeforeToggle = await listedBeforeToggle.json();
+
+		expect(
+			nodesBeforeToggle.find((node: { id: string }) => node.id === aeonId),
+		).toMatchObject({
+			id: aeonId,
+			is_entity: 1,
+		});
+
+		const entityRowsBeforeToggle = dbModule.db
+			.prepare(
+				`
+      SELECT title, title_key, primary_node_id
+      FROM entities
+      ORDER BY title_key
+    `,
+			)
+			.all();
+
+		expect(entityRowsBeforeToggle).toEqual([
+			expect.objectContaining({
+				title: 'Aeon',
+				title_key: 'aeon',
+				primary_node_id: aeonId,
+			}),
+			expect.objectContaining({
+				title: 'Valentinism',
+				title_key: 'valentinism',
+				primary_node_id: valentinismId,
+			}),
+		]);
+
+		await nodesApi.PATCH({
+			request: request({
+				id: aeonId,
+				isEntity: false,
+			}),
+		} as any);
+
+		const listedAfterDisable = await nodesApi.GET({
+			url: new URL(`http://localhost/api/nodes?canvasId=${canvasId}`),
+		} as any);
+		const nodesAfterDisable = await listedAfterDisable.json();
+
+		expect(
+			nodesAfterDisable.find((node: { id: string }) => node.id === aeonId),
+		).toMatchObject({
+			id: aeonId,
+			is_entity: 0,
+		});
+
+		const entityRowsAfterDisable = dbModule.db
+			.prepare(
+				`
+      SELECT title, title_key, primary_node_id
+      FROM entities
+      ORDER BY title_key
+    `,
+			)
+			.all();
+
+		expect(entityRowsAfterDisable).toEqual([
+			expect.objectContaining({
+				title: 'Aeon',
+				title_key: 'aeon',
+				primary_node_id: null,
+			}),
+			expect.objectContaining({
+				title: 'Valentinism',
+				title_key: 'valentinism',
+				primary_node_id: valentinismId,
+			}),
+		]);
+
+		const mentionRowsAfterDisable = dbModule.db
+			.prepare(
+				`
+      SELECT title, title_key, node_id, reference_text
+      FROM entity_mentions
+      ORDER BY node_id, start_index
+    `,
+			)
+			.all();
+
+		expect(mentionRowsAfterDisable).toEqual([
+			expect.objectContaining({
+				title: 'Aeon',
+				title_key: 'aeon',
+				node_id: valentinismId,
+				reference_text: '[[Aeon]]',
+			}),
+		]);
+
+		await nodesApi.PATCH({
+			request: request({
+				id: aeonId,
+				isEntity: true,
+			}),
+		} as any);
+
+		const listedAfterEnable = await nodesApi.GET({
+			url: new URL(`http://localhost/api/nodes?canvasId=${canvasId}`),
+		} as any);
+		const nodesAfterEnable = await listedAfterEnable.json();
+
+		expect(
+			nodesAfterEnable.find((node: { id: string }) => node.id === aeonId),
+		).toMatchObject({
+			id: aeonId,
+			is_entity: 1,
+		});
+
+		const entityRowsAfterEnable = dbModule.db
+			.prepare(
+				`
+      SELECT title, title_key, primary_node_id
+      FROM entities
+      ORDER BY title_key
+    `,
+			)
+			.all();
+
+		expect(entityRowsAfterEnable).toEqual([
+			expect.objectContaining({
+				title: 'Aeon',
+				title_key: 'aeon',
+				primary_node_id: aeonId,
+			}),
+			expect.objectContaining({
+				title: 'Valentinism',
+				title_key: 'valentinism',
+				primary_node_id: valentinismId,
+			}),
+		]);
+	});
+
 	it('returns entity rows and mentions through the entities api', async () => {
 		const canvas = await canvasesApi.POST({
 			request: request({ id: 'canvas-1', name: 'Entities API' }),

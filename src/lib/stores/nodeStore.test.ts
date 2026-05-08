@@ -232,6 +232,39 @@ describe('nodeStore', () => {
 		);
 	});
 
+	it('sends an entity toggle on payloads when enabling entity mode', async () => {
+		vi.mocked(fetch)
+			.mockResolvedValueOnce(
+				jsonResponse([
+					{
+						id: 'node-8',
+						canvas_id: 'canvas-1',
+						title: 'Alpha',
+						body: '',
+						is_entity: 0,
+						tags: [],
+						x: 0,
+						y: 0,
+						collapsed: 0,
+					},
+				]),
+			)
+			.mockResolvedValueOnce(jsonResponse({ success: true }))
+			.mockResolvedValueOnce(jsonResponse({ entities: [], mentions: [] }));
+
+		await nodeStore.load('canvas-1');
+		await nodeStore.updateNode({ id: 'node-8', is_entity: 1 });
+
+		expect(fetch).toHaveBeenNthCalledWith(
+			2,
+			'/api/nodes',
+			expect.objectContaining({
+				method: 'PATCH',
+				body: JSON.stringify({ id: 'node-8', isEntity: true }),
+			}),
+		);
+	});
+
 	it('blocks duplicate titles before sending a patch request', async () => {
 		vi.mocked(fetch).mockResolvedValueOnce(
 			jsonResponse([
