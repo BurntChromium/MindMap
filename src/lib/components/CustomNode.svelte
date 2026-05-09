@@ -113,7 +113,12 @@
 	$effect(() => {
 		const promptOpen = nodeUiState.discardPrompt?.nodeId === id;
 
-		if (!promptOpen && previousDiscardPromptOpen && isEditing && discardPromptRestoreField) {
+		if (
+			!promptOpen &&
+			previousDiscardPromptOpen &&
+			isEditing &&
+			discardPromptRestoreField
+		) {
 			const fieldToRefocus = discardPromptRestoreField;
 			queueMicrotask(() => {
 				focusEditField(fieldToRefocus);

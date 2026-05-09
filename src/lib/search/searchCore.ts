@@ -46,10 +46,16 @@ function compareResults(left: SearchResult, right: SearchResult) {
 		return right.score - left.score;
 	}
 
-	const leftCreatedAt = typeof left.created_at === 'number' ? left.created_at : null;
-	const rightCreatedAt = typeof right.created_at === 'number' ? right.created_at : null;
+	const leftCreatedAt =
+		typeof left.created_at === 'number' ? left.created_at : null;
+	const rightCreatedAt =
+		typeof right.created_at === 'number' ? right.created_at : null;
 
-	if (leftCreatedAt !== null && rightCreatedAt !== null && leftCreatedAt !== rightCreatedAt) {
+	if (
+		leftCreatedAt !== null &&
+		rightCreatedAt !== null &&
+		leftCreatedAt !== rightCreatedAt
+	) {
 		return leftCreatedAt - rightCreatedAt;
 	}
 

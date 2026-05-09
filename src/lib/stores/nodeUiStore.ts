@@ -60,7 +60,8 @@ function createNodeUiStore() {
 				delete expandedNodeIds[id];
 
 				return {
-					editingNodeId: state.editingNodeId === id ? null : state.editingNodeId,
+					editingNodeId:
+						state.editingNodeId === id ? null : state.editingNodeId,
 					expandedNodeIds,
 					discardPrompt:
 						state.discardPrompt?.nodeId === id ? null : state.discardPrompt,

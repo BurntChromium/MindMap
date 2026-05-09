@@ -16,7 +16,11 @@
 	let { activeTab = $bindable(''), tabs, ariaLabel }: Props = $props();
 </script>
 
-<div class="panel-tabs panel-shell__tablist" role="tablist" aria-label={ariaLabel}>
+<div
+	class="panel-tabs panel-shell__tablist"
+	role="tablist"
+	aria-label={ariaLabel}
+>
 	{#each tabs as tab}
 		<button
 			class="panel-shell__tab"

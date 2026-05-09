@@ -76,7 +76,9 @@ export type AppDataClient = {
 		databaseFileName: string;
 	}) => Promise<JsonValue>;
 	updateBackupSettings: (input: AppDataBackupSettings) => Promise<JsonValue>;
-	pickBackupDirectory: (input?: { defaultPath?: string }) => Promise<string | null>;
+	pickBackupDirectory: (input?: {
+		defaultPath?: string;
+	}) => Promise<string | null>;
 	createBackupSnapshot: () => Promise<JsonValue>;
 	restoreLatestBackup: () => Promise<JsonValue>;
 	loadCanvases: () => Promise<JsonValue>;

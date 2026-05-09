@@ -108,7 +108,7 @@ function buildFlowEdge(edge: FlowEdgeInput): FlowEdge {
 		const style =
 			edge.data?.kind === 'associative'
 				? getAssociativeEdgeStyle(edge.data.relation)
-				: edge.style ?? null;
+				: (edge.style ?? null);
 
 		return {
 			...edge,

@@ -64,9 +64,9 @@ export async function PATCH({ request }) {
 }
 
 export async function POST({ request }) {
-	const payload = (await request.json().catch(() => null)) as
-		| { action?: string }
-		| null;
+	const payload = (await request.json().catch(() => null)) as {
+		action?: string;
+	} | null;
 
 	if (payload?.action === 'snapshot') {
 		try {

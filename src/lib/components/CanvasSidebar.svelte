@@ -1,15 +1,15 @@
 <script lang="ts">
 	import {
-	Check,
-	ChevronLeft,
-	ChevronRight,
-	Download,
-	FolderOpen,
-	PencilLine,
-	RotateCcw,
-	Trash2,
-	Upload,
-	X,
+		Check,
+		ChevronLeft,
+		ChevronRight,
+		Download,
+		FolderOpen,
+		PencilLine,
+		RotateCcw,
+		Trash2,
+		Upload,
+		X,
 	} from 'lucide-svelte';
 	import {
 		appDataClient,
@@ -133,7 +133,10 @@
 			return null;
 		}
 
-		if (!Number.isInteger(nextBackupIntervalMinutes) || nextBackupIntervalMinutes < 1) {
+		if (
+			!Number.isInteger(nextBackupIntervalMinutes) ||
+			nextBackupIntervalMinutes < 1
+		) {
 			return null;
 		}
 
@@ -177,7 +180,8 @@
 		}
 
 		const nextPath = await appDataClient.pickBackupDirectory({
-			defaultPath: backupDirectoryPathDraft || backupSettings.backupDirectoryPath,
+			defaultPath:
+				backupDirectoryPathDraft || backupSettings.backupDirectoryPath,
 		});
 
 		if (!nextPath) {
@@ -249,7 +253,9 @@
 		}
 	}
 
-	async function saveBackupConfiguration(nextBackupSettings: AppDataBackupSettings) {
+	async function saveBackupConfiguration(
+		nextBackupSettings: AppDataBackupSettings,
+	) {
 		if (backupSettingsSaveInFlight) {
 			pendingBackupSettings = nextBackupSettings;
 			return;
@@ -634,7 +640,8 @@
 								onclick={chooseBackupDirectory}
 							>
 								<FolderOpen size={14} aria-hidden="true" />
-								<span>{backupDirectoryPathDraft || 'Choose backup folder'}</span>
+								<span>{backupDirectoryPathDraft || 'Choose backup folder'}</span
+								>
 							</button>
 						</div>
 					{/if}
@@ -685,11 +692,9 @@
 					<button
 						class="button"
 						type="button"
-						disabled={
-							operationState !== 'idle' ||
+						disabled={operationState !== 'idle' ||
 							!onRestoreLatestBackup ||
-							backupStatus.backupCount === 0
-						}
+							backupStatus.backupCount === 0}
 						data-testid="sidebar-restore-backup"
 						onclick={restoreLatestBackupNow}
 					>
@@ -702,17 +707,18 @@
 					</button>
 				</div>
 				<p class="sidebar-note">
-					Last backup: {formatBackupTimestamp(backupStatus.latestBackupCreatedAt)}
+					Last backup: {formatBackupTimestamp(
+						backupStatus.latestBackupCreatedAt,
+					)}
 					{#if backupStatus.latestBackupFileName}
 						<span> ({backupStatus.latestBackupFileName})</span>
 					{/if}
 				</p>
 				<p class="sidebar-note">
-					Backups are full SQLite snapshots. Retention controls how many files are
-					kept locally.
+					Backups are full SQLite snapshots. Retention controls how many files
+					are kept locally.
 				</p>
 			</div>
-
 		</div>
 	{/if}
 </div>
@@ -799,5 +805,4 @@
 		font-size: 0.82rem;
 		line-height: 1.35;
 	}
-
 </style>

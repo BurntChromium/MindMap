@@ -141,8 +141,8 @@ export function buildAssociativeFlowEdges(
 				};
 				const isDirect = Boolean(
 					entity.primary_node_id &&
-						(entity.primary_node_id === source ||
-							entity.primary_node_id === target),
+					(entity.primary_node_id === source ||
+						entity.primary_node_id === target),
 				);
 
 				current.sharedEntities.push(entitySummary);

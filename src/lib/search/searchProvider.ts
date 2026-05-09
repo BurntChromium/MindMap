@@ -75,7 +75,11 @@ function indexDocument(document: SearchDocument): IndexedDocument {
 	};
 }
 
-function scoreDocument(indexed: IndexedDocument, queryTokens: string[], tag: string | null) {
+function scoreDocument(
+	indexed: IndexedDocument,
+	queryTokens: string[],
+	tag: string | null,
+) {
 	let score = 0;
 
 	for (const token of queryTokens) {
@@ -92,7 +96,10 @@ function scoreDocument(indexed: IndexedDocument, queryTokens: string[], tag: str
 		score += 25;
 	}
 
-	if (queryTokens.length > 0 && queryTokens.every((token) => indexed.titleTokens.has(token))) {
+	if (
+		queryTokens.length > 0 &&
+		queryTokens.every((token) => indexed.titleTokens.has(token))
+	) {
 		score += 50;
 	}
 
@@ -104,10 +111,16 @@ function compareResults(left: SearchResult, right: SearchResult) {
 		return right.score - left.score;
 	}
 
-	const leftCreatedAt = typeof left.created_at === 'number' ? left.created_at : null;
-	const rightCreatedAt = typeof right.created_at === 'number' ? right.created_at : null;
+	const leftCreatedAt =
+		typeof left.created_at === 'number' ? left.created_at : null;
+	const rightCreatedAt =
+		typeof right.created_at === 'number' ? right.created_at : null;
 
-	if (leftCreatedAt !== null && rightCreatedAt !== null && leftCreatedAt !== rightCreatedAt) {
+	if (
+		leftCreatedAt !== null &&
+		rightCreatedAt !== null &&
+		leftCreatedAt !== rightCreatedAt
+	) {
 		return leftCreatedAt - rightCreatedAt;
 	}
 
@@ -154,7 +167,9 @@ class IndexedSearchStore {
 
 	search(request: SearchRequest): SearchResponse {
 		const queryTokens = tokenizeSearchQuery(request.query);
-		const normalizedTag = request.tag ? normalizeTagList([request.tag])[0] ?? '' : '';
+		const normalizedTag = request.tag
+			? (normalizeTagList([request.tag])[0] ?? '')
+			: '';
 
 		if (!queryTokens.length && !normalizedTag) {
 			return {
@@ -201,7 +216,8 @@ class IndexedSearchStore {
 		}
 
 		if (normalizedTag) {
-			const taggedIds = this.documentsByTag.get(normalizedTag) ?? new Set<string>();
+			const taggedIds =
+				this.documentsByTag.get(normalizedTag) ?? new Set<string>();
 
 			for (const candidateId of Array.from(candidateIds)) {
 				if (!taggedIds.has(candidateId)) {
@@ -325,44 +341,50 @@ type WorkerResponse =
 
 class WorkerSearchProvider implements SearchProvider {
 	private readonly worker: Worker;
-	private readonly pending = new Map<number, {
-		resolve: (value: SearchResponse) => void;
-		reject: (reason?: unknown) => void;
-	}>();
+	private readonly pending = new Map<
+		number,
+		{
+			resolve: (value: SearchResponse) => void;
+			reject: (reason?: unknown) => void;
+		}
+	>();
 
 	constructor() {
-		this.worker = new Worker(
-			new URL('./searchWorker.ts', import.meta.url),
-			{ type: 'module' },
-		);
-
-		this.worker.addEventListener('message', (event: MessageEvent<WorkerResponse>) => {
-			const message = event.data;
-
-			if (message.type === 'ready') {
-				return;
-			}
-
-			if (message.type === 'error') {
-				for (const pending of this.pending.values()) {
-					pending.reject(new Error(message.message));
-				}
-				this.pending.clear();
-				return;
-			}
-
-			const pending = this.pending.get(message.payload.requestId);
-
-			if (!pending) {
-				return;
-			}
-
-			this.pending.delete(message.payload.requestId);
-			pending.resolve(message.payload);
+		this.worker = new Worker(new URL('./searchWorker.ts', import.meta.url), {
+			type: 'module',
 		});
 
+		this.worker.addEventListener(
+			'message',
+			(event: MessageEvent<WorkerResponse>) => {
+				const message = event.data;
+
+				if (message.type === 'ready') {
+					return;
+				}
+
+				if (message.type === 'error') {
+					for (const pending of this.pending.values()) {
+						pending.reject(new Error(message.message));
+					}
+					this.pending.clear();
+					return;
+				}
+
+				const pending = this.pending.get(message.payload.requestId);
+
+				if (!pending) {
+					return;
+				}
+
+				this.pending.delete(message.payload.requestId);
+				pending.resolve(message.payload);
+			},
+		);
+
 		this.worker.addEventListener('error', (event) => {
-			const error = event.error instanceof Error ? event.error : new Error(event.message);
+			const error =
+				event.error instanceof Error ? event.error : new Error(event.message);
 
 			for (const pending of this.pending.values()) {
 				pending.reject(error);
@@ -372,17 +394,26 @@ class WorkerSearchProvider implements SearchProvider {
 	}
 
 	async replaceCorpus(snapshot: SearchCorpusSnapshot) {
-		this.worker.postMessage({ type: 'replaceCorpus', snapshot } satisfies WorkerRequest);
+		this.worker.postMessage({
+			type: 'replaceCorpus',
+			snapshot,
+		} satisfies WorkerRequest);
 	}
 
 	async applyChanges(changes: SearchChange[]) {
-		this.worker.postMessage({ type: 'applyChanges', changes } satisfies WorkerRequest);
+		this.worker.postMessage({
+			type: 'applyChanges',
+			changes,
+		} satisfies WorkerRequest);
 	}
 
 	search(request: SearchRequest) {
 		return new Promise<SearchResponse>((resolve, reject) => {
 			this.pending.set(request.requestId, { resolve, reject });
-			this.worker.postMessage({ type: 'search', request } satisfies WorkerRequest);
+			this.worker.postMessage({
+				type: 'search',
+				request,
+			} satisfies WorkerRequest);
 		});
 	}
 

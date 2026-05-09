@@ -105,7 +105,8 @@ class WorkerSearchIndex {
 		}
 
 		if (normalizedTag) {
-			const taggedIds = this.documentsByTag.get(normalizedTag) ?? new Set<string>();
+			const taggedIds =
+				this.documentsByTag.get(normalizedTag) ?? new Set<string>();
 
 			for (const candidateId of Array.from(candidateIds)) {
 				if (!taggedIds.has(candidateId)) {
@@ -237,7 +238,8 @@ self.onmessage = (event: MessageEvent<WorkerRequest>) => {
 			self.close();
 		}
 	} catch (error) {
-		const message = error instanceof Error ? error.message : 'Search worker failed.';
+		const message =
+			error instanceof Error ? error.message : 'Search worker failed.';
 		self.postMessage({ type: 'error', message });
 	}
 };

@@ -201,7 +201,9 @@ export function rebuildEntitiesForCanvasId(
 	const deleteMentions = currentDb.prepare(
 		'DELETE FROM entity_mentions WHERE canvas_id = ?',
 	);
-	const deleteEntities = currentDb.prepare('DELETE FROM entities WHERE canvas_id = ?');
+	const deleteEntities = currentDb.prepare(
+		'DELETE FROM entities WHERE canvas_id = ?',
+	);
 	const insertEntity = currentDb.prepare(`
     INSERT INTO entities (
       id, canvas_id, title, title_key, primary_node_id, created_at, updated_at

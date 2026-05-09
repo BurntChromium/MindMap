@@ -1,6 +1,10 @@
 import { normalizeTagList, normalizeTagName } from '$lib/tagUtils';
 import { getTagColor } from '$lib/tagColors';
-import { createSearchHitIdSet, searchDocuments, type SearchDocument } from './search/searchCore';
+import {
+	createSearchHitIdSet,
+	searchDocuments,
+	type SearchDocument,
+} from './search/searchCore';
 
 export type DiscoveryNode = {
 	id: string;

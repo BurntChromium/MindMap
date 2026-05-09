@@ -145,8 +145,12 @@
 		expandedNodeIds: {},
 		discardPrompt: null,
 	});
-	let discardPromptNoButtonRef = $state<HTMLButtonElement | undefined>(undefined);
-	let discardPromptYesButtonRef = $state<HTMLButtonElement | undefined>(undefined);
+	let discardPromptNoButtonRef = $state<HTMLButtonElement | undefined>(
+		undefined,
+	);
+	let discardPromptYesButtonRef = $state<HTMLButtonElement | undefined>(
+		undefined,
+	);
 	let previousDiscardPromptNodeId: string | null = null;
 	const nodePositionDebouncer = createNodePositionDebouncer(
 		(updates) => nodeStore.updateNodePositions(updates),
@@ -199,9 +203,7 @@
 	const tagSummaries = $derived(collectTagSummaries(nodes));
 	const tagColorMap = $derived(buildTagColorMap(tagSummaries));
 	const selectedTagSummaries = $derived(collectTagSummaries(selectedNodes));
-	const searchHitIds = $derived(
-		new Set(searchResults.map((node) => node.id)),
-	);
+	const searchHitIds = $derived(new Set(searchResults.map((node) => node.id)));
 	const entityInspectorEntries = $derived(
 		buildEntityInspectorEntries(entities, entityMentions, nodes),
 	);
@@ -323,7 +325,8 @@
 		backupInFlight = true;
 
 		try {
-			const nextStatus = (await appDataClient.createBackupSnapshot()) as AppDataBackupStatus;
+			const nextStatus =
+				(await appDataClient.createBackupSnapshot()) as AppDataBackupStatus;
 			backupStatus = nextStatus;
 			return nextStatus;
 		} catch (error) {

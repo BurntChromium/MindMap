@@ -20,7 +20,10 @@ function tagKey(tags: string[]) {
 	return normalizeTagList(tags).slice().sort().join('\u0000');
 }
 
-export function getCommittedNodeEditTags(draftTags: string[], draftTagInput: string) {
+export function getCommittedNodeEditTags(
+	draftTags: string[],
+	draftTagInput: string,
+) {
 	return normalizeTagList([...draftTags, draftTagInput]);
 }
 

@@ -119,10 +119,7 @@ function persistDatabaseSettings(settings: {
 	backupIntervalMinutes: number;
 	backupRetentionCount: number;
 }) {
-	writeFileSync(
-		databaseSettingsPath,
-		`${JSON.stringify(settings, null, 2)}\n`,
-	);
+	writeFileSync(databaseSettingsPath, `${JSON.stringify(settings, null, 2)}\n`);
 }
 
 const initialDatabaseSettings = readDatabaseSettingsFromFile();
@@ -156,7 +153,9 @@ export function getDatabaseBackupSettings() {
 }
 
 export function isBackupDirectoryConfigurable() {
-	return !serverMode && !isValidBackupDirectoryPath(configuredBackupDirectoryPath);
+	return (
+		!serverMode && !isValidBackupDirectoryPath(configuredBackupDirectoryPath)
+	);
 }
 
 export function getDatabaseSettingsPath() {

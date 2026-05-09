@@ -1,4 +1,5 @@
 use regex::RegexBuilder;
+use rfd::FileDialog;
 use rusqlite::{backup::Backup, params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -6,7 +7,6 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 use std::time::Duration;
-use rfd::FileDialog;
 use tauri::{AppHandle, Manager};
 
 const TAG_PALETTE: [&str; 16] = [
@@ -397,7 +397,7 @@ fn is_valid_database_file_name(file_name: &str) -> bool {
 }
 
 fn is_valid_backup_directory_path(path: &str) -> bool {
-	!path.trim().is_empty() && !path.contains('\0')
+    !path.trim().is_empty() && !path.contains('\0')
 }
 
 fn database_settings_path(app: &AppHandle) -> DbResult<PathBuf> {
@@ -414,9 +414,9 @@ fn read_database_settings(app: &AppHandle) -> DbResult<DatabaseSettingsFile> {
 
     let defaults = DatabaseSettingsFile {
         database_file_name: Some("mindmap.db".to_string()),
-    backup_directory_path: Some("mindmap-backups".to_string()),
-    backup_interval_minutes: Some(10),
-    backup_retention_count: Some(2),
+        backup_directory_path: Some("mindmap-backups".to_string()),
+        backup_interval_minutes: Some(10),
+        backup_retention_count: Some(2),
     };
 
     if let Ok(contents) = fs::read_to_string(&path) {
@@ -474,11 +474,9 @@ fn persist_database_settings(app: &AppHandle, settings: &DatabaseSettingsFile) -
 }
 
 fn read_database_file_name(app: &AppHandle) -> DbResult<String> {
-    Ok(
-        read_database_settings(app)?
-            .database_file_name
-            .unwrap_or_else(|| "mindmap.db".to_string()),
-    )
+    Ok(read_database_settings(app)?
+        .database_file_name
+        .unwrap_or_else(|| "mindmap.db".to_string()))
 }
 
 fn read_backup_settings(app: &AppHandle) -> DbResult<AppDataBackupSettings> {
@@ -920,8 +918,12 @@ struct SearchIndexedNode {
 
 fn index_search_node(node: AppDataNode) -> SearchIndexedNode {
     let normalized_tags = normalize_tag_list(&node.tags);
-    let title_tokens = tokenize_text(&node.title).into_iter().collect::<HashSet<_>>();
-    let body_tokens = tokenize_text(&node.body).into_iter().collect::<HashSet<_>>();
+    let title_tokens = tokenize_text(&node.title)
+        .into_iter()
+        .collect::<HashSet<_>>();
+    let body_tokens = tokenize_text(&node.body)
+        .into_iter()
+        .collect::<HashSet<_>>();
     let tag_tokens = normalized_tags
         .iter()
         .flat_map(|tag| tokenize_text(tag))
@@ -943,7 +945,12 @@ fn index_search_node(node: AppDataNode) -> SearchIndexedNode {
     }
 }
 
-fn compare_search_nodes(left: &SearchIndexedNode, right: &SearchIndexedNode, left_score: i64, right_score: i64) -> std::cmp::Ordering {
+fn compare_search_nodes(
+    left: &SearchIndexedNode,
+    right: &SearchIndexedNode,
+    left_score: i64,
+    right_score: i64,
+) -> std::cmp::Ordering {
     right_score
         .cmp(&left_score)
         .then_with(|| left.node.created_at.cmp(&right.node.created_at))
@@ -960,7 +967,10 @@ fn score_search_node(
         return None;
     }
 
-    if query_tokens.iter().any(|token| !node.all_tokens.contains(token)) {
+    if query_tokens
+        .iter()
+        .any(|token| !node.all_tokens.contains(token))
+    {
         return None;
     }
 
@@ -1457,10 +1467,7 @@ fn search_nodes_by_canvas_id(
         .collect::<Result<Vec<_>, _>>()
         .map_err(|error| format!("Failed to search nodes: {error}"))?;
 
-    let indexed_rows = rows
-        .into_iter()
-        .map(index_search_node)
-        .collect::<Vec<_>>();
+    let indexed_rows = rows.into_iter().map(index_search_node).collect::<Vec<_>>();
     let query_tokens = tokenize_query(&normalized_query);
 
     let mut ranked = indexed_rows
@@ -2840,8 +2847,8 @@ mod tests {
                     id, canvas_id, title, body, is_entity, 0.0_f64, 0.0_f64, 0_i64, created_at,
                     created_at,
                 ],
-        )
-        .expect("seed node");
+            )
+            .expect("seed node");
     }
 
     fn seed_tag(connection: &Connection, id: &str, name: &str) {
@@ -3011,13 +3018,8 @@ mod tests {
         link_node_tag(&connection, "node-tag", "tag-dragon");
         link_node_tag(&connection, "node-body", "tag-npc");
 
-        let results = search_nodes_by_canvas_id(
-            &connection,
-            "canvas-1",
-            "dragon",
-            Some("npc"),
-        )
-        .expect("search nodes");
+        let results = search_nodes_by_canvas_id(&connection, "canvas-1", "dragon", Some("npc"))
+            .expect("search nodes");
 
         assert_eq!(
             results

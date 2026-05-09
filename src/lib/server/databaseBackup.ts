@@ -55,7 +55,10 @@ function getBackupFileName() {
 	return `${getBackupFilePrefix()}${timestamp}-${createId()}.db`;
 }
 
-function getSnapshotInfo(fileName: string, filePath: string): BackupSnapshotInfo {
+function getSnapshotInfo(
+	fileName: string,
+	filePath: string,
+): BackupSnapshotInfo {
 	const stats = statSync(filePath);
 
 	return {
