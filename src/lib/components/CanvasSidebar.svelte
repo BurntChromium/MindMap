@@ -22,6 +22,8 @@
 		onDatabaseFileNameSave?: (databaseFileName: string) => Promise<void> | void;
 	}
 
+	type SidebarTab = 'canvas' | 'database';
+
 	let {
 		canvases,
 		collapsed = $bindable(false),
@@ -31,9 +33,10 @@
 	}: Props = $props();
 
 	let name = $state('');
+	let activeTab = $state<SidebarTab>('canvas');
 	let editingCanvasId = $state<string | null>(null);
 	let editingCanvasName = $state('');
-	let importInput: HTMLInputElement | null = null;
+	let importInput = $state<HTMLInputElement | null>(null);
 	let operationState = $state<'idle' | 'exporting' | 'importing' | 'saving'>(
 		'idle',
 	);
@@ -42,6 +45,14 @@
 	$effect(() => {
 		databaseFileNameDraft = databaseFileName;
 	});
+
+	function getTabTitle(tab: SidebarTab) {
+		return tab === 'canvas' ? 'Canvases' : 'Database';
+	}
+
+	function getCollapsedTabTitle(tab: SidebarTab) {
+		return tab === 'canvas' ? 'C' : 'D';
+	}
 
 	function startRenameCanvas(canvas: Canvas) {
 		editingCanvasId = canvas.id;
@@ -171,7 +182,9 @@
 	<div class="sidebar-topbar">
 		<div class="sidebar-topbar__title">
 			<p class="sidebar-brand">{collapsed ? 'M' : 'Mindmap'}</p>
-			<h3>{collapsed ? 'C' : 'Canvases'}</h3>
+			<h3>
+				{collapsed ? getCollapsedTabTitle(activeTab) : getTabTitle(activeTab)}
+			</h3>
 		</div>
 		<button
 			class="icon-button sidebar-toggle"
@@ -190,169 +203,219 @@
 		</button>
 	</div>
 
-	<div class="sidebar-section">
-		<div class="sidebar-row">
-			<input
-				bind:value={name}
-				class="sidebar-input"
-				placeholder="New canvas"
-				aria-label="New canvas name"
-			/>
+	{#if !collapsed}
+		<div
+			class="panel-shell__tablist sidebar-tablist"
+			role="tablist"
+			aria-label="Left panel tabs"
+		>
 			<button
-				class="button"
+				class="panel-shell__tab"
+				class:panel-shell__tab--active={activeTab === 'canvas'}
 				type="button"
-				data-testid="sidebar-create-canvas"
-				onclick={() => canvasStore.create(name)}
+				role="tab"
+				id="sidebar-tab-canvas"
+				aria-selected={activeTab === 'canvas'}
+				aria-controls="sidebar-panel-canvas"
+				data-testid="sidebar-tab-canvas"
+				onclick={() => (activeTab = 'canvas')}
 			>
-				<span>Create</span>
+				Canvas
+			</button>
+			<button
+				class="panel-shell__tab"
+				class:panel-shell__tab--active={activeTab === 'database'}
+				type="button"
+				role="tab"
+				id="sidebar-tab-database"
+				aria-selected={activeTab === 'database'}
+				aria-controls="sidebar-panel-database"
+				data-testid="sidebar-tab-database"
+				onclick={() => (activeTab = 'database')}
+			>
+				Database
 			</button>
 		</div>
-	</div>
+	{/if}
 
-	<div class="sidebar-section">
-		<ul class="sidebar-list">
-			{#each canvases as canvas}
-				<li class="sidebar-row sidebar-canvas-row">
-					{#if editingCanvasId === canvas.id}
-						<input
-							bind:value={editingCanvasName}
-							class="sidebar-input sidebar-canvas-input"
-							aria-label={`Rename canvas ${canvas.name}`}
-							onkeydown={async (event) => {
-								if (event.key === 'Enter') {
-									event.preventDefault();
-									await saveCanvasName(canvas.id);
-								}
-
-								if (event.key === 'Escape') {
-									event.preventDefault();
-									cancelRenameCanvas();
-								}
-							}}
-							onblur={async (event) => {
-								if (!shouldCommitCanvasRename(event.relatedTarget)) {
-									return;
-								}
-
-								await saveCanvasName(canvas.id);
-							}}
-						/>
-					{:else}
-						<button
-							class="ghost-button"
-							type="button"
-							data-testid={`sidebar-canvas-select-${canvas.id}`}
-							onclick={() => canvasStore.setActive(canvas.id)}
-						>
-							<span>{canvas.name}</span>
-						</button>
-					{/if}
-
-					<div class="sidebar-row-actions">
+	{#if !collapsed && activeTab === 'canvas'}
+		<div
+			class="sidebar-section"
+			id="sidebar-panel-canvas"
+			role="tabpanel"
+			aria-labelledby="sidebar-tab-canvas"
+			data-testid="sidebar-panel-canvas"
+		>
+			<div class="sidebar-row">
+				<input
+					bind:value={name}
+					class="sidebar-input"
+					placeholder="New canvas"
+					aria-label="New canvas name"
+				/>
+				<button
+					class="button"
+					type="button"
+					data-testid="sidebar-create-canvas"
+					onclick={() => canvasStore.create(name)}
+				>
+					<span>Create</span>
+				</button>
+			</div>
+		</div>
+		<div class="sidebar-section">
+			<ul class="sidebar-list">
+				{#each canvases as canvas}
+					<li class="sidebar-row sidebar-canvas-row">
 						{#if editingCanvasId === canvas.id}
-							<button
-								class="icon-button"
-								type="button"
-								aria-label={`Save canvas name ${canvas.name}`}
-								title={`Save canvas name ${canvas.name}`}
-								data-testid={`sidebar-canvas-save-${canvas.id}`}
-								onclick={() => saveCanvasName(canvas.id)}
-							>
-								<Check size={14} aria-hidden="true" />
-							</button>
-							<button
-								class="icon-button"
-								type="button"
-								aria-label={`Cancel rename for ${canvas.name}`}
-								title={`Cancel rename for ${canvas.name}`}
-								data-testid={`sidebar-canvas-cancel-${canvas.id}`}
-								onclick={cancelRenameCanvas}
-							>
-								<X size={14} aria-hidden="true" />
-							</button>
+							<input
+								bind:value={editingCanvasName}
+								class="sidebar-input sidebar-canvas-input"
+								aria-label={`Rename canvas ${canvas.name}`}
+								onkeydown={async (event) => {
+									if (event.key === 'Enter') {
+										event.preventDefault();
+										await saveCanvasName(canvas.id);
+									}
+
+									if (event.key === 'Escape') {
+										event.preventDefault();
+										cancelRenameCanvas();
+									}
+								}}
+								onblur={async (event) => {
+									if (!shouldCommitCanvasRename(event.relatedTarget)) {
+										return;
+									}
+
+									await saveCanvasName(canvas.id);
+								}}
+							/>
 						{:else}
 							<button
-								class="icon-button"
+								class="ghost-button"
 								type="button"
-								aria-label={`Rename canvas ${canvas.name}`}
-								title={`Rename canvas ${canvas.name}`}
-								data-testid={`sidebar-canvas-rename-${canvas.id}`}
-								onclick={() => startRenameCanvas(canvas)}
+								data-testid={`sidebar-canvas-select-${canvas.id}`}
+								onclick={() => canvasStore.setActive(canvas.id)}
 							>
-								<PencilLine size={14} aria-hidden="true" />
-							</button>
-							<button
-								class="icon-button"
-								type="button"
-								aria-label={`Delete canvas ${canvas.name}`}
-								title={`Delete canvas ${canvas.name}`}
-								data-testid={`sidebar-canvas-delete-${canvas.id}`}
-								onclick={() => canvasStore.remove(canvas.id)}
-							>
-								<Trash2 size={14} aria-hidden="true" />
+								<span>{canvas.name}</span>
 							</button>
 						{/if}
-					</div>
-				</li>
-			{/each}
-		</ul>
-	</div>
 
-	<div class="sidebar-footer">
-		<div class="sidebar-topbar__title">
-			<h3>Database</h3>
+						<div class="sidebar-row-actions">
+							{#if editingCanvasId === canvas.id}
+								<button
+									class="icon-button"
+									type="button"
+									aria-label={`Save canvas name ${canvas.name}`}
+									title={`Save canvas name ${canvas.name}`}
+									data-testid={`sidebar-canvas-save-${canvas.id}`}
+									onclick={() => saveCanvasName(canvas.id)}
+								>
+									<Check size={14} aria-hidden="true" />
+								</button>
+								<button
+									class="icon-button"
+									type="button"
+									aria-label={`Cancel rename for ${canvas.name}`}
+									title={`Cancel rename for ${canvas.name}`}
+									data-testid={`sidebar-canvas-cancel-${canvas.id}`}
+									onclick={cancelRenameCanvas}
+								>
+									<X size={14} aria-hidden="true" />
+								</button>
+							{:else}
+								<button
+									class="icon-button"
+									type="button"
+									aria-label={`Rename canvas ${canvas.name}`}
+									title={`Rename canvas ${canvas.name}`}
+									data-testid={`sidebar-canvas-rename-${canvas.id}`}
+									onclick={() => startRenameCanvas(canvas)}
+								>
+									<PencilLine size={14} aria-hidden="true" />
+								</button>
+								<button
+									class="icon-button"
+									type="button"
+									aria-label={`Delete canvas ${canvas.name}`}
+									title={`Delete canvas ${canvas.name}`}
+									data-testid={`sidebar-canvas-delete-${canvas.id}`}
+									onclick={() => canvasStore.remove(canvas.id)}
+								>
+									<Trash2 size={14} aria-hidden="true" />
+								</button>
+							{/if}
+						</div>
+					</li>
+				{/each}
+			</ul>
 		</div>
-		<div class="sidebar-row">
-			<label for="database-file-name">Name</label>
+	{/if}
+
+	{#if !collapsed && activeTab === 'database'}
+		<div
+			class="sidebar-footer"
+			id="sidebar-panel-database"
+			role="tabpanel"
+			aria-labelledby="sidebar-tab-database"
+			data-testid="sidebar-panel-database"
+		>
+			<div class="sidebar-topbar__title">
+				<h3>Database</h3>
+			</div>
+			<div class="sidebar-row">
+				<label for="database-file-name">Name</label>
+				<input
+					id="database-file-name"
+					bind:value={databaseFileNameDraft}
+					class="sidebar-input"
+					placeholder="mindmap.db"
+					aria-label="Database name"
+				/>
+				<button
+					class="button"
+					type="button"
+					disabled={operationState !== 'idle' ||
+						databaseFileNameDraft.trim() === databaseFileName}
+					data-testid="sidebar-save-database-file"
+					onclick={saveDatabaseFileName}
+				>
+					<span>Apply</span>
+				</button>
+			</div>
 			<input
-				id="database-file-name"
-				bind:value={databaseFileNameDraft}
-				class="sidebar-input"
-				placeholder="mindmap.db"
-				aria-label="Database name"
+				bind:this={importInput}
+				class="sidebar-file-input"
+				type="file"
+				accept=".db,.sqlite,.sqlite3,application/x-sqlite3"
+				data-testid="sidebar-import-input"
+				onchange={importDatabase}
 			/>
 			<button
-				class="button"
+				class="button sidebar-transfer-button"
 				type="button"
-				disabled={operationState !== 'idle' ||
-					databaseFileNameDraft.trim() === databaseFileName}
-				data-testid="sidebar-save-database-file"
-				onclick={saveDatabaseFileName}
+				disabled={operationState !== 'idle'}
+				data-testid="sidebar-export-db"
+				onclick={exportDatabase}
 			>
-				<span>Apply</span>
+				<Download size={14} aria-hidden="true" />
+				<span
+					>{operationState === 'exporting' ? 'Exporting...' : 'Export DB'}</span
+				>
+			</button>
+			<button
+				class="button sidebar-transfer-button"
+				type="button"
+				disabled={operationState !== 'idle'}
+				data-testid="sidebar-import-db"
+				onclick={openImportPicker}
+			>
+				<Upload size={14} aria-hidden="true" />
+				<span
+					>{operationState === 'importing' ? 'Importing...' : 'Import DB'}</span
+				>
 			</button>
 		</div>
-		<input
-			bind:this={importInput}
-			class="sidebar-file-input"
-			type="file"
-			accept=".db,.sqlite,.sqlite3,application/x-sqlite3"
-			data-testid="sidebar-import-input"
-			onchange={importDatabase}
-		/>
-		<button
-			class="button sidebar-transfer-button"
-			type="button"
-			disabled={operationState !== 'idle'}
-			data-testid="sidebar-export-db"
-			onclick={exportDatabase}
-		>
-			<Download size={14} aria-hidden="true" />
-			<span
-				>{operationState === 'exporting' ? 'Exporting...' : 'Export DB'}</span
-			>
-		</button>
-		<button
-			class="button sidebar-transfer-button"
-			type="button"
-			disabled={operationState !== 'idle'}
-			data-testid="sidebar-import-db"
-			onclick={openImportPicker}
-		>
-			<Upload size={14} aria-hidden="true" />
-			<span
-				>{operationState === 'importing' ? 'Importing...' : 'Import DB'}</span
-			>
-		</button>
-	</div>
+	{/if}
 </div>
