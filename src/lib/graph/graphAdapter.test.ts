@@ -197,9 +197,9 @@ describe('graphAdapter', () => {
 				deletable: false,
 				focusable: false,
 				zIndex: 999,
-				style: 'stroke-dasharray: 6 5;',
 				data: {
 					kind: 'associative',
+					relation: 'direct',
 					sourceNodeId: 'node-a',
 					targetNodeId: 'node-b',
 					sourceNodeTitle: 'A',
@@ -228,9 +228,9 @@ describe('graphAdapter', () => {
 				deletable: false,
 				focusable: false,
 				zIndex: 999,
-				style: 'stroke-dasharray: 6 5;',
 				data: {
 					kind: 'associative',
+					relation: 'direct',
 					sourceNodeId: 'node-a',
 					targetNodeId: 'node-c',
 					sourceNodeTitle: 'A',
@@ -254,9 +254,9 @@ describe('graphAdapter', () => {
 				deletable: false,
 				focusable: false,
 				zIndex: 999,
-				style: 'stroke-dasharray: 6 5;',
 				data: {
 					kind: 'associative',
+					relation: 'indirect',
 					sourceNodeId: 'node-b',
 					targetNodeId: 'node-c',
 					sourceNodeTitle: 'B',
@@ -368,6 +368,45 @@ describe('graphAdapter', () => {
 			selectable: false,
 			deletable: false,
 			focusable: false,
+			style: 'stroke-dasharray: 6 5;',
+		});
+	});
+
+	it('renders mixed associative edges as dashed when a direct relation is present', () => {
+		const associativeEdges = buildAssociativeFlowEdges(
+			[
+				{ id: 'node-a', title: 'A' },
+				{ id: 'node-b', title: 'B' },
+			],
+			[
+				{
+					id: 'entity-direct',
+					title: 'Alpha',
+					title_key: 'alpha',
+					primary_node_id: 'node-a',
+				},
+				{
+					id: 'entity-indirect',
+					title: 'Beta',
+					title_key: 'beta',
+					primary_node_id: null,
+				},
+			],
+			[
+				{ entity_id: 'entity-direct', node_id: 'node-b' },
+				{ entity_id: 'entity-indirect', node_id: 'node-a' },
+				{ entity_id: 'entity-indirect', node_id: 'node-b' },
+			],
+		);
+
+		const [flowEdge] = toFlowEdges([], associativeEdges);
+
+		expect(flowEdge).toMatchObject({
+			id: 'assoc:node-a:node-b',
+			style: 'stroke-dasharray: 6 5;',
+			data: {
+				relation: 'mixed',
+			},
 		});
 	});
 });

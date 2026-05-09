@@ -1,6 +1,9 @@
 import { nodeStore, type Node as AppNode } from '$lib/stores/nodeStore';
 import { type Edge as AppEdge } from '$lib/stores/edgeStore';
-import type { AssociativeFlowEdge } from '$lib/graph/associativeEdges';
+import {
+	getAssociativeEdgeStyle,
+	type AssociativeFlowEdge,
+} from '$lib/graph/associativeEdges';
 import { getTagColor } from '$lib/tagColors';
 
 export type FlowNodeOptions = {
@@ -102,8 +105,14 @@ type FlowEdgeInput = AppEdge | AssociativeFlowEdge;
 
 function buildFlowEdge(edge: FlowEdgeInput): FlowEdge {
 	if ('data' in edge) {
+		const style =
+			edge.data?.kind === 'associative'
+				? getAssociativeEdgeStyle(edge.data.relation)
+				: edge.style ?? null;
+
 		return {
 			...edge,
+			style: style ?? undefined,
 		};
 	}
 

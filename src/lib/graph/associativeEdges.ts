@@ -9,12 +9,15 @@ export type AssociativeEdgeEntity = {
 
 export type AssociativeEdgeData = {
 	kind: 'associative';
+	relation: AssociativeEdgeRelation;
 	sourceNodeId: string;
 	targetNodeId: string;
 	sourceNodeTitle: string;
 	targetNodeTitle: string;
 	sharedEntities: AssociativeEdgeEntity[];
 };
+
+export type AssociativeEdgeRelation = 'direct' | 'indirect' | 'mixed';
 
 export type AssociativeFlowEdge = {
 	id: string;
@@ -26,7 +29,7 @@ export type AssociativeFlowEdge = {
 	deletable: false;
 	focusable: false;
 	zIndex: number;
-	style: string;
+	style?: string;
 	data: AssociativeEdgeData;
 };
 
@@ -50,6 +53,23 @@ function sortEntities(
 	}
 
 	return left.title.localeCompare(right.title);
+}
+
+function resolveAssociativeEdgeRelation(
+	hasDirect: boolean,
+	hasIndirect: boolean,
+): AssociativeEdgeRelation {
+	if (hasDirect && hasIndirect) {
+		return 'mixed';
+	}
+
+	return hasDirect ? 'direct' : 'indirect';
+}
+
+export function getAssociativeEdgeStyle(relation: AssociativeEdgeRelation) {
+	return relation === 'indirect'
+		? 'stroke-dasharray: 1 6; stroke-linecap: round;'
+		: 'stroke-dasharray: 6 5;';
 }
 
 export function buildAssociativeFlowEdges(
@@ -77,6 +97,8 @@ export function buildAssociativeFlowEdges(
 			source: string;
 			target: string;
 			sharedEntities: AssociativeEdgeEntity[];
+			hasDirect: boolean;
+			hasIndirect: boolean;
 		}
 	>();
 
@@ -114,9 +136,18 @@ export function buildAssociativeFlowEdges(
 					source,
 					target,
 					sharedEntities: [],
+					hasDirect: false,
+					hasIndirect: false,
 				};
+				const isDirect = Boolean(
+					entity.primary_node_id &&
+						(entity.primary_node_id === source ||
+							entity.primary_node_id === target),
+				);
 
 				current.sharedEntities.push(entitySummary);
+				current.hasDirect ||= isDirect;
+				current.hasIndirect ||= !isDirect;
 				edgesByPair.set(key, current);
 			}
 		}
@@ -127,6 +158,10 @@ export function buildAssociativeFlowEdges(
 			const sourceNode = nodeById.get(edge.source);
 			const targetNode = nodeById.get(edge.target);
 			const sharedEntities = [...edge.sharedEntities].sort(sortEntities);
+			const relation = resolveAssociativeEdgeRelation(
+				edge.hasDirect,
+				edge.hasIndirect,
+			);
 
 			return {
 				id: `assoc:${edge.source}:${edge.target}`,
@@ -138,9 +173,9 @@ export function buildAssociativeFlowEdges(
 				deletable: false as const,
 				focusable: false as const,
 				zIndex: 999,
-				style: 'stroke-dasharray: 6 5;',
 				data: {
 					kind: 'associative' as const,
+					relation,
 					sourceNodeId: edge.source,
 					targetNodeId: edge.target,
 					sourceNodeTitle: sourceNode?.title || 'Untitled',

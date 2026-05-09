@@ -55,13 +55,13 @@ Context boundary:
 - Keep only the search schema, query code, and related tests in context.
 - After this stage, clear search implementation details before starting editor work.
 
-## Stage 2.5: Visual Semantics Tweak
+## Stage 2.5: Visual Semantics Tweak (DONE)
 
 Right now we use dashed lines to represent all associative edges (mentioning an entity). We should split that up: a "direct" mention (this note body references another entity which exists as its own note -- `is_entity` is True) uses the dashed edge. Two notes that simply both mention the same entity get a dotted line instead. 
 
 Suppose we have Smaug, Dragon, and Shire nodes. Smaug is an entity node. If Dragon mentions `[[Smaug]]` then we draw a dashed line between dragon and smaug. If both Smaug and Dragon mention the `[[Shire]]` then there's a dotted line between them.
 
-- [ ] Visual distinction between types of entity references
+- [x] Visual distinction between types of entity references
 
 ## Stage 3: Capture and edit workflow
 
