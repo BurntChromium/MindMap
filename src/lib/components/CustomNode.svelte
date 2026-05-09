@@ -6,6 +6,7 @@
 	import {
 		getNodeMode,
 		nodeUiStore,
+		type NodeEditDiscardField,
 		type NodeMode,
 		type NodeUiState,
 	} from '$lib/stores/nodeUiStore';
@@ -16,7 +17,11 @@
 	} from '$lib/tagUtils';
 	import { hasNodeTitleConflict, normalizeNodeTitle } from '$lib/nodeTitles';
 	import { parseInlineContent } from '$lib/inlineContent';
-	import { isSaveAndExitEditShortcut } from '$lib/shortcutUtils';
+	import {
+		getCommittedNodeEditTags,
+		isNodeEditDraftDirty,
+		type NodeEditBaseline,
+	} from '$lib/nodeEditDraft';
 	import {
 		getTagColor,
 		getTagColorWithAlpha,
@@ -35,6 +40,15 @@
 	let draftTagInput = $state('');
 	let draftIsEntity = $state(true);
 	let titleError = $state<string | null>(null);
+	let editBaseline = $state<NodeEditBaseline | null>(null);
+	let activeDiscardPromptField = $state<NodeEditDiscardField | null>(null);
+	let previousDiscardPromptOpen = false;
+	let nodeUiState = $state<NodeUiState>({
+		editingNodeId: null,
+		expandedNodeIds: {},
+		discardPrompt: null,
+	});
+	let previousEditingState = false;
 
 	const isEditing = $derived(nodeMode === 'edit');
 	const isExpanded = $derived(nodeMode !== 'compact');
@@ -57,6 +71,7 @@
 
 	$effect(() => {
 		const unsub = nodeUiStore.subscribe((v: NodeUiState) => {
+			nodeUiState = v;
 			nodeMode = getNodeMode(v, id);
 		});
 
@@ -64,6 +79,25 @@
 	});
 
 	$effect(() => {
+		if (isEditing && !previousEditingState) {
+			editBaseline = {
+				title: data.label || 'Untitled',
+				body: bodyText,
+				tags: normalizeTagList(nodeTags),
+				isEntity: isEntityPage,
+			};
+			draftTitle = editBaseline.title;
+			draftBody = editBaseline.body;
+			draftTags = [...editBaseline.tags];
+			draftTagInput = '';
+			draftIsEntity = editBaseline.isEntity;
+			titleError = null;
+		}
+
+		if (!isEditing && previousEditingState) {
+			editBaseline = null;
+		}
+
 		if (!isEditing) {
 			draftTitle = data.label || 'Untitled';
 			draftBody = bodyText;
@@ -72,15 +106,29 @@
 			draftIsEntity = isEntityPage;
 			titleError = null;
 		}
+
+		previousEditingState = isEditing;
 	});
 
-	async function beginEdit() {
-		draftTitle = data.label || 'Untitled';
-		draftBody = bodyText;
-		draftTags = normalizeTagList(nodeTags);
-		draftTagInput = '';
-		draftIsEntity = isEntityPage;
-		titleError = null;
+	$effect(() => {
+		const promptOpen = nodeUiState.discardPrompt?.nodeId === id;
+
+		if (!promptOpen && previousDiscardPromptOpen && isEditing && activeDiscardPromptField) {
+			const fieldToRefocus = activeDiscardPromptField;
+			queueMicrotask(() => {
+				focusEditField(fieldToRefocus);
+			});
+			activeDiscardPromptField = null;
+		}
+
+		if (!promptOpen && !isEditing) {
+			activeDiscardPromptField = null;
+		}
+
+		previousDiscardPromptOpen = promptOpen;
+	});
+
+	function beginEdit() {
 		nodeUiStore.beginEdit(id);
 	}
 
@@ -101,6 +149,17 @@
 		bodyInput?.select();
 	}
 
+	function getEditBaseline() {
+		return (
+			editBaseline ?? {
+				title: data.label || 'Untitled',
+				body: bodyText,
+				tags: normalizeTagList(nodeTags),
+				isEntity: isEntityPage,
+			}
+		);
+	}
+
 	function focusNextEditField(current: 'title' | 'tag' | 'body') {
 		if (current === 'title') {
 			focusEditField(tagInput ? 'tag' : 'body');
@@ -113,10 +172,6 @@
 		}
 
 		focusEditField('title');
-	}
-
-	function tagKey(tags: string[]) {
-		return normalizeTagList(tags).slice().sort().join('\u0000');
 	}
 
 	function addDraftTag(rawTag: string) {
@@ -140,18 +195,22 @@
 	}
 
 	async function saveAndLock() {
+		const baseline = getEditBaseline();
 		const nextTitle = draftTitle.trim() || 'Untitled';
 		const nextBody = draftBody;
-		const nextTags = normalizeTagList([...draftTags, draftTagInput]);
-		const currentTitle = data.label || 'Untitled';
-		const titleChanged =
-			normalizeNodeTitle(nextTitle) !== normalizeNodeTitle(currentTitle);
-		const entityChanged = draftIsEntity !== isEntityPage;
-		const changed =
-			titleChanged ||
-			nextBody !== bodyText ||
-			tagKey(nextTags) !== tagKey(nodeTags) ||
-			entityChanged;
+		const nextTags = getCommittedNodeEditTags(draftTags, draftTagInput);
+		const changed = isNodeEditDraftDirty(
+			{
+				title: draftTitle,
+				body: draftBody,
+				tags: draftTags,
+				tagInput: draftTagInput,
+				isEntity: draftIsEntity,
+			},
+			baseline,
+		);
+		const titleDisplayChanged =
+			normalizeNodeTitle(nextTitle) !== normalizeNodeTitle(baseline.title);
 
 		if (changed) {
 			const updatePayload: Parameters<typeof nodeStore.updateNode>[0] = {
@@ -161,7 +220,7 @@
 				tags: nextTags,
 			};
 
-			if (titleChanged) {
+			if (titleDisplayChanged) {
 				const currentState = get(nodeStore);
 				const currentNodes = Array.from(currentState.nodes.values());
 
@@ -181,6 +240,7 @@
 		}
 
 		titleError = null;
+		editBaseline = null;
 		nodeUiStore.endEdit(id);
 	}
 
@@ -201,6 +261,43 @@
 		nodeUiStore.toggleExpanded(id);
 	}
 
+	function closeDiscardPrompt() {
+		nodeUiStore.clearDiscardPrompt();
+	}
+
+	function discardEdit() {
+		closeDiscardPrompt();
+		titleError = null;
+		editBaseline = null;
+		nodeUiStore.endEdit(id);
+	}
+
+	function openDiscardPrompt(field: NodeEditDiscardField) {
+		activeDiscardPromptField = field;
+		nodeUiStore.requestDiscardPrompt(id, field);
+	}
+
+	function handleEscapeFromField(field: NodeEditDiscardField) {
+		const baseline = getEditBaseline();
+		const dirty = isNodeEditDraftDirty(
+			{
+				title: draftTitle,
+				body: draftBody,
+				tags: draftTags,
+				tagInput: draftTagInput,
+				isEntity: draftIsEntity,
+			},
+			baseline,
+		);
+
+		if (!dirty) {
+			discardEdit();
+			return;
+		}
+
+		openDiscardPrompt(field);
+	}
+
 	function handleTitleKeyDown(e: KeyboardEvent) {
 		if (e.key === 'Tab') {
 			e.preventDefault();
@@ -208,9 +305,9 @@
 			return;
 		}
 
-		if (isSaveAndExitEditShortcut(e)) {
+		if (e.key === 'Escape') {
 			e.preventDefault();
-			void saveAndLock();
+			handleEscapeFromField('title');
 			return;
 		}
 
@@ -227,9 +324,9 @@
 			return;
 		}
 
-		if (isSaveAndExitEditShortcut(e)) {
+		if (e.key === 'Escape') {
 			e.preventDefault();
-			void saveAndLock();
+			handleEscapeFromField('body');
 			return;
 		}
 
@@ -246,9 +343,9 @@
 			return;
 		}
 
-		if (isSaveAndExitEditShortcut(e)) {
+		if (e.key === 'Escape') {
 			e.preventDefault();
-			void saveAndLock();
+			handleEscapeFromField('tag');
 			return;
 		}
 

@@ -68,7 +68,7 @@ Suppose we have Smaug, Dragon, and Shire nodes. Smaug is an entity node. If Drag
 Goal: reduce friction when users create and refine notes.
 
 - [ ] Remove temporary editing workarounds and tighten the edit state model.
-    - Context: we had persistent rendering lifecycle issues with making the edit key (`e`) drop the cursor into the title field. So we worked around it by adding the `w` key. By the time that the human could hit both keystrokes, rendering has settled.
+    - Context: we had persistent rendering lifecycle issues with making the edit key (`e`) drop the cursor into the title field. The fallback `w` key is back because the edit-entry focus path is still unreliable.
 - [ ] Make node creation faster from keyboard and mouse.
     - Note: skeptical that we can make it much faster because right now it's a single keystroke. To check: is it easy to create a node off of an existing node? (Instead of `n`, finish, then draw arrow?)
 - [ ] Reduce mode-switching overhead between preview, view, and edit states.

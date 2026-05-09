@@ -57,10 +57,11 @@ You can search via free text, tags, or entities from the right-hand panel.
 - `Shift + Alt/Option + Arrow`: jump focus and add the jumped-to node to the selection
 - `Alt/Option + h/j/k/l`: optional Vim-style alias for jump focus
 - `t`: open or focus tag editing for the current selection
-- `Esc`: contextually escape current action: clear selection, save and exit edit mode from a node, close the quick search bar, or exit tag editing
+- `Esc`: contextually escape current action: clear selection, prompt to discard node edits, close the quick search bar, or exit tag editing
+- `Y` / `N`: confirm or cancel the discard prompt when editing a node
 - `Space`: toggle the focused node in or out of the current selection
 - `Tab`: cycle focus through visible nodes or search results
 
 Keyboard shortcuts are disabled while typing in text inputs, textareas, selects, and other editable fields.
 
-Note: `w` is a temporary workaround for jumping to the title field from edit mode. It may change as the edit workflow is refined.
+Note: `w` is the temporary workaround for jumping to the title field from edit mode until the edit-entry focus path is made reliable again.

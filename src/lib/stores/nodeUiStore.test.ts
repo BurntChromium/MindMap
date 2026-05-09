@@ -5,9 +5,14 @@ function snapshot() {
 	let current: {
 		editingNodeId: string | null;
 		expandedNodeIds: Record<string, true>;
+		discardPrompt: {
+			nodeId: string;
+			field: 'title' | 'tag' | 'body';
+		} | null;
 	} = {
 		editingNodeId: null,
 		expandedNodeIds: {},
+		discardPrompt: null,
 	};
 
 	const unsubscribe = nodeUiStore.subscribe((value) => {
@@ -29,6 +34,7 @@ describe('nodeUiStore', () => {
 		const state = snapshot();
 		expect(state.editingNodeId).toBe('node-1');
 		expect(state.expandedNodeIds['node-1']).toBe(true);
+		expect(state.discardPrompt).toBeNull();
 		expect(getNodeMode(state, 'node-1')).toBe('edit');
 	});
 
@@ -54,6 +60,20 @@ describe('nodeUiStore', () => {
 		expect(snapshot()).toEqual({
 			editingNodeId: null,
 			expandedNodeIds: {},
+			discardPrompt: null,
 		});
+	});
+
+	it('tracks discard confirmation prompts for the active editor', () => {
+		nodeUiStore.beginEdit('node-4');
+		nodeUiStore.requestDiscardPrompt('node-4', 'body');
+
+		expect(snapshot().discardPrompt).toEqual({
+			nodeId: 'node-4',
+			field: 'body',
+		});
+
+		nodeUiStore.clearDiscardPrompt();
+		expect(snapshot().discardPrompt).toBeNull();
 	});
 });

@@ -111,6 +111,51 @@ test('toggles the entity checkbox and persists the flag after reload', async ({
 	await expect(nodeCard.getByLabel('Treat as entity page')).toBeChecked();
 });
 
+test('prompts before discarding node edits and supports y/n shortcuts', async ({
+	page,
+	request,
+}) => {
+	await resetDatabase(request);
+	await seedCanvas(request, { id: 'canvas-discard', name: 'Drafts' });
+	await seedNode(request, {
+		id: 'node-discard',
+		canvasId: 'canvas-discard',
+		title: 'Original title',
+		body: 'Original body.',
+	});
+
+	await page.goto('/');
+
+	const nodeCard = page.getByTestId('node-card-node-discard');
+	await expect(nodeCard).toBeVisible();
+	await nodeCard.click();
+	await page.keyboard.press('e');
+	await page.keyboard.press('w');
+
+	const titleInput = page.getByLabel('Node title');
+	await expect(titleInput).toBeFocused();
+	await titleInput.fill('Updated title');
+
+	await page.keyboard.press('Escape');
+
+	const discardDialog = page.getByRole('dialog', {
+		name: 'Discard changes?',
+	});
+	await expect(discardDialog).toBeVisible();
+
+	await page.keyboard.press('n');
+	await expect(discardDialog).toHaveCount(0);
+	await expect(titleInput).toHaveValue('Updated title');
+
+	await page.keyboard.press('Escape');
+	await expect(discardDialog).toBeVisible();
+	await page.keyboard.press('y');
+
+	await expect(discardDialog).toHaveCount(0);
+	await expect(page.getByText('Original title')).toBeVisible();
+	await expect(page.getByLabel('Node title')).toHaveCount(0);
+});
+
 test('filters search results by keyword and tag, then focuses a match', async ({
 	page,
 	request,
