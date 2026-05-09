@@ -42,10 +42,10 @@ Context boundary:
 
 Goal: make finding notes fast and reliable as notebooks grow.
 
-- [ ] Replace substring search with a ranked SQLite-backed search approach.
-- [ ] Add better result ranking for titles, bodies, and tags.
-- [ ] Make search feel responsive on larger notebooks.
-- [ ] Add tests for ranking and tag-filter combinations.
+- [x] ~~Replace substring search with a ranked SQLite-backed search approach.~~ Use a ranked local-first search provider with a shared core and backend adapter.
+- [x] Add better result ranking for titles, bodies, and tags.
+- [x] Make search feel responsive on larger notebooks.
+- [x] Add tests for ranking and tag-filter combinations.
 
 Why this stage matters:
 - Search is one of the primary daily-value loops in a notes app.
