@@ -4,6 +4,7 @@ import {
 	normalizeTagList,
 	normalizeTagName,
 } from '$lib/tagUtils';
+import { searchDocuments } from '$lib/search/searchCore';
 
 export type BulkTagMutation = {
 	id: string;
@@ -104,28 +105,12 @@ export function getSearchHitIds(
 	searchQuery: string,
 	activeTag: string | null,
 ) {
-	const normalizedQuery = searchQuery.trim().toLowerCase();
-	const normalizedTag = activeTag ? normalizeTagName(activeTag) : null;
-
-	if (!normalizedQuery && !normalizedTag) {
-		return new Set<string>();
-	}
-
-	const result = new Set<string>();
-
-	for (const node of nodes) {
-		const haystack = `${node.title} ${node.body}`.toLowerCase();
-		const matchesKeyword =
-			!normalizedQuery || haystack.includes(normalizedQuery);
-		const matchesTag =
-			!normalizedTag || node.tags.map(normalizeTagName).includes(normalizedTag);
-
-		if (matchesKeyword && matchesTag) {
-			result.add(node.id);
-		}
-	}
-
-	return result;
+	return new Set(
+		searchDocuments(nodes, {
+			query: searchQuery,
+			tag: activeTag,
+		}).map((node) => node.id),
+	);
 }
 
 export function buildBulkTagMutations(

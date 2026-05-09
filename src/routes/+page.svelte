@@ -23,7 +23,12 @@ import {
 		getNearestNodeInDirection,
 		type Direction,
 	} from '$lib/graph/navigation';
-	import { collectTagSummaries, createDiscoveryState } from '$lib/discovery';
+	import { collectTagSummaries } from '$lib/discovery';
+	import {
+		createSearchProvider,
+		type SearchProvider,
+		type SearchResponse,
+	} from '$lib/search/searchProvider';
 	import {
 		isCanvasToggleShortcut,
 		isCreateNodeShortcut,
@@ -112,6 +117,12 @@ import {
 	let quickSearchInputRef = $state<HTMLInputElement | undefined>(undefined);
 	let backupTimer: ReturnType<typeof setTimeout> | null = null;
 	let backupInFlight = false;
+	let searchProvider = $state<SearchProvider | null>(null);
+	let searchCorpusRevision = 0;
+	let searchRequestRevision = 0;
+	let searchResults = $state<
+		Array<{ id: string; title: string; body: string; tags: string[] }>
+	>([]);
 	let exportNotice = $state<{ title: string; detail: string } | null>(null);
 	let exportNoticeTimeout: ReturnType<typeof setTimeout> | null = null;
 	let pendingNodePositionOverrides = $state<
@@ -169,14 +180,12 @@ import {
 	const selectedNodes = $derived(
 		nodes.filter((node) => selectedNodeIdSet.has(node.id)),
 	);
-	const discoveryState = $derived(
-		createDiscoveryState(nodes, searchQuery, activeTag),
-	);
-	const tagSummaries = $derived(discoveryState.tagSummaries);
+	const tagSummaries = $derived(collectTagSummaries(nodes));
 	const tagColorMap = $derived(buildTagColorMap(tagSummaries));
 	const selectedTagSummaries = $derived(collectTagSummaries(selectedNodes));
-	const searchResults = $derived(discoveryState.searchResults);
-	const searchHitIds = $derived(discoveryState.searchHitIds);
+	const searchHitIds = $derived(
+		new Set(searchResults.map((node) => node.id)),
+	);
 	const entityInspectorEntries = $derived(
 		buildEntityInspectorEntries(entities, entityMentions, nodes),
 	);
@@ -325,14 +334,74 @@ import {
 		window.location.reload();
 	}
 
+	function toSearchDocument(node: Node) {
+		return {
+			id: node.id,
+			title: node.title,
+			body: node.body ?? '',
+			tags: Array.isArray(node.tags) ? [...node.tags] : [],
+		};
+	}
+
+	async function replaceSearchCorpus() {
+		if (!searchProvider || !activeCanvasId) {
+			searchResults = [];
+			return;
+		}
+
+		searchCorpusRevision += 1;
+
+		await searchProvider.replaceCorpus({
+			canvasId: activeCanvasId,
+			revision: searchCorpusRevision,
+			documents: nodes.map(toSearchDocument),
+		});
+	}
+
+	async function refreshSearchResults() {
+		if (!searchProvider || !activeCanvasId) {
+			searchResults = [];
+			return;
+		}
+
+		const trimmedQuery = searchQuery.trim();
+
+		if (!trimmedQuery && !activeTag) {
+			searchResults = [];
+			return;
+		}
+
+		const requestRevision = ++searchRequestRevision;
+		const response = (await searchProvider.search({
+			requestId: requestRevision,
+			canvasId: activeCanvasId,
+			corpusRevision: searchCorpusRevision,
+			query: searchQuery,
+			tag: activeTag,
+			limit: 200,
+		})) as SearchResponse;
+
+		if (
+			response.requestId !== searchRequestRevision ||
+			response.canvasId !== activeCanvasId ||
+			response.corpusRevision !== searchCorpusRevision
+		) {
+			return;
+		}
+
+		searchResults = response.results.map(({ score: _, ...node }) => node);
+	}
+
 	onDestroy(() => {
 		clearExportNoticeTimer();
 		clearBackupTimer();
+		void searchProvider?.dispose();
 		void nodePositionDebouncer.destroy();
 	});
 
 	onMount(() => {
 		isTauriRuntime = typeof window !== 'undefined' && Boolean(window.__TAURI__);
+		searchProvider = createSearchProvider();
 		backupSettings = { ...data.backupSettings };
 		backupStatus = { ...data.backupStatus };
 		canvasStore.hydrate(initialCanvases, initialActiveCanvasId);
@@ -644,6 +713,28 @@ import {
 		backupSettings.backupRetentionCount;
 		backupStatus.latestBackupCreatedAt;
 		scheduleNextBackup();
+	});
+
+	$effect(() => {
+		searchProvider;
+		nodes;
+		activeCanvasId;
+
+		void replaceSearchCorpus()
+			.then(() => refreshSearchResults())
+			.catch((error) => {
+				console.error(error);
+			});
+	});
+
+	$effect(() => {
+		searchQuery;
+		activeTag;
+		activeCanvasId;
+
+		void refreshSearchResults().catch((error) => {
+			console.error(error);
+		});
 	});
 
 	$effect(() => {

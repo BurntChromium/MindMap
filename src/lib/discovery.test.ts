@@ -44,7 +44,7 @@ describe('discovery helpers', () => {
 		).toEqual(['1']);
 		expect(
 			filterDiscoveryNodes(nodes, '', 'npc').map((node) => node.id),
-		).toEqual(['1', '2']);
+		).toEqual(['2', '1']);
 		expect(
 			filterDiscoveryNodes(nodes, 'dragon', 'npc').map((node) => node.id),
 		).toEqual(['1']);

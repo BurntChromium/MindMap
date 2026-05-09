@@ -32,6 +32,7 @@ import {
 	type AppDataBackupStatus,
 	restoreLatestBackup,
 } from './databaseBackup';
+import { searchDocuments } from '$lib/search/searchCore';
 
 export type AppDataCanvas = {
 	id: string;
@@ -120,10 +121,6 @@ type EntitySeed = {
 	primary_node_id: string | null;
 	created_at: number;
 };
-
-function escapeLike(value: string) {
-	return value.replace(/[\\%_]/g, '\\$&');
-}
 
 function parseTags(rawTags: unknown) {
 	if (typeof rawTags !== 'string' || !rawTags) {
@@ -430,9 +427,7 @@ export function searchNodesByCanvasId(
 		return [];
 	}
 
-	const like = `%${escapeLike(normalizedQuery)}%`;
-
-	return (
+	const rows = (
 		getDb(database)
 			.prepare(
 				`
@@ -450,36 +445,18 @@ export function searchNodesByCanvasId(
         ), '[]') AS tags
       FROM nodes n
       WHERE n.canvas_id = ?
-        AND (
-          ? = ''
-          OR LOWER(COALESCE(n.title, '')) LIKE ? ESCAPE '\\'
-          OR LOWER(COALESCE(n.body, '')) LIKE ? ESCAPE '\\'
-        )
-        AND (
-          ? = ''
-          OR EXISTS (
-            SELECT 1
-            FROM node_tags nt
-            JOIN tags t ON t.id = nt.tag_id
-            WHERE nt.node_id = n.id
-              AND t.name = ?
-          )
-        )
-      ORDER BY n.created_at ASC
     `,
 			)
-			.all(
-				canvasId,
-				normalizedQuery,
-				like,
-				like,
-				normalizedTag,
-				normalizedTag,
-			) as Array<Record<string, unknown> & { tags?: unknown }>
+			.all(canvasId) as Array<Record<string, unknown> & { tags?: unknown }>
 	).map((node) => ({
 		...node,
 		tags: parseTags(node.tags),
 	})) as AppDataNode[];
+
+	return searchDocuments(rows, {
+		query: normalizedQuery,
+		tag: normalizedTag || null,
+	}).map(({ score: _, ...node }) => node) as AppDataNode[];
 }
 
 export function getEdgesByCanvasId(

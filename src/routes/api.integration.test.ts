@@ -1320,6 +1320,67 @@ describe('API integration', () => {
 		});
 	});
 
+	it('ranks title matches ahead of tag and body matches', async () => {
+		const canvas = await canvasesApi.POST({
+			request: request({ id: 'canvas-rank', name: 'Ranked Search' }),
+		} as any);
+		const { id: canvasId } = await canvas.json();
+
+		const titleNode = await nodesApi.POST({
+			request: request({ id: 'node-title', canvasId, x: 0, y: 0 }),
+		} as any);
+		const tagNode = await nodesApi.POST({
+			request: request({ id: 'node-tag', canvasId, x: 120, y: 120 }),
+		} as any);
+		const bodyNode = await nodesApi.POST({
+			request: request({ id: 'node-body', canvasId, x: 240, y: 240 }),
+		} as any);
+
+		const { id: titleNodeId } = await titleNode.json();
+		const { id: tagNodeId } = await tagNode.json();
+		const { id: bodyNodeId } = await bodyNode.json();
+
+		await nodesApi.PATCH({
+			request: request({
+				id: titleNodeId,
+				title: 'Dragon keeper',
+				body: 'A quiet note.',
+				tags: ['npc'],
+			}),
+		} as any);
+
+		await nodesApi.PATCH({
+			request: request({
+				id: tagNodeId,
+				title: 'Index',
+				body: 'Something else entirely.',
+				tags: ['npc', 'dragon'],
+			}),
+		} as any);
+
+		await nodesApi.PATCH({
+			request: request({
+				id: bodyNodeId,
+				title: 'Notes',
+				body: 'The dragon sleeps below the mountain.',
+				tags: ['npc'],
+			}),
+		} as any);
+
+		const response = await searchApi.GET({
+			url: new URL(
+				`http://localhost/api/search?canvasId=${canvasId}&query=dragon&tag=npc`,
+			),
+		} as any);
+		const results = await response.json();
+
+		expect(results.map((node: { id: string }) => node.id)).toEqual([
+			titleNodeId,
+			tagNodeId,
+			bodyNodeId,
+		]);
+	});
+
 	it('creates and lists edges', async () => {
 		const canvas = await canvasesApi.POST({
 			request: request({ id: 'canvas-1', name: 'Connections' }),

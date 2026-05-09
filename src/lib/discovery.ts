@@ -1,5 +1,6 @@
 import { normalizeTagList, normalizeTagName } from '$lib/tagUtils';
 import { getTagColor } from '$lib/tagColors';
+import { createSearchHitIdSet, searchDocuments, type SearchDocument } from './search/searchCore';
 
 export type DiscoveryNode = {
 	id: string;
@@ -30,23 +31,6 @@ let cachedSearchHitIds = new Set<string>();
 
 function normalizeQuery(query: string) {
 	return query.trim().toLowerCase();
-}
-
-function nodeMatchesKeyword(node: DiscoveryNode, query: string) {
-	if (!query) {
-		return true;
-	}
-
-	const haystack = `${node.title} ${node.body}`.toLowerCase();
-	return haystack.includes(query);
-}
-
-function nodeMatchesTag(node: DiscoveryNode, tag: string | null) {
-	if (!tag) {
-		return true;
-	}
-
-	return normalizeTagList(node.tags).includes(normalizeTagName(tag));
 }
 
 export function collectTagSummaries(nodes: DiscoveryNode[]) {
@@ -105,29 +89,16 @@ export function createDiscoveryState(
 		cachedSearchQuery !== normalizedQuery ||
 		cachedSearchTag !== normalizedTag
 	) {
-		const searchResults: DiscoveryNode[] = [];
-		const searchHitIds = new Set<string>();
-		const shouldFilter = Boolean(normalizedQuery || normalizedTag);
-
-		if (shouldFilter) {
-			for (const node of nodes) {
-				const normalizedTags = normalizeTagList(node.tags);
-				const matchesKeyword =
-					!normalizedQuery || nodeMatchesKeyword(node, normalizedQuery);
-				const matchesTag =
-					!normalizedTag || normalizedTags.includes(normalizedTag);
-
-				if (matchesKeyword && matchesTag) {
-					searchResults.push(node);
-					searchHitIds.add(node.id);
-				}
-			}
-		}
+		const searchResults = searchDocuments(nodes as SearchDocument[], {
+			query: normalizedQuery,
+			tag: normalizedTag,
+		});
+		const searchHitIds = createSearchHitIdSet(searchResults);
 
 		cachedSearchNodes = nodes;
 		cachedSearchQuery = normalizedQuery;
 		cachedSearchTag = normalizedTag;
-		cachedSearchResults = searchResults;
+		cachedSearchResults = searchResults.map(({ score: _, ...node }) => node);
 		cachedSearchHitIds = searchHitIds;
 	}
 
@@ -146,15 +117,10 @@ export function filterDiscoveryNodes(
 	const normalizedQuery = normalizeQuery(query);
 	const normalizedTag = activeTag ? normalizeTagName(activeTag) : null;
 
-	if (!normalizedQuery && !normalizedTag) {
-		return [];
-	}
-
-	return nodes.filter(
-		(node) =>
-			nodeMatchesKeyword(node, normalizedQuery) &&
-			nodeMatchesTag(node, normalizedTag),
-	);
+	return searchDocuments(nodes as SearchDocument[], {
+		query: normalizedQuery,
+		tag: normalizedTag,
+	}).map(({ score: _, ...node }) => node);
 }
 
 export function discoveryMatchesNode(
@@ -165,12 +131,10 @@ export function discoveryMatchesNode(
 	const normalizedQuery = normalizeQuery(query);
 	const normalizedTag = activeTag ? normalizeTagName(activeTag) : null;
 
-	if (!normalizedQuery && !normalizedTag) {
-		return false;
-	}
-
 	return (
-		nodeMatchesKeyword(node, normalizedQuery) &&
-		nodeMatchesTag(node, normalizedTag)
+		searchDocuments([node] as SearchDocument[], {
+			query: normalizedQuery,
+			tag: normalizedTag,
+		}).length > 0
 	);
 }

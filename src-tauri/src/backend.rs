@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::OnceLock;
 use std::time::Duration;
 use rfd::FileDialog;
 use tauri::{AppHandle, Manager};
@@ -849,13 +850,6 @@ fn init_schema(connection: &Connection) -> DbResult<()> {
     Ok(())
 }
 
-fn escape_like(value: &str) -> String {
-    value
-        .replace('\\', r"\\")
-        .replace('%', r"\%")
-        .replace('_', r"\_")
-}
-
 fn normalize_tag_name(raw: &str) -> String {
     raw.trim()
         .trim_start_matches('#')
@@ -881,6 +875,120 @@ fn normalize_tag_list(tags: &[String]) -> Vec<String> {
     }
 
     result
+}
+
+fn search_token_regex() -> &'static regex::Regex {
+    static REGEX: OnceLock<regex::Regex> = OnceLock::new();
+
+    REGEX.get_or_init(|| {
+        RegexBuilder::new(r"[\p{L}\p{N}]+")
+            .unicode(true)
+            .build()
+            .expect("compile search token regex")
+    })
+}
+
+fn tokenize_text(value: &str) -> Vec<String> {
+    search_token_regex()
+        .find_iter(&value.to_lowercase())
+        .map(|match_| match_.as_str().to_string())
+        .collect()
+}
+
+fn tokenize_query(query: &str) -> Vec<String> {
+    let mut seen = HashSet::new();
+    let mut result = Vec::new();
+
+    for token in tokenize_text(query.trim()) {
+        if seen.insert(token.clone()) {
+            result.push(token);
+        }
+    }
+
+    result
+}
+
+#[derive(Debug, Clone)]
+struct SearchIndexedNode {
+    node: AppDataNode,
+    title_tokens: HashSet<String>,
+    body_tokens: HashSet<String>,
+    tag_tokens: HashSet<String>,
+    all_tokens: HashSet<String>,
+    normalized_tags: Vec<String>,
+}
+
+fn index_search_node(node: AppDataNode) -> SearchIndexedNode {
+    let normalized_tags = normalize_tag_list(&node.tags);
+    let title_tokens = tokenize_text(&node.title).into_iter().collect::<HashSet<_>>();
+    let body_tokens = tokenize_text(&node.body).into_iter().collect::<HashSet<_>>();
+    let tag_tokens = normalized_tags
+        .iter()
+        .flat_map(|tag| tokenize_text(tag))
+        .collect::<HashSet<_>>();
+    let all_tokens = title_tokens
+        .iter()
+        .chain(body_tokens.iter())
+        .chain(tag_tokens.iter())
+        .cloned()
+        .collect::<HashSet<_>>();
+
+    SearchIndexedNode {
+        node,
+        title_tokens,
+        body_tokens,
+        tag_tokens,
+        all_tokens,
+        normalized_tags,
+    }
+}
+
+fn compare_search_nodes(left: &SearchIndexedNode, right: &SearchIndexedNode, left_score: i64, right_score: i64) -> std::cmp::Ordering {
+    right_score
+        .cmp(&left_score)
+        .then_with(|| left.node.created_at.cmp(&right.node.created_at))
+        .then_with(|| left.node.title.cmp(&right.node.title))
+        .then_with(|| left.node.id.cmp(&right.node.id))
+}
+
+fn score_search_node(
+    node: &SearchIndexedNode,
+    query_tokens: &[String],
+    normalized_tag: &str,
+) -> Option<i64> {
+    if !normalized_tag.is_empty() && !node.normalized_tags.iter().any(|tag| tag == normalized_tag) {
+        return None;
+    }
+
+    if query_tokens.iter().any(|token| !node.all_tokens.contains(token)) {
+        return None;
+    }
+
+    let mut score = 0_i64;
+
+    for token in query_tokens {
+        if node.title_tokens.contains(token) {
+            score += 300;
+        } else if node.tag_tokens.contains(token) {
+            score += 200;
+        } else if node.body_tokens.contains(token) {
+            score += 100;
+        }
+    }
+
+    if !normalized_tag.is_empty() {
+        score += 25;
+    }
+
+    if !query_tokens.is_empty()
+        && query_tokens
+            .iter()
+            .all(|token| node.title_tokens.contains(token))
+    {
+        score += 50;
+    }
+
+    Some(score)
 }
 
 fn hash_tag_name(value: &str) -> usize {
@@ -1296,68 +1404,81 @@ fn search_nodes_by_canvas_id(
         return Ok(Vec::new());
     }
 
-    let like = format!("%{}%", escape_like(&normalized_query));
     let mut stmt = connection
         .prepare(
             "
-        SELECT id, canvas_id, title, body, is_entity, x, y, collapsed, created_at, updated_at
-        FROM nodes n
-        WHERE n.canvas_id = ?
-          AND (
-            ? = ''
-            OR LOWER(COALESCE(n.title, '')) LIKE ? ESCAPE '\\'
-            OR LOWER(COALESCE(n.body, '')) LIKE ? ESCAPE '\\'
-          )
-          AND (
-            ? = ''
-            OR EXISTS (
-              SELECT 1
+        SELECT
+          n.id,
+          n.canvas_id,
+          n.title,
+          n.body,
+          n.is_entity,
+          n.x,
+          n.y,
+          n.collapsed,
+          n.created_at,
+          n.updated_at,
+          COALESCE((
+            SELECT json_group_array(tag_name)
+            FROM (
+              SELECT t.name AS tag_name
               FROM node_tags nt
               JOIN tags t ON t.id = nt.tag_id
               WHERE nt.node_id = n.id
-                AND t.name = ?
+              ORDER BY nt.rowid
             )
-          )
-        ORDER BY n.created_at ASC
+          ), '[]') AS tags
+        FROM nodes n
+        WHERE n.canvas_id = ?
       ",
         )
         .map_err(|error| format!("Failed to search nodes: {error}"))?;
 
-    let mut rows = stmt
-        .query_map(
-            params![
-                canvas_id,
-                normalized_query,
-                like,
-                like,
-                normalized_tag,
-                normalized_tag
-            ],
-            |row| {
-                Ok(AppDataNode {
-                    id: row.get(0)?,
-                    canvas_id: row.get(1)?,
-                    title: row.get(2)?,
-                    body: row.get::<_, Option<String>>(3)?.unwrap_or_default(),
-                    is_entity: row.get::<_, Option<i64>>(4)?.unwrap_or(0),
-                    tags: Vec::new(),
-                    x: row.get::<_, Option<f64>>(5)?.unwrap_or(0.0),
-                    y: row.get::<_, Option<f64>>(6)?.unwrap_or(0.0),
-                    collapsed: row.get::<_, Option<i64>>(7)?.unwrap_or(0),
-                    created_at: row.get(8)?,
-                    updated_at: row.get(9)?,
-                })
-            },
-        )
+    let rows = stmt
+        .query_map(params![canvas_id], |row| {
+            let raw_tags: String = row.get(10)?;
+            let tags = serde_json::from_str(&raw_tags).unwrap_or_default();
+
+            Ok(AppDataNode {
+                id: row.get(0)?,
+                canvas_id: row.get(1)?,
+                title: row.get(2)?,
+                body: row.get::<_, Option<String>>(3)?.unwrap_or_default(),
+                is_entity: row.get::<_, Option<i64>>(4)?.unwrap_or(0),
+                tags,
+                x: row.get::<_, Option<f64>>(5)?.unwrap_or(0.0),
+                y: row.get::<_, Option<f64>>(6)?.unwrap_or(0.0),
+                collapsed: row.get::<_, Option<i64>>(7)?.unwrap_or(0),
+                created_at: row.get(8)?,
+                updated_at: row.get(9)?,
+            })
+        })
         .map_err(|error| format!("Failed to search nodes: {error}"))?
         .collect::<Result<Vec<_>, _>>()
         .map_err(|error| format!("Failed to search nodes: {error}"))?;
 
-    for node in &mut rows {
-        node.tags = parse_tag_row_ids(connection, &node.id)?;
-    }
+    let indexed_rows = rows
+        .into_iter()
+        .map(index_search_node)
+        .collect::<Vec<_>>();
+    let query_tokens = tokenize_query(&normalized_query);
 
-    Ok(rows)
+    let mut ranked = indexed_rows
+        .into_iter()
+        .filter_map(|indexed| {
+            score_search_node(&indexed, &query_tokens, &normalized_tag)
+                .map(|score| (indexed, score))
+        })
+        .collect::<Vec<_>>();
+
+    ranked.sort_by(|(left, left_score), (right, right_score)| {
+        compare_search_nodes(left, right, *left_score, *right_score)
+    });
+
+    Ok(ranked
+        .into_iter()
+        .map(|(indexed, _)| indexed.node)
+        .collect())
 }
 
 fn load_edges_by_canvas_id(connection: &Connection, canvas_id: &str) -> DbResult<Vec<AppDataEdge>> {
@@ -2719,8 +2840,32 @@ mod tests {
                     id, canvas_id, title, body, is_entity, 0.0_f64, 0.0_f64, 0_i64, created_at,
                     created_at,
                 ],
+        )
+        .expect("seed node");
+    }
+
+    fn seed_tag(connection: &Connection, id: &str, name: &str) {
+        connection
+            .execute(
+                "
+          INSERT INTO tags (id, name, color)
+          VALUES (?, ?, ?)
+        ",
+                params![id, name, "#ffffff"],
             )
-            .expect("seed node");
+            .expect("seed tag");
+    }
+
+    fn link_node_tag(connection: &Connection, node_id: &str, tag_id: &str) {
+        connection
+            .execute(
+                "
+          INSERT INTO node_tags (node_id, tag_id)
+          VALUES (?, ?)
+        ",
+                params![node_id, tag_id],
+            )
+            .expect("link tag");
     }
 
     #[test]
@@ -2822,6 +2967,64 @@ mod tests {
                 .find(|entity| entity.title_key == "aeon")
                 .and_then(|entity| entity.primary_node_id.clone()),
             Some("node-aeon".to_string())
+        );
+    }
+
+    #[test]
+    fn ranks_title_matches_before_tag_and_body_matches() {
+        let connection = Connection::open_in_memory().expect("open in-memory db");
+        init_schema(&connection).expect("initialize schema");
+        seed_canvas(&connection, "canvas-1");
+        seed_tag(&connection, "tag-npc", "npc");
+        seed_tag(&connection, "tag-dragon", "dragon");
+
+        seed_node(
+            &connection,
+            "node-title",
+            "canvas-1",
+            "Dragon keeper",
+            "Nothing relevant here.",
+            0,
+            1,
+        );
+        seed_node(
+            &connection,
+            "node-tag",
+            "canvas-1",
+            "Index",
+            "Something else entirely.",
+            0,
+            2,
+        );
+        seed_node(
+            &connection,
+            "node-body",
+            "canvas-1",
+            "Notes",
+            "The dragon sleeps below the mountain.",
+            0,
+            3,
+        );
+
+        link_node_tag(&connection, "node-title", "tag-npc");
+        link_node_tag(&connection, "node-tag", "tag-npc");
+        link_node_tag(&connection, "node-tag", "tag-dragon");
+        link_node_tag(&connection, "node-body", "tag-npc");
+
+        let results = search_nodes_by_canvas_id(
+            &connection,
+            "canvas-1",
+            "dragon",
+            Some("npc"),
+        )
+        .expect("search nodes");
+
+        assert_eq!(
+            results
+                .iter()
+                .map(|node| node.id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["node-title", "node-tag", "node-body"]
         );
     }
 }

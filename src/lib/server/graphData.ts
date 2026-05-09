@@ -1,6 +1,7 @@
 import { db } from './db';
 import { normalizeTagList, normalizeTagName } from '$lib/tagUtils';
 import { getTagColor } from '$lib/tagColors';
+import { searchDocuments } from '$lib/search/searchCore';
 import {
 	getEntitiesByCanvasId,
 	getEntityMentionsByCanvasId,
@@ -57,10 +58,6 @@ function parseTags(rawTags: unknown) {
 	} catch {
 		return [];
 	}
-}
-
-function escapeLike(value: string) {
-	return value.replace(/[\\%_]/g, '\\$&');
 }
 
 export function getCanvases() {
@@ -169,9 +166,7 @@ export function searchNodesByCanvasId(
 		return [];
 	}
 
-	const like = `%${escapeLike(normalizedQuery)}%`;
-
-	return (
+	const rows = (
 		db
 			.prepare(
 				`
@@ -189,36 +184,18 @@ export function searchNodesByCanvasId(
         ), '[]') AS tags
       FROM nodes n
       WHERE n.canvas_id = ?
-        AND (
-          ? = ''
-          OR LOWER(COALESCE(n.title, '')) LIKE ? ESCAPE '\\'
-          OR LOWER(COALESCE(n.body, '')) LIKE ? ESCAPE '\\'
-        )
-        AND (
-          ? = ''
-          OR EXISTS (
-            SELECT 1
-            FROM node_tags nt
-            JOIN tags t ON t.id = nt.tag_id
-            WHERE nt.node_id = n.id
-              AND t.name = ?
-          )
-        )
-      ORDER BY n.created_at ASC
     `,
 			)
-			.all(
-				canvasId,
-				normalizedQuery,
-				like,
-				like,
-				normalizedTag,
-				normalizedTag,
-			) as Array<Record<string, unknown> & { tags?: unknown }>
+			.all(canvasId) as Array<Record<string, unknown> & { tags?: unknown }>
 	).map((node) => ({
 		...node,
 		tags: parseTags(node.tags),
 	})) as NodeRow[];
+
+	return searchDocuments(rows, {
+		query: normalizedQuery,
+		tag: normalizedTag || null,
+	}).map(({ score: _, ...node }) => node) as NodeRow[];
 }
 
 export function getEdgesByCanvasId(canvasId: string | null) {
