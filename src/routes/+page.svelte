@@ -106,6 +106,7 @@ import {
 	let quickSearchOpen = $state(false);
 	let loadedCanvasId = $state<string | null>(null);
 	let initialHydrationDone = $state(false);
+	let isTauriRuntime = $state(false);
 	let canvasStageApi = $state<CanvasStageApi | null>(null);
 	let canvasShell: HTMLDivElement | undefined;
 	let quickSearchInputRef = $state<HTMLInputElement | undefined>(undefined);
@@ -156,6 +157,9 @@ import {
 	const edges = $derived(storeEdges ?? initialEdges);
 	const entities = $derived(storeEntities ?? initialEntities);
 	const entityMentions = $derived(storeEntityMentions ?? initialEntityMentions);
+	const backupDirectoryConfigurable = $derived(
+		data.backupDirectoryConfigurable && isTauriRuntime,
+	);
 	const selectedNodeIds = $derived(storeSelectedNodeIds ?? []);
 	const clipboardFragment = $derived(storeClipboardFragment);
 	const clipboardPasteCount = $derived(storeClipboardPasteCount);
@@ -328,6 +332,7 @@ import {
 	});
 
 	onMount(() => {
+		isTauriRuntime = typeof window !== 'undefined' && Boolean(window.__TAURI__);
 		backupSettings = { ...data.backupSettings };
 		backupStatus = { ...data.backupStatus };
 		canvasStore.hydrate(initialCanvases, initialActiveCanvasId);
@@ -1498,7 +1503,7 @@ import {
 		{databaseFileName}
 		{backupSettings}
 		{backupStatus}
-		backupDirectoryConfigurable={data.backupDirectoryConfigurable}
+		{backupDirectoryConfigurable}
 		onExportSuccess={showExportNotice}
 		onDatabaseFileNameSave={updateDatabaseFileName}
 		onBackupSettingsSave={saveBackupSettings}

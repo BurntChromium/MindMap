@@ -292,6 +292,7 @@ test('autosaves backup interval and retention settings', async ({
 	await page.goto('/');
 
 	await page.getByTestId('sidebar-tab-database').click();
+	await expect(page.getByTestId('sidebar-choose-backup-folder')).toHaveCount(0);
 
 	await page.getByLabel('Backup interval in minutes').fill('12');
 	await page.getByLabel('Backup retention count').fill('4');
