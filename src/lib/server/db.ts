@@ -10,6 +10,11 @@ const databaseSettingsPath = join(databaseDirectory, 'mindmap.config.json');
 const defaultBackupDirectoryPath = 'mindmap-backups';
 const defaultBackupIntervalMinutes = 10;
 const defaultBackupRetentionCount = 2;
+const configuredBackupDirectoryPath =
+	typeof process.env.MINDMAP_BACKUP_DIRECTORY_PATH === 'string'
+		? process.env.MINDMAP_BACKUP_DIRECTORY_PATH.trim()
+		: '';
+const serverMode = process.env.MINDMAP_SERVER_MODE === '1';
 
 type DatabaseSettings = {
 	databaseFileName?: unknown;
@@ -40,6 +45,14 @@ function normalizeBackupDirectoryPath(value: unknown) {
 	return isValidBackupDirectoryPath(candidate)
 		? candidate
 		: defaultBackupDirectoryPath;
+}
+
+function getConfiguredBackupDirectoryPath(settingsBackupDirectoryPath: string) {
+	if (isValidBackupDirectoryPath(configuredBackupDirectoryPath)) {
+		return configuredBackupDirectoryPath;
+	}
+
+	return serverMode ? defaultBackupDirectoryPath : settingsBackupDirectoryPath;
 }
 
 function normalizePositiveInteger(
@@ -134,10 +147,16 @@ export function getDatabaseBackupSettings() {
 	const settings = readDatabaseSettingsFromFile();
 
 	return {
-		backupDirectoryPath: settings.backupDirectoryPath,
+		backupDirectoryPath: getConfiguredBackupDirectoryPath(
+			settings.backupDirectoryPath,
+		),
 		backupIntervalMinutes: settings.backupIntervalMinutes,
 		backupRetentionCount: settings.backupRetentionCount,
 	};
+}
+
+export function isBackupDirectoryConfigurable() {
+	return !serverMode && !isValidBackupDirectoryPath(configuredBackupDirectoryPath);
 }
 
 export function getDatabaseSettingsPath() {
@@ -222,7 +241,11 @@ export async function setBackupSettings(input: {
 	backupIntervalMinutes: number;
 	backupRetentionCount: number;
 }) {
-	const directoryPath = input.backupDirectoryPath.trim();
+	const settings = readDatabaseSettingsFromFile();
+	const directoryConfigurable = isBackupDirectoryConfigurable();
+	const directoryPath = directoryConfigurable
+		? input.backupDirectoryPath.trim()
+		: getConfiguredBackupDirectoryPath(settings.backupDirectoryPath).trim();
 
 	if (!isValidBackupDirectoryPath(directoryPath)) {
 		throw new Error('Backup folder path is required.');
@@ -242,10 +265,11 @@ export async function setBackupSettings(input: {
 		throw new Error('Backup retention must be at least 1 snapshot.');
 	}
 
-	const settings = readDatabaseSettingsFromFile();
 	persistDatabaseSettings({
 		...settings,
-		backupDirectoryPath: directoryPath,
+		backupDirectoryPath: directoryConfigurable
+			? directoryPath
+			: settings.backupDirectoryPath,
 		backupIntervalMinutes: input.backupIntervalMinutes,
 		backupRetentionCount: input.backupRetentionCount,
 	});

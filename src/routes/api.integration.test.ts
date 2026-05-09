@@ -171,6 +171,7 @@ describe('API integration', () => {
 				latestBackupCreatedAt: null,
 			}),
 		);
+		expect(pageData.backupDirectoryConfigurable).toBe(true);
 	});
 
 	it('creates and restores the latest backup snapshot', async () => {

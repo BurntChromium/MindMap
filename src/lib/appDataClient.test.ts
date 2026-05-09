@@ -24,6 +24,33 @@ afterEach(() => {
 });
 
 describe('appDataClient', () => {
+	it('uses the Tauri folder picker for backup folders in desktop builds', async () => {
+		invoke.mockResolvedValueOnce('/tmp/backups');
+
+		const { appDataClient } = await loadClient();
+
+		await expect(
+			appDataClient.pickBackupDirectory({ defaultPath: 'mindmap-backups' }),
+		).resolves.toBe('/tmp/backups');
+		expect(invoke).toHaveBeenCalledWith('pick_backup_directory', {
+			input: { defaultPath: 'mindmap-backups' },
+		});
+	});
+
+	it('does not fake backup folder paths outside Tauri', async () => {
+		const prompt = vi.fn();
+		vi.stubGlobal('window', {
+			prompt,
+		});
+
+		const { appDataClient } = await loadClient();
+
+		await expect(
+			appDataClient.pickBackupDirectory({ defaultPath: 'mindmap-backups' }),
+		).resolves.toBeNull();
+		expect(prompt).not.toHaveBeenCalled();
+	});
+
 	it('normalizes Tauri node create payloads before invoking the backend', async () => {
 		invoke.mockResolvedValueOnce({ success: true });
 

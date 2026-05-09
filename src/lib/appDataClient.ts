@@ -140,12 +140,7 @@ function createFetchClient(): AppDataClient {
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify(input),
 			}),
-		pickBackupDirectory: async (input) =>
-			(window.prompt(
-				'Choose a backup folder path.',
-				input?.defaultPath ?? '',
-			) ??
-				null),
+		pickBackupDirectory: async () => null,
 		createBackupSnapshot: () =>
 			requestJson('/api/database-backups', {
 				method: 'POST',

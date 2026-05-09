@@ -4,6 +4,7 @@
 	import { formatTagLabel } from '$lib/tagUtils';
 	import type { EntityInspectorEntry } from '$lib/entityInspector';
 	import type { AssociativeFlowEdge } from '$lib/graph/associativeEdges';
+	import PanelTabs from './PanelTabs.svelte';
 
 	type PanelTab = 'search' | 'tags' | 'entities';
 
@@ -153,45 +154,19 @@
 		</button>
 		<div class="panel-shell__header-actions">
 			{#if !collapsed}
-				<div
-					class="panel-shell__tablist"
-					role="tablist"
-					aria-label="Right panel tabs"
-				>
-					<button
-						class="panel-shell__tab"
-						class:panel-shell__tab--active={activeTab === 'search'}
-						type="button"
-						role="tab"
-						aria-selected={activeTab === 'search'}
-						data-testid="panel-tab-search"
-						onclick={() => (activeTab = 'search')}
-					>
-						Search
-					</button>
-					<button
-						class="panel-shell__tab"
-						class:panel-shell__tab--active={activeTab === 'tags'}
-						type="button"
-						role="tab"
-						aria-selected={activeTab === 'tags'}
-						data-testid="panel-tab-tags"
-						onclick={() => (activeTab = 'tags')}
-					>
-						Tags
-					</button>
-					<button
-						class="panel-shell__tab"
-						class:panel-shell__tab--active={activeTab === 'entities'}
-						type="button"
-						role="tab"
-						aria-selected={activeTab === 'entities'}
-						data-testid="panel-tab-entities"
-						onclick={() => (activeTab = 'entities')}
-					>
-						Entities
-					</button>
-				</div>
+				<PanelTabs
+					bind:activeTab
+					ariaLabel="Right panel tabs"
+					tabs={[
+						{ value: 'search', label: 'Search', testId: 'panel-tab-search' },
+						{ value: 'tags', label: 'Tags', testId: 'panel-tab-tags' },
+						{
+							value: 'entities',
+							label: 'Entities',
+							testId: 'panel-tab-entities',
+						},
+					]}
+				/>
 			{/if}
 		</div>
 	</div>

@@ -84,6 +84,8 @@ pub struct AppDataPageData {
     pub backup_settings: AppDataBackupSettings,
     #[serde(rename = "backupStatus")]
     pub backup_status: AppDataBackupStatus,
+    #[serde(rename = "backupDirectoryConfigurable")]
+    pub backup_directory_configurable: bool,
     pub nodes: Vec<AppDataNode>,
     pub edges: Vec<AppDataEdge>,
     pub tags: Vec<AppDataTagSummary>,
@@ -1710,6 +1712,7 @@ fn get_initial_page_data(connection: &Connection) -> DbResult<AppDataPageData> {
                 latest_backup_created_at: None,
                 backup_count: 0,
             },
+            backup_directory_configurable: true,
             nodes: load_nodes_by_canvas_id(connection, &canvas_id)?,
             edges: load_edges_by_canvas_id(connection, &canvas_id)?,
             tags: get_tags_by_canvas_id(connection, &canvas_id)?,
@@ -1731,6 +1734,7 @@ fn get_initial_page_data(connection: &Connection) -> DbResult<AppDataPageData> {
                 latest_backup_created_at: None,
                 backup_count: 0,
             },
+            backup_directory_configurable: true,
             nodes: Vec::new(),
             edges: Vec::new(),
             tags: Vec::new(),

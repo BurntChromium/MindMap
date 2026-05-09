@@ -1498,6 +1498,7 @@ import {
 		{databaseFileName}
 		{backupSettings}
 		{backupStatus}
+		backupDirectoryConfigurable={data.backupDirectoryConfigurable}
 		onExportSuccess={showExportNotice}
 		onDatabaseFileNameSave={updateDatabaseFileName}
 		onBackupSettingsSave={saveBackupSettings}

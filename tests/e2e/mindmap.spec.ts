@@ -282,26 +282,16 @@ test('switches between canvas and database tabs in the left sidebar', async ({
 	await expect(page.getByTestId('sidebar-panel-canvas')).toBeVisible();
 });
 
-test('autosaves backup settings and opens the folder picker', async ({
+test('autosaves backup interval and retention settings', async ({
 	page,
 	request,
 }) => {
 	await resetDatabase(request);
 	await seedCanvas(request, { id: 'canvas-backup-settings', name: 'Settings' });
 
-	await page.addInitScript(() => {
-		Object.defineProperty(window, 'prompt', {
-			value: () => '/tmp/mindmap-backups',
-		});
-	});
 	await page.goto('/');
 
 	await page.getByTestId('sidebar-tab-database').click();
-	await page.getByTestId('sidebar-choose-backup-folder').click();
-
-	await expect(page.getByTestId('sidebar-choose-backup-folder')).toContainText(
-		'/tmp/mindmap-backups',
-	);
 
 	await page.getByLabel('Backup interval in minutes').fill('12');
 	await page.getByLabel('Backup retention count').fill('4');
@@ -318,7 +308,7 @@ test('autosaves backup settings and opens the folder picker', async ({
 
 	expect(backupSettingsPayload.backupSettings).toEqual(
 		expect.objectContaining({
-			backupDirectoryPath: '/tmp/mindmap-backups',
+			backupDirectoryPath: 'mindmap-backups',
 			backupIntervalMinutes: 12,
 			backupRetentionCount: 4,
 		}),

@@ -16,6 +16,7 @@
 		type AppDataBackupSettings,
 		type AppDataBackupStatus,
 	} from '$lib/appDataClient';
+	import PanelTabs from './PanelTabs.svelte';
 	import { saveBytesToFile } from '$lib/fileTransfers';
 	import { canvasStore, type Canvas } from '$lib/stores/canvasStore';
 	import { shouldCommitCanvasRename } from '$lib/routes/mindmapPage';
@@ -27,6 +28,7 @@
 		databaseFileName: string;
 		backupSettings: AppDataBackupSettings;
 		backupStatus: AppDataBackupStatus;
+		backupDirectoryConfigurable?: boolean;
 		onExportSuccess?: (destinationLabel: string) => void;
 		onDatabaseFileNameSave?: (databaseFileName: string) => Promise<void> | void;
 		onBackupSettingsSave?: (
@@ -44,6 +46,7 @@
 		databaseFileName,
 		backupSettings,
 		backupStatus,
+		backupDirectoryConfigurable = true,
 		onExportSuccess,
 		onDatabaseFileNameSave,
 		onBackupSettingsSave,
@@ -177,7 +180,7 @@
 	}
 
 	async function chooseBackupDirectory() {
-		if (operationState !== 'idle') {
+		if (operationState !== 'idle' || !backupDirectoryConfigurable) {
 			return;
 		}
 
@@ -407,38 +410,26 @@
 	</div>
 
 	{#if !collapsed}
-		<div
-			class="panel-shell__tablist sidebar-tablist"
-			role="tablist"
-			aria-label="Left panel tabs"
-		>
-			<button
-				class="panel-shell__tab"
-				class:panel-shell__tab--active={activeTab === 'canvas'}
-				type="button"
-				role="tab"
-				id="sidebar-tab-canvas"
-				aria-selected={activeTab === 'canvas'}
-				aria-controls="sidebar-panel-canvas"
-				data-testid="sidebar-tab-canvas"
-				onclick={() => (activeTab = 'canvas')}
-			>
-				Canvas
-			</button>
-			<button
-				class="panel-shell__tab"
-				class:panel-shell__tab--active={activeTab === 'database'}
-				type="button"
-				role="tab"
-				id="sidebar-tab-database"
-				aria-selected={activeTab === 'database'}
-				aria-controls="sidebar-panel-database"
-				data-testid="sidebar-tab-database"
-				onclick={() => (activeTab = 'database')}
-			>
-				Database
-			</button>
-		</div>
+		<PanelTabs
+			bind:activeTab
+			ariaLabel="Left panel tabs"
+			tabs={[
+				{
+					value: 'canvas',
+					label: 'Canvas',
+					testId: 'sidebar-tab-canvas',
+					id: 'sidebar-tab-canvas',
+					controls: 'sidebar-panel-canvas',
+				},
+				{
+					value: 'database',
+					label: 'Database',
+					testId: 'sidebar-tab-database',
+					id: 'sidebar-tab-database',
+					controls: 'sidebar-panel-database',
+				},
+			]}
+		/>
 	{/if}
 
 	{#if !collapsed && activeTab === 'canvas'}
@@ -635,22 +626,24 @@
 					<span>{backupStatus.backupCount} snapshots</span>
 				</div>
 				<div class="sidebar-row sidebar-row--stack">
-					<div class="sidebar-row sidebar-row--tight">
-						<span>Folder</span>
-						<button
-							id="backup-directory-path"
-							class="sidebar-picker-button"
-							type="button"
-							disabled={operationState !== 'idle'}
-							aria-label="Choose backup folder"
-							title={backupDirectoryPathDraft || 'Choose backup folder'}
-							data-testid="sidebar-choose-backup-folder"
-							onclick={chooseBackupDirectory}
-						>
-							<FolderOpen size={14} aria-hidden="true" />
-							<span>{backupDirectoryPathDraft || 'Choose backup folder'}</span>
-						</button>
-					</div>
+					{#if backupDirectoryConfigurable}
+						<div class="sidebar-row sidebar-row--tight">
+							<span>Folder</span>
+							<button
+								id="backup-directory-path"
+								class="sidebar-picker-button"
+								type="button"
+								disabled={operationState !== 'idle'}
+								aria-label="Choose backup folder"
+								title={backupDirectoryPathDraft || 'Choose backup folder'}
+								data-testid="sidebar-choose-backup-folder"
+								onclick={chooseBackupDirectory}
+							>
+								<FolderOpen size={14} aria-hidden="true" />
+								<span>{backupDirectoryPathDraft || 'Choose backup folder'}</span>
+							</button>
+						</div>
+					{/if}
 					<div class="sidebar-row sidebar-row--tight">
 						<label for="backup-interval-minutes">Interval</label>
 						<input
@@ -790,14 +783,4 @@
 		line-height: 1.4;
 	}
 
-	.sidebar-tablist {
-		margin-top: 0;
-		padding: 0.15rem;
-		gap: 0.25rem;
-	}
-
-	.sidebar-tablist :global(.panel-shell__tab) {
-		padding: 0.2rem 0.5rem;
-		font-size: 0.73rem;
-	}
 </style>

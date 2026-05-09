@@ -74,3 +74,5 @@ The repo uses bundled SQLite libraries, so you do not need a separate system SQL
 - `npm run build` plus `npm run preview` uses `mindmap.db`
 - The left panel includes a `Database file` field that renames the live SQLite file and persists the choice in a `mindmap.config.json` file alongside the active database directory
 - `MINDMAP_DB_PATH` still overrides either default when set, which is mainly useful for development and tests
+- `MINDMAP_BACKUP_DIRECTORY_PATH` overrides the automatic backup folder, which is useful for server deployments
+- `MINDMAP_SERVER_MODE=1` hides backup folder selection from the browser UI so deployments can control the backup path

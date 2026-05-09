@@ -3,6 +3,7 @@ import {
 	db,
 	getDatabaseBackupSettings,
 	getDatabaseFileName,
+	isBackupDirectoryConfigurable,
 	setBackupSettings,
 	setDatabaseFileName,
 } from './db';
@@ -91,6 +92,7 @@ export type AppDataPageData = {
 	databaseFileName: string;
 	backupSettings: AppDataBackupSettings;
 	backupStatus: AppDataBackupStatus;
+	backupDirectoryConfigurable: boolean;
 	nodes: AppDataNode[];
 	edges: AppDataEdge[];
 	tags: Array<{ id: string; name: string; color: string; node_count: number }>;
@@ -573,6 +575,7 @@ export function getInitialPageData(database?: SqliteDatabase): AppDataPageData {
 		databaseFileName: getDatabaseFileName(),
 		backupSettings,
 		backupStatus,
+		backupDirectoryConfigurable: isBackupDirectoryConfigurable(),
 		nodes: getNodesByCanvasId(activeCanvasId, database),
 		edges: getEdgesByCanvasId(activeCanvasId, database),
 		tags: getTagsByCanvasId(activeCanvasId, database),
