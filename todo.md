@@ -11,7 +11,7 @@ Each stage should be treated as a natural stop point: finish the stage, verify i
 - Preserve unrelated user work.
 - After code changes, run `npm run check` and `npm test`.
 
-## Stage 0: A Settings Panel
+## Stage 0: A Settings Panel (DONE)
 
 We're adding a lot of features that would cram the single-panel UI. Similar to how the right hand panel is tabbed, we should make the left-hand panel tabbed.
 - Canvas tab
