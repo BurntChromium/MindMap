@@ -41,7 +41,7 @@
 	let draftIsEntity = $state(true);
 	let titleError = $state<string | null>(null);
 	let editBaseline = $state<NodeEditBaseline | null>(null);
-	let activeDiscardPromptField = $state<NodeEditDiscardField | null>(null);
+	let discardPromptRestoreField = $state<NodeEditDiscardField | null>(null);
 	let previousDiscardPromptOpen = false;
 	let nodeUiState = $state<NodeUiState>({
 		editingNodeId: null,
@@ -113,16 +113,16 @@
 	$effect(() => {
 		const promptOpen = nodeUiState.discardPrompt?.nodeId === id;
 
-		if (!promptOpen && previousDiscardPromptOpen && isEditing && activeDiscardPromptField) {
-			const fieldToRefocus = activeDiscardPromptField;
+		if (!promptOpen && previousDiscardPromptOpen && isEditing && discardPromptRestoreField) {
+			const fieldToRefocus = discardPromptRestoreField;
 			queueMicrotask(() => {
 				focusEditField(fieldToRefocus);
 			});
-			activeDiscardPromptField = null;
+			discardPromptRestoreField = null;
 		}
 
 		if (!promptOpen && !isEditing) {
-			activeDiscardPromptField = null;
+			discardPromptRestoreField = null;
 		}
 
 		previousDiscardPromptOpen = promptOpen;
@@ -269,11 +269,11 @@
 		closeDiscardPrompt();
 		titleError = null;
 		editBaseline = null;
-		nodeUiStore.endEdit(id);
+		nodeUiStore.endEditCollapsed(id);
 	}
 
 	function openDiscardPrompt(field: NodeEditDiscardField) {
-		activeDiscardPromptField = field;
+		discardPromptRestoreField = field;
 		nodeUiStore.requestDiscardPrompt(id, field);
 	}
 
@@ -307,6 +307,7 @@
 
 		if (e.key === 'Escape') {
 			e.preventDefault();
+			e.stopPropagation();
 			handleEscapeFromField('title');
 			return;
 		}
@@ -326,6 +327,7 @@
 
 		if (e.key === 'Escape') {
 			e.preventDefault();
+			e.stopPropagation();
 			handleEscapeFromField('body');
 			return;
 		}
@@ -345,6 +347,7 @@
 
 		if (e.key === 'Escape') {
 			e.preventDefault();
+			e.stopPropagation();
 			handleEscapeFromField('tag');
 			return;
 		}

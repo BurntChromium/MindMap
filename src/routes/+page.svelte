@@ -537,6 +537,22 @@ import {
 			}
 
 			if (
+				event.key.toLowerCase() === 'w' &&
+				!event.metaKey &&
+				!event.ctrlKey &&
+				!event.altKey &&
+				!event.shiftKey
+			) {
+				if (!editingNodeId) {
+					return;
+				}
+
+				event.preventDefault();
+				void focusEditingNodeTitle();
+				return;
+			}
+
+			if (
 				!canvasShell ||
 				!(activeElement instanceof HTMLElement) ||
 				!canvasShell.contains(activeElement)
@@ -601,22 +617,6 @@ import {
 
 				event.preventDefault();
 				nodeUiStore.toggleExpanded(nodeId);
-				return;
-			}
-
-			if (
-				event.key.toLowerCase() === 'w' &&
-				!event.metaKey &&
-				!event.ctrlKey &&
-				!event.altKey &&
-				!event.shiftKey
-			) {
-				if (!editingNodeId) {
-					return;
-				}
-
-				event.preventDefault();
-				void focusEditingNodeTitle();
 				return;
 			}
 
@@ -1584,7 +1584,7 @@ import {
 			return;
 		}
 
-		nodeUiStore.endEdit(prompt.nodeId);
+		nodeUiStore.endEditCollapsed(prompt.nodeId);
 	}
 
 	function handleDiscardPromptKeyDown(event: KeyboardEvent) {

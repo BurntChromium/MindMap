@@ -54,6 +54,20 @@ function createNodeUiStore() {
 			}));
 		},
 
+		endEditCollapsed(id: string) {
+			update((state) => {
+				const expandedNodeIds = { ...state.expandedNodeIds };
+				delete expandedNodeIds[id];
+
+				return {
+					editingNodeId: state.editingNodeId === id ? null : state.editingNodeId,
+					expandedNodeIds,
+					discardPrompt:
+						state.discardPrompt?.nodeId === id ? null : state.discardPrompt,
+				};
+			});
+		},
+
 		requestDiscardPrompt(nodeId: string, field: NodeEditDiscardField) {
 			update((state) => {
 				if (state.editingNodeId !== nodeId) {

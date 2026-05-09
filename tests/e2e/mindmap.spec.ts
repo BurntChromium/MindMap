@@ -153,6 +153,7 @@ test('prompts before discarding node edits and supports y/n shortcuts', async ({
 
 	await expect(discardDialog).toHaveCount(0);
 	await expect(page.getByText('Original title')).toBeVisible();
+	await expect(page.getByText('Original body.')).toHaveCount(0);
 	await expect(page.getByLabel('Node title')).toHaveCount(0);
 });
 

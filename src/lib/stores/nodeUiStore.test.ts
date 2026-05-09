@@ -76,4 +76,15 @@ describe('nodeUiStore', () => {
 		nodeUiStore.clearDiscardPrompt();
 		expect(snapshot().discardPrompt).toBeNull();
 	});
+
+	it('collapses the node when ending edit in preview mode', () => {
+		nodeUiStore.beginEdit('node-5');
+		nodeUiStore.endEditCollapsed('node-5');
+
+		expect(snapshot()).toEqual({
+			editingNodeId: null,
+			expandedNodeIds: {},
+			discardPrompt: null,
+		});
+	});
 });
