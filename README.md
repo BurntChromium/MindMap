@@ -1,6 +1,6 @@
 # Mindmap
 
-Mindmap is software that is designed to improve how you take notes. You can create multiple notebooks and link notes together in various ways to represent how different ideas are connected. You can download the latest version of the desktop app for Windows or Ubuntu on the [Releases page](https://github.com/BurntChromium/MindMap/releases/tag/app-v0.1.3).
+Mindmap is software that is designed to improve how you take notes. You can create multiple notebooks and link notes together in various ways to represent how different ideas are connected. You can download the latest version of the desktop app for Windows or Ubuntu on the [Releases page](https://github.com/BurntChromium/MindMap/releases).
 
 ![A screenshot of the application](./docs/img/Screenshot-v0.1.0-alpha.png)
 
