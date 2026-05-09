@@ -80,14 +80,6 @@
 		backupRetentionCountDraft = String(backupSettings.backupRetentionCount);
 	});
 
-	function getTabTitle(tab: SidebarTab) {
-		return tab === 'canvas' ? 'Canvases' : 'Database';
-	}
-
-	function getCollapsedTabTitle(tab: SidebarTab) {
-		return tab === 'canvas' ? 'C' : 'D';
-	}
-
 	function startRenameCanvas(canvas: Canvas) {
 		editingCanvasId = canvas.id;
 		editingCanvasName = canvas.name;
@@ -386,12 +378,30 @@
 	class:panel-shell--collapsed={collapsed}
 >
 	<div class="sidebar-topbar">
-		<div class="sidebar-topbar__title">
-			<p class="sidebar-brand">{collapsed ? 'M' : 'Mindmap'}</p>
-			<h3>
-				{collapsed ? getCollapsedTabTitle(activeTab) : getTabTitle(activeTab)}
-			</h3>
-		</div>
+		{#if !collapsed}
+			<div class="panel-shell__header-actions">
+				<PanelTabs
+					bind:activeTab
+					ariaLabel="Left panel tabs"
+					tabs={[
+						{
+							value: 'canvas',
+							label: 'Canvas',
+							testId: 'sidebar-tab-canvas',
+							id: 'sidebar-tab-canvas',
+							controls: 'sidebar-panel-canvas',
+						},
+						{
+							value: 'database',
+							label: 'Database',
+							testId: 'sidebar-tab-database',
+							id: 'sidebar-tab-database',
+							controls: 'sidebar-panel-database',
+						},
+					]}
+				/>
+			</div>
+		{/if}
 		<button
 			class="icon-button sidebar-toggle"
 			type="button"
@@ -408,29 +418,6 @@
 			{/if}
 		</button>
 	</div>
-
-	{#if !collapsed}
-		<PanelTabs
-			bind:activeTab
-			ariaLabel="Left panel tabs"
-			tabs={[
-				{
-					value: 'canvas',
-					label: 'Canvas',
-					testId: 'sidebar-tab-canvas',
-					id: 'sidebar-tab-canvas',
-					controls: 'sidebar-panel-canvas',
-				},
-				{
-					value: 'database',
-					label: 'Database',
-					testId: 'sidebar-tab-database',
-					id: 'sidebar-tab-database',
-					controls: 'sidebar-panel-database',
-				},
-			]}
-		/>
-	{/if}
 
 	{#if !collapsed && activeTab === 'canvas'}
 		<div
@@ -555,10 +542,6 @@
 			aria-labelledby="sidebar-tab-database"
 			data-testid="sidebar-panel-database"
 		>
-			<div class="sidebar-topbar__title">
-				<h3>Database</h3>
-			</div>
-
 			<div class="sidebar-section">
 				<div class="sidebar-row">
 					<label for="database-file-name">Name</label>
