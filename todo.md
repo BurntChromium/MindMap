@@ -68,9 +68,15 @@ Suppose we have Smaug, Dragon, and Shire nodes. Smaug is an entity node. If Drag
 Goal: reduce friction when users create and refine notes.
 
 - [ ] Remove temporary editing workarounds and tighten the edit state model.
+    - Context: we had persistent rendering lifecycle issues with making the edit key (`e`) drop the cursor into the title field. So we worked around it by adding the `w` key. By the time that the human could hit both keystrokes, rendering has settled.
 - [ ] Make node creation faster from keyboard and mouse.
+    - Note: skeptical that we can make it much faster because right now it's a single keystroke. To check: is it easy to create a node off of an existing node? (Instead of `n`, finish, then draw arrow?)
 - [ ] Reduce mode-switching overhead between preview, view, and edit states.
+    - We need a way to bail out of edit mode without accepting changes
+    - Should the `esc` key remove us not just from edit mode, but from view mode as well?
 - [ ] Improve first-run guidance for creating a notebook and capturing a first note.
+    - Caveat: don't want click-through tutorials. I like the message we have on an empty canvas (something like "press n or click the new note button to add a note"). Perhaps we add a similar message on the canvas picker if there are no canvases?
+- [ ] Add buttons in the UI for undo and redo (we already have key-driven commands). I think if we put two buttons where the `Synced` pill is currently, then just push that rightward to fit, that would be good. 
 - [ ] Add tests for the edit flow and keyboard interactions that matter most.
 
 Why this stage matters:
@@ -81,46 +87,8 @@ Context boundary:
 - Keep the editing interaction model, keyboard shortcuts, and node state code in context.
 - After this stage, clear the UI details and start a desktop-ergonomics task.
 
-## Stage 4: Desktop ergonomics
+## Stage 4: UI and UX polish
 
-Goal: make the app feel like a first-class desktop file-based tool.
-
-- [ ] Add an "open data folder" action.
-- [ ] Add a "copy database path" action.
-- [ ] Improve database-file conflict messages and validation feedback.
-- [ ] Add a simple recent-databases or last-opened hint if useful.
-- [ ] Add tests for the file-path handling and conflict cases.
-
-Why this stage matters:
-- Desktop users think in files, folders, and recovery paths.
-- This app already stores its data locally, so these affordances fit the product.
-
-Context boundary:
-- Keep the file-path and database-settings behavior in context.
-- After this stage, clear the desktop-ergonomics details before any release work.
-
-## Stage 5: Productionization and release polish
-
-Goal: make the desktop app easier to ship and safer to upgrade.
-
-- [ ] Improve startup resilience and error reporting.
-- [ ] Verify release steps and packaging assumptions.
-- [ ] Check for crashes or data issues in the Tauri path.
-- [ ] Add tests or smoke checks for the release-sensitive paths.
-- [ ] Update release notes or the user guide where behavior changed.
-
-Why this stage matters:
-- For a local-first desktop app, productionization means fewer surprises and fewer support burdens.
-- This is lower priority than data safety and search, but it matters once the core UX is stable.
-
-Context boundary:
-- Keep release flow and runtime stability in context only when working this stage.
-- Otherwise, start fresh with the narrower feature area you are changing.
-
-## Suggested Execution Order
-
-1. Stage 1: Data safety and recovery
-2. Stage 2: Search and retrieval quality
-3. Stage 3: Capture and edit workflow
-4. Stage 4: Desktop ergonomics
-5. Stage 5: Productionization and release polish
+- [ ] Add a small dot to the preview node state if that node is an entity (just a small visual indicator)
+- [ ] Make the node view/editing state larger, and center is better within the screen. 
+- [ ] Make sure we support different and small screen sizes better. 
