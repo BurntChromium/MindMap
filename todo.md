@@ -38,7 +38,7 @@ Context boundary:
 - Keep the database file layout, import/export flow, and recovery behavior in context.
 - After this stage, clear the implementation details and start a new task for search.
 
-## Stage 2: Search and retrieval quality
+## Stage 2: Search and retrieval quality (DONE)
 
 Goal: make finding notes fast and reliable as notebooks grow.
 
