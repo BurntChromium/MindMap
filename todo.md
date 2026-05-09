@@ -64,16 +64,8 @@ Suppose we have Smaug, Dragon, and Shire nodes. Smaug is an entity node. If Drag
 - [x] Visual distinction between types of entity references
 
 ## Stage 3: Capture and edit workflow
-
 Goal: reduce friction when users create and refine notes.
 
-- [ ] Remove temporary editing workarounds and tighten the edit state model.
-    - Context: we had persistent rendering lifecycle issues with making the edit key (`e`) drop the cursor into the title field. The fallback `w` key is back because the edit-entry focus path is still unreliable.
-- [ ] Make node creation faster from keyboard and mouse.
-    - Note: skeptical that we can make it much faster because right now it's a single keystroke. To check: is it easy to create a node off of an existing node? (Instead of `n`, finish, then draw arrow?)
-- [ ] Reduce mode-switching overhead between preview, view, and edit states.
-    - We need a way to bail out of edit mode without accepting changes
-    - Should the `esc` key remove us not just from edit mode, but from view mode as well?
 - [ ] Improve first-run guidance for creating a notebook and capturing a first note.
     - Caveat: don't want click-through tutorials. I like the message we have on an empty canvas (something like "press n or click the new note button to add a note"). Perhaps we add a similar message on the canvas picker if there are no canvases?
 - [ ] Add buttons in the UI for undo and redo (we already have key-driven commands). I think if we put two buttons where the `Synced` pill is currently, then just push that rightward to fit, that would be good. 
