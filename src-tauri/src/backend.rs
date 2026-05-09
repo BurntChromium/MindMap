@@ -1706,8 +1706,7 @@ fn update_node(app: AppHandle, input: NodeUpdateInput) -> DbResult<AppDataUpdate
                         row.get::<_, Option<String>>(1)?.unwrap_or_default(),
                     ))
                 })
-                .map_err(|error| format!("Failed to read node bodies: {error}"))?
-            ;
+                .map_err(|error| format!("Failed to read node bodies: {error}"))?;
 
             rows.collect::<Result<Vec<_>, _>>()
                 .map_err(|error| format!("Failed to read node bodies: {error}"))?
@@ -2174,8 +2173,7 @@ fn delete_graph_fragment(
                 .query_map(rusqlite::params_from_iter(node_ids.iter()), |row| {
                     row.get::<_, Option<String>>(0)
                 })
-                .map_err(|error| format!("Failed to collect affected canvases: {error}"))?
-            ;
+                .map_err(|error| format!("Failed to collect affected canvases: {error}"))?;
 
             rows.collect::<Result<Vec<_>, _>>()
                 .map_err(|error| format!("Failed to collect affected canvases: {error}"))?
@@ -2317,4 +2315,149 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rusqlite::Connection;
+    use serde_json::json;
+
+    fn seed_canvas(connection: &Connection, id: &str) {
+        connection
+            .execute(
+                "
+          INSERT INTO canvases (id, name, created_at, updated_at)
+          VALUES (?, ?, ?, ?)
+        ",
+                params![id, "Canvas", 1_i64, 1_i64],
+            )
+            .expect("seed canvas");
+    }
+
+    fn seed_node(
+        connection: &Connection,
+        id: &str,
+        canvas_id: &str,
+        title: &str,
+        body: &str,
+        is_entity: i64,
+        created_at: i64,
+    ) {
+        connection
+            .execute(
+                "
+          INSERT INTO nodes (
+            id, canvas_id, title, body, is_entity, x, y, collapsed, created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ",
+                params![
+                    id, canvas_id, title, body, is_entity, 0.0_f64, 0.0_f64, 0_i64, created_at,
+                    created_at,
+                ],
+            )
+            .expect("seed node");
+    }
+
+    #[test]
+    fn deserializes_tauri_node_updates_from_camel_case_payloads() {
+        let update: NodeUpdateInput = serde_json::from_value(json!({
+            "id": "node-1",
+            "title": "Aeon",
+            "isEntity": true,
+            "tags": ["lore"],
+        }))
+        .expect("deserialize update payload");
+
+        assert_eq!(update.id, "node-1");
+        assert_eq!(update.title.as_deref(), Some("Aeon"));
+        assert_eq!(update.is_entity, Some(true));
+
+        let create: NodeCreateInput = serde_json::from_value(json!({
+            "id": "node-2",
+            "canvasId": "canvas-1",
+            "title": "Aeon",
+            "body": "Entity note",
+            "isEntity": true,
+            "tags": ["lore"],
+            "x": 12.0,
+            "y": 34.0,
+        }))
+        .expect("deserialize create payload");
+
+        assert_eq!(create.id.as_deref(), Some("node-2"));
+        assert_eq!(create.canvas_id, "canvas-1");
+        assert_eq!(create.is_entity, Some(true));
+    }
+
+    #[test]
+    fn rebuilds_entities_from_primary_flags_and_mentions() {
+        let connection = Connection::open_in_memory().expect("open in-memory db");
+        init_schema(&connection).expect("initialize schema");
+        seed_canvas(&connection, "canvas-1");
+        seed_node(&connection, "node-aeon", "canvas-1", "Aeon", "", 1, 1);
+        seed_node(
+            &connection,
+            "node-valentinism",
+            "canvas-1",
+            "Valentinism",
+            "School of [[Aeon]].",
+            0,
+            2,
+        );
+
+        rebuild_entities_for_canvas_id(&connection, "canvas-1").expect("rebuild entities");
+
+        let entities = load_entities_by_canvas_id(&connection, "canvas-1").expect("load entities");
+        assert_eq!(entities.len(), 1);
+        assert_eq!(
+            entities
+                .iter()
+                .find(|entity| entity.title_key == "aeon")
+                .and_then(|entity| entity.primary_node_id.clone()),
+            Some("node-aeon".to_string())
+        );
+
+        let mentions =
+            load_entity_mentions_by_canvas_id(&connection, "canvas-1").expect("load mentions");
+        assert_eq!(mentions.len(), 1);
+        assert_eq!(mentions[0].title_key, "aeon");
+        assert_eq!(mentions[0].node_id, "node-valentinism");
+
+        connection
+            .execute(
+                "UPDATE nodes SET is_entity = 0 WHERE id = ?",
+                params!["node-aeon"],
+            )
+            .expect("disable primary flag");
+        rebuild_entities_for_canvas_id(&connection, "canvas-1").expect("rebuild entities");
+
+        let entities =
+            load_entities_by_canvas_id(&connection, "canvas-1").expect("reload entities");
+        assert_eq!(
+            entities
+                .iter()
+                .find(|entity| entity.title_key == "aeon")
+                .and_then(|entity| entity.primary_node_id.clone()),
+            None
+        );
+
+        connection
+            .execute(
+                "UPDATE nodes SET is_entity = 1 WHERE id = ?",
+                params!["node-aeon"],
+            )
+            .expect("enable primary flag");
+        rebuild_entities_for_canvas_id(&connection, "canvas-1").expect("rebuild entities");
+
+        let entities =
+            load_entities_by_canvas_id(&connection, "canvas-1").expect("reload entities");
+        assert_eq!(
+            entities
+                .iter()
+                .find(|entity| entity.title_key == "aeon")
+                .and_then(|entity| entity.primary_node_id.clone()),
+            Some("node-aeon".to_string())
+        );
+    }
 }
