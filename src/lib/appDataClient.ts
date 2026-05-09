@@ -18,6 +18,18 @@ type JsonValue =
 	| null;
 type BinaryValue = ArrayBuffer;
 
+export type AppDataBackupSettings = {
+	backupDirectoryPath: string;
+	backupIntervalMinutes: number;
+	backupRetentionCount: number;
+};
+
+export type AppDataBackupStatus = {
+	latestBackupFileName: string | null;
+	latestBackupCreatedAt: number | null;
+	backupCount: number;
+};
+
 async function requestJson<T>(
 	input: RequestInfo | URL,
 	init?: RequestInit,
@@ -63,6 +75,10 @@ export type AppDataClient = {
 	updateDatabaseSettings: (input: {
 		databaseFileName: string;
 	}) => Promise<JsonValue>;
+	updateBackupSettings: (input: AppDataBackupSettings) => Promise<JsonValue>;
+	pickBackupDirectory: (input?: { defaultPath?: string }) => Promise<string | null>;
+	createBackupSnapshot: () => Promise<JsonValue>;
+	restoreLatestBackup: () => Promise<JsonValue>;
 	loadCanvases: () => Promise<JsonValue>;
 	createCanvas: (input: { id: string; name: string }) => Promise<JsonValue>;
 	renameCanvas: (input: { id: string; name: string }) => Promise<JsonValue>;
@@ -117,6 +133,30 @@ function createFetchClient(): AppDataClient {
 				method: 'PATCH',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify(input),
+			}),
+		updateBackupSettings: (input) =>
+			requestJson('/api/database-backups', {
+				method: 'PATCH',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify(input),
+			}),
+		pickBackupDirectory: async (input) =>
+			(window.prompt(
+				'Choose a backup folder path.',
+				input?.defaultPath ?? '',
+			) ??
+				null),
+		createBackupSnapshot: () =>
+			requestJson('/api/database-backups', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ action: 'snapshot' }),
+			}),
+		restoreLatestBackup: () =>
+			requestJson('/api/database-backups', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ action: 'restore-latest' }),
 			}),
 		loadCanvases: () => requestJson('/api/canvases'),
 		createCanvas: (input) =>
@@ -202,6 +242,12 @@ function createTauriClient(bridge: AppDataTauriBridge): AppDataClient {
 		loadInitialPageData: () => bridge.core.invoke('load_initial_page_data'),
 		updateDatabaseSettings: (input) =>
 			invokeWithInput('update_database_settings', input),
+		updateBackupSettings: (input) =>
+			invokeWithInput('update_backup_settings', input),
+		pickBackupDirectory: (input) =>
+			invokeWithInput('pick_backup_directory', input ?? {}),
+		createBackupSnapshot: () => bridge.core.invoke('create_backup_snapshot'),
+		restoreLatestBackup: () => bridge.core.invoke('restore_latest_backup'),
 		loadCanvases: () => bridge.core.invoke('load_canvases'),
 		createCanvas: (input) => invokeWithInput('create_canvas', input),
 		renameCanvas: (input) => invokeWithInput('rename_canvas', input),
@@ -280,6 +326,12 @@ export const appDataClient = {
 		syncRuntimeClient().loadInitialPageData(fetchImpl),
 	updateDatabaseSettings: (input: { databaseFileName: string }) =>
 		syncRuntimeClient().updateDatabaseSettings(input),
+	updateBackupSettings: (input: AppDataBackupSettings) =>
+		syncRuntimeClient().updateBackupSettings(input),
+	pickBackupDirectory: (input?: { defaultPath?: string }) =>
+		syncRuntimeClient().pickBackupDirectory(input),
+	createBackupSnapshot: () => syncRuntimeClient().createBackupSnapshot(),
+	restoreLatestBackup: () => syncRuntimeClient().restoreLatestBackup(),
 	loadCanvases: () => syncRuntimeClient().loadCanvases(),
 	createCanvas: (input: { id: string; name: string }) =>
 		syncRuntimeClient().createCanvas(input),

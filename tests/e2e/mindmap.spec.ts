@@ -219,6 +219,36 @@ test('exports and imports the database through the sidebar', async ({
 	await expect(page.getByTestId('node-tag-node-transfer-export')).toBeVisible();
 });
 
+test('creates and restores a backup through the sidebar', async ({
+	page,
+	request,
+}) => {
+	await resetDatabase(request);
+	await seedCanvas(request, { id: 'canvas-backup', name: 'Backups' });
+	await seedNode(request, {
+		id: 'node-backup',
+		canvasId: 'canvas-backup',
+		title: 'Backup node',
+		body: 'This should come back after restore.',
+	});
+
+	await page.goto('/');
+
+	await page.getByTestId('sidebar-tab-database').click();
+	await page.getByTestId('sidebar-create-backup').click();
+	await expect(page.getByTestId('sidebar-restore-backup')).toBeEnabled();
+
+	await resetDatabase(request);
+
+	await page.once('dialog', async (dialog) => {
+		await dialog.accept();
+	});
+
+	await page.getByTestId('sidebar-restore-backup').click();
+
+	await expect(page.getByText('Backup node')).toBeVisible();
+});
+
 test('switches between canvas and database tabs in the left sidebar', async ({
 	page,
 	request,
@@ -241,11 +271,56 @@ test('switches between canvas and database tabs in the left sidebar', async ({
 		'aria-selected',
 		'true',
 	);
+	await expect(page.getByText('Automatic Backups')).toBeVisible();
 	await expect(page.getByTestId('sidebar-save-database-file')).toBeVisible();
 	await expect(page.getByTestId('sidebar-panel-database')).toBeVisible();
+	await expect(page.getByTestId('sidebar-save-backup-settings')).toHaveCount(0);
 
 	await page.getByTestId('sidebar-tab-canvas').click();
 
 	await expect(page.getByTestId('sidebar-create-canvas')).toBeVisible();
 	await expect(page.getByTestId('sidebar-panel-canvas')).toBeVisible();
+});
+
+test('autosaves backup settings and opens the folder picker', async ({
+	page,
+	request,
+}) => {
+	await resetDatabase(request);
+	await seedCanvas(request, { id: 'canvas-backup-settings', name: 'Settings' });
+
+	await page.addInitScript(() => {
+		Object.defineProperty(window, 'prompt', {
+			value: () => '/tmp/mindmap-backups',
+		});
+	});
+	await page.goto('/');
+
+	await page.getByTestId('sidebar-tab-database').click();
+	await page.getByTestId('sidebar-choose-backup-folder').click();
+
+	await expect(page.getByTestId('sidebar-choose-backup-folder')).toContainText(
+		'/tmp/mindmap-backups',
+	);
+
+	await page.getByLabel('Backup interval in minutes').fill('12');
+	await page.getByLabel('Backup retention count').fill('4');
+	await page.waitForTimeout(500);
+
+	const backupSettingsResponse = await request.get('/api/database-backups');
+	const backupSettingsPayload = (await backupSettingsResponse.json()) as {
+		backupSettings: {
+			backupDirectoryPath: string;
+			backupIntervalMinutes: number;
+			backupRetentionCount: number;
+		};
+	};
+
+	expect(backupSettingsPayload.backupSettings).toEqual(
+		expect.objectContaining({
+			backupDirectoryPath: '/tmp/mindmap-backups',
+			backupIntervalMinutes: 12,
+			backupRetentionCount: 4,
+		}),
+	);
 });

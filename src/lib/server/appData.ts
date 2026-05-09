@@ -1,5 +1,11 @@
 import Database from 'better-sqlite3';
-import { db, getDatabaseFileName, setDatabaseFileName } from './db';
+import {
+	db,
+	getDatabaseBackupSettings,
+	getDatabaseFileName,
+	setBackupSettings,
+	setDatabaseFileName,
+} from './db';
 import { createId, now } from './utils';
 import { getTagColor } from '$lib/tagColors';
 import { normalizeTagList, normalizeTagName } from '$lib/tagUtils';
@@ -18,6 +24,13 @@ import {
 	exportDatabaseSnapshot,
 	importDatabaseSnapshot,
 } from './databaseTransfer';
+import {
+	createBackupSnapshot,
+	getBackupStatus,
+	type AppDataBackupSettings,
+	type AppDataBackupStatus,
+	restoreLatestBackup,
+} from './databaseBackup';
 
 export type AppDataCanvas = {
 	id: string;
@@ -76,6 +89,8 @@ export type AppDataPageData = {
 	canvases: AppDataCanvas[];
 	activeCanvasId: string | null;
 	databaseFileName: string;
+	backupSettings: AppDataBackupSettings;
+	backupStatus: AppDataBackupStatus;
 	nodes: AppDataNode[];
 	edges: AppDataEdge[];
 	tags: Array<{ id: string; name: string; color: string; node_count: number }>;
@@ -549,11 +564,15 @@ export function getEntityMentionsByCanvasId(
 export function getInitialPageData(database?: SqliteDatabase): AppDataPageData {
 	const canvases = getCanvases(database);
 	const activeCanvasId = canvases[0]?.id ?? null;
+	const backupSettings = getDatabaseBackupSettings();
+	const backupStatus = getBackupStatus();
 
 	return {
 		canvases,
 		activeCanvasId,
 		databaseFileName: getDatabaseFileName(),
+		backupSettings,
+		backupStatus,
 		nodes: getNodesByCanvasId(activeCanvasId, database),
 		edges: getEdgesByCanvasId(activeCanvasId, database),
 		tags: getTagsByCanvasId(activeCanvasId, database),
@@ -566,6 +585,14 @@ export async function updateDatabaseFileName(input: {
 	databaseFileName: string;
 }): Promise<AppDataDatabaseSettings> {
 	return setDatabaseFileName(input.databaseFileName);
+}
+
+export async function updateBackupSettings(input: {
+	backupDirectoryPath: string;
+	backupIntervalMinutes: number;
+	backupRetentionCount: number;
+}): Promise<AppDataBackupSettings> {
+	return setBackupSettings(input);
 }
 
 export function createCanvas(
@@ -1083,6 +1110,14 @@ export async function importDatabase(
 	input: Uint8Array | ArrayBuffer | ArrayBufferView,
 ) {
 	return importDatabaseSnapshot(input);
+}
+
+export async function createBackupSnapshotNow() {
+	return createBackupSnapshot();
+}
+
+export async function restoreLatestBackupNow() {
+	return restoreLatestBackup();
 }
 
 export function deleteGraphFragment(

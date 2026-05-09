@@ -1,9 +1,11 @@
 use regex::RegexBuilder;
-use rusqlite::{params, Connection, OptionalExtension};
+use rusqlite::{backup::Backup, params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::time::Duration;
+use rfd::FileDialog;
 use tauri::{AppHandle, Manager};
 
 const TAG_PALETTE: [&str; 16] = [
@@ -78,6 +80,10 @@ pub struct AppDataPageData {
     pub active_canvas_id: Option<String>,
     #[serde(rename = "databaseFileName")]
     pub database_file_name: String,
+    #[serde(rename = "backupSettings")]
+    pub backup_settings: AppDataBackupSettings,
+    #[serde(rename = "backupStatus")]
+    pub backup_status: AppDataBackupStatus,
     pub nodes: Vec<AppDataNode>,
     pub edges: Vec<AppDataEdge>,
     pub tags: Vec<AppDataTagSummary>,
@@ -167,6 +173,26 @@ pub struct AppDataImportResult {
 }
 
 #[derive(Debug, Clone, Serialize)]
+pub struct AppDataBackupSettings {
+    #[serde(rename = "backupDirectoryPath")]
+    pub backup_directory_path: String,
+    #[serde(rename = "backupIntervalMinutes")]
+    pub backup_interval_minutes: u32,
+    #[serde(rename = "backupRetentionCount")]
+    pub backup_retention_count: u32,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct AppDataBackupStatus {
+    #[serde(rename = "latestBackupFileName")]
+    pub latest_backup_file_name: Option<String>,
+    #[serde(rename = "latestBackupCreatedAt")]
+    pub latest_backup_created_at: Option<i64>,
+    #[serde(rename = "backupCount")]
+    pub backup_count: usize,
+}
+
+#[derive(Debug, Clone, Serialize)]
 pub struct AppDataDatabaseSettings {
     #[serde(rename = "databaseFileName")]
     pub database_file_name: String,
@@ -221,6 +247,23 @@ struct DatabaseSettingsInput {
 #[serde(rename_all = "camelCase")]
 struct DatabaseSettingsFile {
     database_file_name: Option<String>,
+    backup_directory_path: Option<String>,
+    backup_interval_minutes: Option<u32>,
+    backup_retention_count: Option<u32>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct BackupSettingsInput {
+    backup_directory_path: String,
+    backup_interval_minutes: u32,
+    backup_retention_count: u32,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct BackupDirectoryPickerInput {
+    default_path: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -350,6 +393,10 @@ fn is_valid_database_file_name(file_name: &str) -> bool {
         && !trimmed.contains('\0')
 }
 
+fn is_valid_backup_directory_path(path: &str) -> bool {
+	!path.trim().is_empty() && !path.contains('\0')
+}
+
 fn database_settings_path(app: &AppHandle) -> DbResult<PathBuf> {
     let dir = app
         .path()
@@ -359,25 +406,54 @@ fn database_settings_path(app: &AppHandle) -> DbResult<PathBuf> {
     Ok(dir.join("mindmap.config.json"))
 }
 
-fn read_database_file_name(app: &AppHandle) -> DbResult<String> {
+fn read_database_settings(app: &AppHandle) -> DbResult<DatabaseSettingsFile> {
     let path = database_settings_path(app)?;
+
+    let defaults = DatabaseSettingsFile {
+        database_file_name: Some("mindmap.db".to_string()),
+    backup_directory_path: Some("mindmap-backups".to_string()),
+    backup_interval_minutes: Some(10),
+    backup_retention_count: Some(2),
+    };
 
     if let Ok(contents) = fs::read_to_string(&path) {
         if let Ok(settings) = serde_json::from_str::<DatabaseSettingsFile>(&contents) {
-            if let Some(file_name) = settings.database_file_name {
-                let trimmed = file_name.trim();
+            let file_name = settings
+                .database_file_name
+                .as_deref()
+                .map(str::trim)
+                .filter(|value| is_valid_database_file_name(value))
+                .map(str::to_string)
+                .or_else(|| defaults.database_file_name.clone());
+            let backup_directory_path = settings
+                .backup_directory_path
+                .as_deref()
+                .map(str::trim)
+                .filter(|value| is_valid_backup_directory_path(value))
+                .map(str::to_string)
+                .or_else(|| defaults.backup_directory_path.clone());
+            let backup_interval_minutes = settings
+                .backup_interval_minutes
+                .filter(|value| *value >= 1)
+                .or(defaults.backup_interval_minutes);
+            let backup_retention_count = settings
+                .backup_retention_count
+                .filter(|value| *value >= 1)
+                .or(defaults.backup_retention_count);
 
-                if is_valid_database_file_name(trimmed) {
-                    return Ok(trimmed.to_string());
-                }
-            }
+            return Ok(DatabaseSettingsFile {
+                database_file_name: file_name,
+                backup_directory_path,
+                backup_interval_minutes,
+                backup_retention_count,
+            });
         }
     }
 
-    Ok("mindmap.db".to_string())
+    Ok(defaults)
 }
 
-fn persist_database_file_name(app: &AppHandle, file_name: &str) -> DbResult<()> {
+fn persist_database_settings(app: &AppHandle, settings: &DatabaseSettingsFile) -> DbResult<()> {
     let path = database_settings_path(app)?;
     let parent = path
         .parent()
@@ -386,15 +462,46 @@ fn persist_database_file_name(app: &AppHandle, file_name: &str) -> DbResult<()> 
     fs::create_dir_all(parent)
         .map_err(|error| format!("Failed to create database settings directory: {error}"))?;
 
-    let payload = DatabaseSettingsFile {
-        database_file_name: Some(file_name.to_string()),
-    };
-    let contents = serde_json::to_string_pretty(&payload)
+    let contents = serde_json::to_string_pretty(settings)
         .map_err(|error| format!("Failed to serialize database settings: {error}"))?;
 
     fs::write(&path, format!("{contents}\n"))
         .map_err(|error| format!("Failed to write database settings: {error}"))?;
     Ok(())
+}
+
+fn read_database_file_name(app: &AppHandle) -> DbResult<String> {
+    Ok(
+        read_database_settings(app)?
+            .database_file_name
+            .unwrap_or_else(|| "mindmap.db".to_string()),
+    )
+}
+
+fn read_backup_settings(app: &AppHandle) -> DbResult<AppDataBackupSettings> {
+    let settings = read_database_settings(app)?;
+
+    Ok(AppDataBackupSettings {
+        backup_directory_path: settings
+            .backup_directory_path
+            .unwrap_or_else(|| "mindmap-backups".to_string()),
+        backup_interval_minutes: settings.backup_interval_minutes.unwrap_or(10),
+        backup_retention_count: settings.backup_retention_count.unwrap_or(2),
+    })
+}
+
+fn persist_database_file_name(app: &AppHandle, file_name: &str) -> DbResult<()> {
+    let mut settings = read_database_settings(app)?;
+    settings.database_file_name = Some(file_name.to_string());
+    persist_database_settings(app, &settings)
+}
+
+fn persist_backup_settings(app: &AppHandle, settings: &AppDataBackupSettings) -> DbResult<()> {
+    let mut file_settings = read_database_settings(app)?;
+    file_settings.backup_directory_path = Some(settings.backup_directory_path.clone());
+    file_settings.backup_interval_minutes = Some(settings.backup_interval_minutes);
+    file_settings.backup_retention_count = Some(settings.backup_retention_count);
+    persist_database_settings(app, &file_settings)
 }
 
 fn db_path(app: &AppHandle) -> DbResult<PathBuf> {
@@ -404,6 +511,183 @@ fn db_path(app: &AppHandle) -> DbResult<PathBuf> {
         .map_err(|error| format!("Failed to resolve app data directory: {error}"))?;
 
     Ok(dir.join(read_database_file_name(app)?))
+}
+
+#[derive(Debug, Clone)]
+struct BackupSnapshotInfo {
+    file_name: String,
+    file_path: PathBuf,
+    created_at: i64,
+}
+
+fn backup_directory_path(app: &AppHandle) -> DbResult<PathBuf> {
+    let base_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|error| format!("Failed to resolve app data directory: {error}"))?;
+    let settings = read_backup_settings(app)?;
+
+    Ok(resolve_configured_path(
+        &base_dir,
+        &settings.backup_directory_path,
+    ))
+}
+
+fn backup_file_name() -> String {
+    format!("mindmap-backup-{}-{}.db", now(), create_id())
+}
+
+fn list_backup_snapshots(app: &AppHandle) -> DbResult<Vec<BackupSnapshotInfo>> {
+    let directory = backup_directory_path(app)?;
+    let mut snapshots = Vec::new();
+
+    if !directory.exists() {
+        return Ok(snapshots);
+    }
+
+    let entries = fs::read_dir(&directory)
+        .map_err(|error| format!("Failed to read backup directory: {error}"))?;
+
+    for entry in entries {
+        let entry = entry.map_err(|error| format!("Failed to read backup entry: {error}"))?;
+        let path = entry.path();
+        let file_name = entry.file_name().to_string_lossy().to_string();
+
+        if !path.is_file()
+            || !file_name.starts_with("mindmap-backup-")
+            || !file_name.ends_with(".db")
+        {
+            continue;
+        }
+
+        let metadata = fs::metadata(&path)
+            .map_err(|error| format!("Failed to inspect backup snapshot: {error}"))?;
+        let modified = metadata
+            .modified()
+            .map_err(|error| format!("Failed to inspect backup snapshot: {error}"))?;
+        let created_at = modified
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis() as i64;
+
+        snapshots.push(BackupSnapshotInfo {
+            file_name,
+            file_path: path,
+            created_at,
+        });
+    }
+
+    snapshots.sort_by(|left, right| right.created_at.cmp(&left.created_at));
+    Ok(snapshots)
+}
+
+fn backup_status(app: &AppHandle) -> DbResult<AppDataBackupStatus> {
+    let snapshots = list_backup_snapshots(app)?;
+    let latest = snapshots.first();
+
+    Ok(AppDataBackupStatus {
+        latest_backup_file_name: latest.map(|snapshot| snapshot.file_name.clone()),
+        latest_backup_created_at: latest.map(|snapshot| snapshot.created_at),
+        backup_count: snapshots.len(),
+    })
+}
+
+fn prune_backup_snapshots(app: &AppHandle, retention_count: u32) -> DbResult<()> {
+    let snapshots = list_backup_snapshots(app)?;
+    for snapshot in snapshots.into_iter().skip(retention_count as usize) {
+        let _ = fs::remove_file(snapshot.file_path);
+    }
+
+    Ok(())
+}
+
+fn backup_database_to_path(source: &Connection, backup_path: &Path) -> DbResult<()> {
+    if let Some(parent) = backup_path.parent() {
+        fs::create_dir_all(parent)
+            .map_err(|error| format!("Failed to create backup directory: {error}"))?;
+    }
+
+    let mut destination = Connection::open(backup_path)
+        .map_err(|error| format!("Failed to open backup snapshot: {error}"))?;
+    let backup = Backup::new(source, &mut destination)
+        .map_err(|error| format!("Failed to create backup snapshot: {error}"))?;
+    backup
+        .run_to_completion(5, Duration::from_millis(250), None)
+        .map_err(|error| format!("Failed to create backup snapshot: {error}"))?;
+    Ok(())
+}
+
+fn create_backup_snapshot_for_app(app: &AppHandle) -> DbResult<AppDataBackupStatus> {
+    let settings = read_backup_settings(app)?;
+    let source_path = db_path(app)?;
+    let source = open_database(&source_path)?;
+    init_schema(&source)?;
+
+    let directory = backup_directory_path(app)?;
+    fs::create_dir_all(&directory)
+        .map_err(|error| format!("Failed to create backup directory: {error}"))?;
+    let snapshot_path = directory.join(backup_file_name());
+
+    backup_database_to_path(&source, &snapshot_path)?;
+    prune_backup_snapshots(app, settings.backup_retention_count)?;
+    backup_status(app)
+}
+
+fn restore_latest_backup_for_app(app: &AppHandle) -> DbResult<AppDataBackupStatus> {
+    let snapshots = list_backup_snapshots(app)?;
+    let latest = snapshots
+        .first()
+        .ok_or_else(|| "No backup snapshots are available to restore.".to_string())?
+        .clone();
+    let current_path = db_path(app)?;
+    let temp_root = std::env::temp_dir().join(format!("mindmap-restore-{}", create_id()));
+    fs::create_dir_all(&temp_root)
+        .map_err(|error| format!("Failed to create restore directory: {error}"))?;
+    let current_backup_path = temp_root.join("current.db");
+
+    let result = (|| -> DbResult<AppDataBackupStatus> {
+        let source = open_database(&current_path)?;
+        init_schema(&source)?;
+        backup_database_to_path(&source, &current_backup_path)?;
+        drop(source);
+
+        if current_path.exists() {
+            fs::remove_file(&current_path)
+                .map_err(|error| format!("Failed to replace current database: {error}"))?;
+        }
+
+        fs::copy(&latest.file_path, &current_path)
+            .map_err(|error| format!("Failed to restore backup snapshot: {error}"))?;
+
+        let restored = open_database(&current_path)?;
+        init_schema(&restored)?;
+        backup_status(app)
+    })();
+
+    let cleanup_result = fs::remove_dir_all(&temp_root);
+
+    match result {
+        Ok(status) => {
+            let _ = cleanup_result;
+            Ok(status)
+        }
+        Err(error) => {
+            let _ = fs::copy(&current_backup_path, &current_path);
+            let _ = open_database(&current_path).and_then(|connection| init_schema(&connection));
+            let _ = cleanup_result;
+            Err(error)
+        }
+    }
+}
+
+fn resolve_configured_path(base_dir: &Path, configured_path: &str) -> PathBuf {
+    let candidate = Path::new(configured_path);
+
+    if candidate.is_absolute() {
+        candidate.to_path_buf()
+    } else {
+        base_dir.join(candidate)
+    }
 }
 
 fn open_database(path: &Path) -> DbResult<Connection> {
@@ -1416,6 +1700,16 @@ fn get_initial_page_data(connection: &Connection) -> DbResult<AppDataPageData> {
             canvases,
             active_canvas_id,
             database_file_name: String::new(),
+            backup_settings: AppDataBackupSettings {
+                backup_directory_path: "mindmap-backups".to_string(),
+                backup_interval_minutes: 10,
+                backup_retention_count: 2,
+            },
+            backup_status: AppDataBackupStatus {
+                latest_backup_file_name: None,
+                latest_backup_created_at: None,
+                backup_count: 0,
+            },
             nodes: load_nodes_by_canvas_id(connection, &canvas_id)?,
             edges: load_edges_by_canvas_id(connection, &canvas_id)?,
             tags: get_tags_by_canvas_id(connection, &canvas_id)?,
@@ -1427,6 +1721,16 @@ fn get_initial_page_data(connection: &Connection) -> DbResult<AppDataPageData> {
             canvases,
             active_canvas_id,
             database_file_name: String::new(),
+            backup_settings: AppDataBackupSettings {
+                backup_directory_path: "mindmap-backups".to_string(),
+                backup_interval_minutes: 10,
+                backup_retention_count: 2,
+            },
+            backup_status: AppDataBackupStatus {
+                latest_backup_file_name: None,
+                latest_backup_created_at: None,
+                backup_count: 0,
+            },
             nodes: Vec::new(),
             edges: Vec::new(),
             tags: Vec::new(),
@@ -1441,6 +1745,8 @@ fn load_initial_page_data(app: AppHandle) -> DbResult<AppDataPageData> {
     with_database(&app, |connection| {
         let mut page_data = get_initial_page_data(connection)?;
         page_data.database_file_name = read_database_file_name(&app)?;
+        page_data.backup_settings = read_backup_settings(&app)?;
+        page_data.backup_status = backup_status(&app)?;
         Ok(page_data)
     })
 }
@@ -1493,6 +1799,56 @@ async fn update_database_settings(
     Ok(AppDataDatabaseSettings {
         database_file_name: normalized.to_string(),
     })
+}
+
+#[tauri::command]
+async fn update_backup_settings(
+    app: AppHandle,
+    input: BackupSettingsInput,
+) -> DbResult<AppDataBackupSettings> {
+    if !is_valid_backup_directory_path(&input.backup_directory_path) {
+        return Err("Backup folder path is required.".to_string());
+    }
+
+    if input.backup_interval_minutes < 1 {
+        return Err("Backup interval must be at least 1 minute.".to_string());
+    }
+
+    if input.backup_retention_count < 1 {
+        return Err("Backup retention must be at least 1 snapshot.".to_string());
+    }
+
+    let settings = AppDataBackupSettings {
+        backup_directory_path: input.backup_directory_path.trim().to_string(),
+        backup_interval_minutes: input.backup_interval_minutes,
+        backup_retention_count: input.backup_retention_count,
+    };
+    persist_backup_settings(&app, &settings)?;
+    Ok(settings)
+}
+
+#[tauri::command]
+fn pick_backup_directory(input: Option<BackupDirectoryPickerInput>) -> Option<String> {
+    let default_path = input
+        .and_then(|value| value.default_path)
+        .filter(|value| !value.trim().is_empty());
+    let mut dialog = FileDialog::new();
+
+    if let Some(path) = default_path {
+        dialog = dialog.set_directory(path);
+    }
+
+    dialog.pick_folder().map(|path| path.display().to_string())
+}
+
+#[tauri::command]
+fn create_backup_snapshot(app: AppHandle) -> DbResult<AppDataBackupStatus> {
+    create_backup_snapshot_for_app(&app)
+}
+
+#[tauri::command]
+fn restore_latest_backup(app: AppHandle) -> DbResult<AppDataBackupStatus> {
+    restore_latest_backup_for_app(&app)
 }
 
 #[tauri::command]
@@ -2293,6 +2649,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             load_initial_page_data,
             update_database_settings,
+            update_backup_settings,
+            pick_backup_directory,
             load_canvases,
             create_canvas,
             rename_canvas,
@@ -2310,6 +2668,8 @@ pub fn run() {
             search_nodes,
             mutate_graph_fragment,
             delete_graph_fragment,
+            create_backup_snapshot,
+            restore_latest_backup,
             export_database,
             import_database
         ])

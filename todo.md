@@ -19,16 +19,16 @@ We're adding a lot of features that would cram the single-panel UI. Similar to h
 
 Stage 0 is to set up this tab UI and move the appropriate buttons and interfaces into it so that we can expand on it later.
 
-## Stage 1: Data safety and recovery
+## Stage 1: Data safety and recovery (DONE)
 
 Goal: make the desktop app hard to lose data with, and easy to recover when something goes wrong.
 
-- [ ] Add automatic backup snapshots for the SQLite database.
-    - Add a setting to specify a folder to use for snapshots - can use the same UI flow as we do for the database path
-- [ ] Add a restore flow for the most recent backup.
-- [ ] Add a visible recovery action in the desktop UI.
-- [ ] Clarify what happens on import, export, and rename failures.
-- [ ] Add tests for successful backup/restore and failure recovery.
+- [x] Add automatic backup snapshots for the SQLite database.
+    - [x] Add a setting to specify a folder to use for snapshots - can use the same UI flow as we do for the database path
+- [x] Add a restore flow for the most recent backup.
+- [x] Add a visible recovery action in the desktop UI.
+- [x] Clarify what happens on import, export, and rename failures.
+- [x] Add tests for successful backup/restore and failure recovery.
 
 Why this stage matters:
 - This is the highest-value desktop-app work because the app is a local note store and data loss is the worst failure mode.
@@ -124,4 +124,3 @@ Context boundary:
 3. Stage 3: Capture and edit workflow
 4. Stage 4: Desktop ergonomics
 5. Stage 5: Productionization and release polish
-

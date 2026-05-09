@@ -7,7 +7,12 @@ import {
 	it,
 	vi,
 } from 'vitest';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+	mkdtempSync,
+	readFileSync,
+	rmSync,
+	writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import Database from 'better-sqlite3';
@@ -27,6 +32,7 @@ let edgesApi: typeof import('./api/edges/+server');
 let searchApi: typeof import('./api/search/+server');
 let databaseApi: typeof import('./api/database/+server');
 let databaseSettingsApi: typeof import('./api/database-settings/+server');
+let databaseBackupsApi: typeof import('./api/database-backups/+server');
 let dbModule: typeof import('$lib/server/db');
 
 beforeAll(async () => {
@@ -43,6 +49,7 @@ beforeAll(async () => {
 	searchApi = await import('./api/search/+server');
 	databaseApi = await import('./api/database/+server');
 	databaseSettingsApi = await import('./api/database-settings/+server');
+	databaseBackupsApi = await import('./api/database-backups/+server');
 	dbModule = await import('$lib/server/db');
 });
 
@@ -143,6 +150,126 @@ describe('API integration', () => {
 		).toEqual(
 			expect.arrayContaining([expect.objectContaining({ name: 'canvases' })]),
 		);
+	});
+
+	it('reports backup settings and status in initial page data', async () => {
+		const pageData = await (
+			await (await import('./api/page-data/+server')).GET()
+		).json();
+
+		expect(pageData.backupSettings).toEqual(
+			expect.objectContaining({
+				backupDirectoryPath: 'mindmap-backups',
+				backupIntervalMinutes: 10,
+				backupRetentionCount: 2,
+			}),
+		);
+		expect(pageData.backupStatus).toEqual(
+			expect.objectContaining({
+				backupCount: 0,
+				latestBackupFileName: null,
+				latestBackupCreatedAt: null,
+			}),
+		);
+	});
+
+	it('creates and restores the latest backup snapshot', async () => {
+		await canvasesApi.POST({
+			request: request({ id: 'canvas-backup', name: 'Backups' }),
+		} as any);
+
+		const settingsResponse = await databaseBackupsApi.PATCH({
+			request: new Request('http://localhost/api/database-backups', {
+				method: 'PATCH',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					backupDirectoryPath: 'mindmap-backups',
+					backupIntervalMinutes: 5,
+					backupRetentionCount: 3,
+				}),
+			}),
+		} as any);
+		const settingsPayload = await settingsResponse.json();
+
+		expect(settingsPayload).toEqual(
+			expect.objectContaining({
+				backupDirectoryPath: 'mindmap-backups',
+				backupIntervalMinutes: 5,
+				backupRetentionCount: 3,
+			}),
+		);
+
+		const snapshotResponse = await databaseBackupsApi.POST({
+			request: new Request('http://localhost/api/database-backups', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ action: 'snapshot' }),
+			}),
+		} as any);
+		const snapshotPayload = await snapshotResponse.json();
+
+		expect(snapshotPayload.backupCount).toBe(1);
+		expect(snapshotPayload.latestBackupFileName).toMatch(
+			/^mindmap-backup-.*\.db$/,
+		);
+
+		dbModule.db.prepare('DELETE FROM canvases').run();
+
+		const restoreResponse = await databaseBackupsApi.POST({
+			request: new Request('http://localhost/api/database-backups', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ action: 'restore-latest' }),
+			}),
+		} as any);
+		const restorePayload = await restoreResponse.json();
+
+		expect(restorePayload.backupCount).toBe(1);
+
+		const canvases = dbModule.db
+			.prepare('SELECT id, name FROM canvases ORDER BY name')
+			.all();
+
+		expect(canvases).toEqual([
+			expect.objectContaining({
+				id: 'canvas-backup',
+				name: 'Backups',
+			}),
+		]);
+
+		rmSync(join(tempDir, 'mindmap-backups'), {
+			recursive: true,
+			force: true,
+		});
+	});
+
+	it('rejects restoring the latest backup when none exist', async () => {
+		await canvasesApi.POST({
+			request: request({ id: 'canvas-backup-missing', name: 'Missing' }),
+		} as any);
+
+		const response = await databaseBackupsApi.POST({
+			request: new Request('http://localhost/api/database-backups', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ action: 'restore-latest' }),
+			}),
+		} as any);
+		const payload = await response.json();
+
+		expect(response.status).toBe(400);
+		expect(payload.success).toBe(false);
+
+		const canvases = dbModule.db
+			.prepare('SELECT id, name FROM canvases ORDER BY name')
+			.all();
+
+		expect(canvases).toEqual([
+			expect.objectContaining({
+				id: 'canvas-backup-missing',
+				name: 'Missing',
+			}),
+		]);
 	});
 
 	it('replaces the current database when importing a valid snapshot', async () => {

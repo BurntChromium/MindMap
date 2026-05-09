@@ -3,7 +3,11 @@
 	import type { Connection } from '@xyflow/svelte';
 	import { Check, Search, X } from 'lucide-svelte';
 	import { createClientId } from '$lib/clientId';
-	import { appDataClient } from '$lib/appDataClient';
+import {
+	appDataClient,
+	type AppDataBackupSettings,
+	type AppDataBackupStatus,
+} from '$lib/appDataClient';
 	import type { CanvasStageApi } from '$lib/canvasApi';
 	import CanvasSidebar from '$lib/components/CanvasSidebar.svelte';
 	import CanvasStage from '$lib/components/CanvasStage.svelte';
@@ -105,6 +109,8 @@
 	let canvasStageApi = $state<CanvasStageApi | null>(null);
 	let canvasShell: HTMLDivElement | undefined;
 	let quickSearchInputRef = $state<HTMLInputElement | undefined>(undefined);
+	let backupTimer: ReturnType<typeof setTimeout> | null = null;
+	let backupInFlight = false;
 	let exportNotice = $state<{ title: string; detail: string } | null>(null);
 	let exportNoticeTimeout: ReturnType<typeof setTimeout> | null = null;
 	let pendingNodePositionOverrides = $state<
@@ -136,6 +142,16 @@
 	const canvases = $derived(storeCanvases ?? initialCanvases);
 	const activeCanvasId = $derived(storeActiveCanvasId ?? initialActiveCanvasId);
 	const databaseFileName = $derived(initialDatabaseFileName);
+	let backupSettings = $state<AppDataBackupSettings>({
+		backupDirectoryPath: 'mindmap-backups',
+		backupIntervalMinutes: 10,
+		backupRetentionCount: 2,
+	});
+	let backupStatus = $state<AppDataBackupStatus>({
+		latestBackupFileName: null,
+		latestBackupCreatedAt: null,
+		backupCount: 0,
+	});
 	const nodes = $derived(storeNodes ?? initialNodes);
 	const edges = $derived(storeEdges ?? initialEdges);
 	const entities = $derived(storeEntities ?? initialEntities);
@@ -236,6 +252,67 @@
 		}, 4500);
 	}
 
+	function clearBackupTimer() {
+		if (backupTimer) {
+			clearTimeout(backupTimer);
+			backupTimer = null;
+		}
+	}
+
+	function scheduleNextBackup() {
+		clearBackupTimer();
+
+		if (backupInFlight || !backupSettings.backupDirectoryPath.trim()) {
+			return;
+		}
+
+		const intervalMs = backupSettings.backupIntervalMinutes * 60_000;
+
+		if (!Number.isFinite(intervalMs) || intervalMs <= 0) {
+			return;
+		}
+
+		const latestBackupAt = backupStatus.latestBackupCreatedAt ?? 0;
+		const delay = latestBackupAt
+			? Math.max(0, intervalMs - (Date.now() - latestBackupAt))
+			: intervalMs;
+
+		backupTimer = setTimeout(() => {
+			void createBackupSnapshot().catch(() => undefined);
+		}, delay);
+	}
+
+	async function createBackupSnapshot() {
+		if (backupInFlight) {
+			return backupStatus;
+		}
+
+		backupInFlight = true;
+
+		try {
+			const nextStatus = (await appDataClient.createBackupSnapshot()) as AppDataBackupStatus;
+			backupStatus = nextStatus;
+			return nextStatus;
+		} catch (error) {
+			console.error(error);
+			throw error;
+		} finally {
+			backupInFlight = false;
+		}
+	}
+
+	async function saveBackupSettings(nextBackupSettings: AppDataBackupSettings) {
+		const updatedSettings = (await appDataClient.updateBackupSettings(
+			nextBackupSettings,
+		)) as AppDataBackupSettings;
+		backupSettings = { ...updatedSettings };
+	}
+
+	async function restoreLatestBackup() {
+		await appDataClient.restoreLatestBackup();
+		window.location.reload();
+	}
+
 	async function updateDatabaseFileName(nextDatabaseFileName: string) {
 		await appDataClient.updateDatabaseSettings({
 			databaseFileName: nextDatabaseFileName,
@@ -246,10 +323,13 @@
 
 	onDestroy(() => {
 		clearExportNoticeTimer();
+		clearBackupTimer();
 		void nodePositionDebouncer.destroy();
 	});
 
 	onMount(() => {
+		backupSettings = { ...data.backupSettings };
+		backupStatus = { ...data.backupStatus };
 		canvasStore.hydrate(initialCanvases, initialActiveCanvasId);
 		nodeStore.hydrate(initialNodes, initialActiveCanvasId);
 		edgeStore.hydrate(initialEdges, initialActiveCanvasId);
@@ -551,6 +631,14 @@
 			unsubClipboard();
 			unsubMutationState();
 		};
+	});
+
+	$effect(() => {
+		backupSettings.backupDirectoryPath;
+		backupSettings.backupIntervalMinutes;
+		backupSettings.backupRetentionCount;
+		backupStatus.latestBackupCreatedAt;
+		scheduleNextBackup();
 	});
 
 	$effect(() => {
@@ -1408,8 +1496,13 @@
 		bind:collapsed={sidebarCollapsed}
 		{canvases}
 		{databaseFileName}
+		{backupSettings}
+		{backupStatus}
 		onExportSuccess={showExportNotice}
 		onDatabaseFileNameSave={updateDatabaseFileName}
+		onBackupSettingsSave={saveBackupSettings}
+		onBackupNow={createBackupSnapshot}
+		onRestoreLatestBackup={restoreLatestBackup}
 	/>
 
 	<main class="workspace">
