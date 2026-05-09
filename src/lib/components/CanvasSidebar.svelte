@@ -443,6 +443,17 @@
 					<span>Create</span>
 				</button>
 			</div>
+			{#if canvases.length === 0}
+				<div
+					class="sidebar-empty-state"
+					role="status"
+					aria-live="polite"
+					data-testid="sidebar-canvas-empty-state"
+				>
+					<h4>No canvases yet</h4>
+					<p>Create a canvas to write notes.</p>
+				</div>
+			{/if}
 		</div>
 		<div class="sidebar-section">
 			<ul class="sidebar-list">
@@ -764,6 +775,29 @@
 		color: var(--text-muted);
 		font-size: 0.82rem;
 		line-height: 1.4;
+	}
+
+	.sidebar-empty-state {
+		display: grid;
+		gap: 0.25rem;
+		padding: 0.8rem 0.9rem;
+		border: 1px solid rgba(148, 163, 184, 0.28);
+		border-radius: 0.9rem;
+		background: rgba(248, 250, 252, 0.85);
+		color: var(--text-main);
+	}
+
+	.sidebar-empty-state h4 {
+		margin: 0;
+		font-size: 0.88rem;
+		line-height: 1.25;
+	}
+
+	.sidebar-empty-state p {
+		margin: 0;
+		color: var(--text-muted);
+		font-size: 0.82rem;
+		line-height: 1.35;
 	}
 
 </style>

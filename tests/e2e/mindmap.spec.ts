@@ -157,6 +157,62 @@ test('prompts before discarding node edits and supports y/n shortcuts', async ({
 	await expect(page.getByLabel('Node title')).toHaveCount(0);
 });
 
+test('guides first-time canvas and note creation', async ({ page, request }) => {
+	await resetDatabase(request);
+
+	await page.goto('/');
+
+	await expect(page.getByTestId('sidebar-canvas-empty-state')).toBeVisible();
+	await expect(
+		page.getByText('Create a canvas to write notes.'),
+	).toBeVisible();
+
+	await page.getByLabel('New canvas name').fill('Ideas');
+	await page.getByTestId('sidebar-create-canvas').click();
+
+	await expect(page.getByText('Ideas')).toBeVisible();
+	await expect(page.getByText('No notes yet')).toBeVisible();
+	await expect(
+		page.getByText('Press N to create a note on this canvas.'),
+	).toBeVisible();
+});
+
+test('undoes and redoes through the canvas status buttons', async ({
+	page,
+	request,
+}) => {
+	await resetDatabase(request);
+	await seedCanvas(request, { id: 'canvas-history-buttons', name: 'History' });
+
+	await page.goto('/');
+
+	await expect(page.getByTestId('canvas-history-undo')).toBeDisabled();
+	await expect(page.getByTestId('canvas-history-redo')).toBeDisabled();
+
+	await page.getByTestId('canvas-add-node').click();
+	await expect(page.getByRole('button', { name: 'Save node' })).toBeVisible();
+	await page.getByLabel('Node title').fill('First title');
+	await page.getByRole('button', { name: 'Save node' }).click();
+
+	await page.getByRole('button', { name: 'Edit node' }).click();
+	await page.getByLabel('Node title').fill('Second title');
+	await page.getByRole('button', { name: 'Save node' }).click();
+
+	await expect(page.getByText('Second title')).toBeVisible();
+	await expect(page.getByTestId('canvas-history-undo')).toBeEnabled();
+	await expect(page.getByTestId('canvas-history-redo')).toBeDisabled();
+
+	await page.getByTestId('canvas-history-undo').click();
+
+	await expect(page.getByText('First title')).toBeVisible();
+	await expect(page.getByText('Second title')).toHaveCount(0);
+	await expect(page.getByTestId('canvas-history-redo')).toBeEnabled();
+
+	await page.getByTestId('canvas-history-redo').click();
+
+	await expect(page.getByText('Second title')).toBeVisible();
+});
+
 test('filters search results by keyword and tag, then focuses a match', async ({
 	page,
 	request,

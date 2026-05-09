@@ -66,10 +66,10 @@ Suppose we have Smaug, Dragon, and Shire nodes. Smaug is an entity node. If Drag
 ## Stage 3: Capture and edit workflow
 Goal: reduce friction when users create and refine notes.
 
-- [ ] Improve first-run guidance for creating a notebook and capturing a first note.
+- [x] Improve first-run guidance for creating a notebook and capturing a first note.
     - Caveat: don't want click-through tutorials. I like the message we have on an empty canvas (something like "press n or click the new note button to add a note"). Perhaps we add a similar message on the canvas picker if there are no canvases?
-- [ ] Add buttons in the UI for undo and redo (we already have key-driven commands). I think if we put two buttons where the `Synced` pill is currently, then just push that rightward to fit, that would be good. 
-- [ ] Add tests for the edit flow and keyboard interactions that matter most.
+- [x] Add buttons in the UI for undo and redo (we already have key-driven commands). I think if we put two buttons where the `Synced` pill is currently, then just push that rightward to fit, that would be good. 
+- [x] Add tests for the edit flow and keyboard interactions that matter most.
 
 Why this stage matters:
 - A note app wins when capture feels effortless.

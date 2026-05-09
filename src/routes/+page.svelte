@@ -1,13 +1,13 @@
 <script lang="ts">
 	import { onDestroy, onMount, tick } from 'svelte';
 	import type { Connection } from '@xyflow/svelte';
-	import { Check, Search, X } from 'lucide-svelte';
+	import { Check, RotateCcw, RotateCw, Search, X } from 'lucide-svelte';
 	import { createClientId } from '$lib/clientId';
-import {
-	appDataClient,
-	type AppDataBackupSettings,
-	type AppDataBackupStatus,
-} from '$lib/appDataClient';
+	import {
+		appDataClient,
+		type AppDataBackupSettings,
+		type AppDataBackupStatus,
+	} from '$lib/appDataClient';
 	import type { CanvasStageApi } from '$lib/canvasApi';
 	import CanvasSidebar from '$lib/components/CanvasSidebar.svelte';
 	import CanvasStage from '$lib/components/CanvasStage.svelte';
@@ -96,6 +96,18 @@ import {
 		'synced',
 	);
 	let storeMutationError = $state<string | null>(null);
+	type HistoryState = {
+		undoCount: number;
+		redoCount: number;
+		lastLabel: string | null;
+		replaying: boolean;
+	};
+	let historyState = $state<HistoryState>({
+		undoCount: 0,
+		redoCount: 0,
+		lastLabel: null,
+		replaying: false,
+	});
 	let duplicateCount = $state(0);
 	let bulkTagFocusSignal = $state(0);
 	let searchQuery = $state('');
@@ -695,6 +707,10 @@ import {
 			storeMutationError = value.lastError;
 		});
 
+		const unsubHistory = historyStore.subscribe((value) => {
+			historyState = value;
+		});
+
 		loadedCanvasId = data.activeCanvasId;
 		initialHydrationDone = true;
 
@@ -712,6 +728,7 @@ import {
 			unsubSelection();
 			unsubClipboard();
 			unsubMutationState();
+			unsubHistory();
 		};
 	});
 
@@ -1740,7 +1757,31 @@ import {
 				class:canvas-hint--status-failed={mutationPhase === 'failed'}
 				aria-live="polite"
 			>
-				{canvasStatusLabel}
+				<div class="canvas-hint__actions">
+					<button
+						class="icon-button canvas-hint__action"
+						type="button"
+						aria-label="Undo"
+						title="Undo (Cmd/Ctrl+Z)"
+						data-testid="canvas-history-undo"
+						onclick={() => void undoHistory()}
+						disabled={historyState.undoCount === 0 || historyState.replaying}
+					>
+						<RotateCcw size={14} aria-hidden="true" />
+					</button>
+					<button
+						class="icon-button canvas-hint__action"
+						type="button"
+						aria-label="Redo"
+						title="Redo (Cmd/Ctrl+Shift+Z)"
+						data-testid="canvas-history-redo"
+						onclick={() => void redoHistory()}
+						disabled={historyState.redoCount === 0 || historyState.replaying}
+					>
+						<RotateCw size={14} aria-hidden="true" />
+					</button>
+				</div>
+				<span class="canvas-hint__status-label">{canvasStatusLabel}</span>
 			</div>
 
 			{#if showCanvasLoadingState}
@@ -1763,8 +1804,8 @@ import {
 				</div>
 			{:else if showCanvasEmptyState}
 				<div class="canvas-empty-state" role="status" aria-live="polite">
-					<h3>No nodes yet</h3>
-					<p>Press <kbd>N</kbd> to create a node on this canvas.</p>
+					<h3>No notes yet</h3>
+					<p>Press <kbd>N</kbd> to create a note on this canvas.</p>
 				</div>
 			{/if}
 
@@ -1981,6 +2022,26 @@ import {
 	.canvas-hint--status {
 		left: 3.75rem;
 		bottom: 1rem;
+		gap: 0.45rem;
+		padding-inline: 0.55rem 0.7rem;
+		min-width: 11rem;
+	}
+
+	.canvas-hint__actions {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.25rem;
+		flex: none;
+	}
+
+	.canvas-hint__action {
+		flex: none;
+		width: 1.8rem;
+		height: 1.8rem;
+	}
+
+	.canvas-hint__status-label {
+		white-space: nowrap;
 	}
 
 	.canvas-hint--status-loading {
