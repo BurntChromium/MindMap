@@ -208,8 +208,12 @@
 	const associativeFlowEdges = $derived(
 		buildAssociativeFlowEdges(nodes, entities, entityMentions),
 	);
-	const flowNodes = $derived(
-		toFlowNodes(nodes, {
+	// Keep XYFlow inputs raw so its internal Svelte store does not wrap every node.
+	let flowNodes = $state.raw<ReturnType<typeof toFlowNodes>>([]);
+	let flowEdges = $state.raw<ReturnType<typeof toFlowEdges>>([]);
+
+	$effect(() => {
+		flowNodes = toFlowNodes(nodes, {
 			editingNodeId,
 			focusedNodeId,
 			selectedNodeIds,
@@ -219,9 +223,9 @@
 			positionOverrides: pendingNodePositionOverrides,
 			onTagClick: toggleTagFilter,
 			onEntityClick: focusEntityReference,
-		}),
-	);
-	const flowEdges = $derived(toFlowEdges(edges, associativeFlowEdges));
+		});
+		flowEdges = toFlowEdges(edges, associativeFlowEdges);
+	});
 	const activeAssociativeEdge = $derived(
 		activeAssociativeEdgeId
 			? (associativeFlowEdges.find(
