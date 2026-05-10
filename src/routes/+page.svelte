@@ -1168,16 +1168,26 @@
 	}
 
 	async function focusEditingNodeTitle() {
-		await tick();
-
-		const titleInput = document.querySelector<HTMLInputElement>('.title-input');
-
-		if (!titleInput) {
+		if (!editingNodeId) {
 			return;
 		}
 
-		titleInput.focus();
-		titleInput.select();
+		for (let attempt = 0; attempt < 5; attempt += 1) {
+			await tick();
+
+			const titleInput =
+				document.querySelector<HTMLInputElement>('.title-input');
+
+			if (titleInput) {
+				titleInput.focus();
+				titleInput.select();
+				return;
+			}
+
+			await new Promise<void>((resolve) => {
+				requestAnimationFrame(() => resolve());
+			});
+		}
 	}
 
 	function focusNearestNode(direction: Direction, extendSelection = false) {
