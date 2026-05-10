@@ -16,12 +16,28 @@ The application has strong keyboard support (most actions can be taken with just
 
 Mindmap is free and open-source, and has no ads, spyware, telemetry, accounts, subscriptions, or AI features.
 
-### Tech Stack
-
-This app uses Svelte and XYFlow on the front-end, and Tauri and SQLite on the back-end.
-
 See [USER_GUIDE.md](./USER_GUIDE.md) for the app layout and keyboard shortcuts.
 See [CHANGELOG.md](./CHANGELOG.md) for release notes.
+
+## Installation
+
+To install the binaries, download the appropriate executable (or equivalent) from the releases section. 
+
+### Windows
+
+I will not pay Microsoft money to sign the program, so you'll get a security warning during the initial installation. You can click more details and then install it anyways.
+
+### MacOS
+
+I will not pay Apple money to sign the program, so you'll get a security warning during installation. You'll have to try to install, then go to your settings, go to the security menu, and somewhere on there you can provide your password to install the app anyways.
+
+### Linux
+
+Should work fine out of the box!
+
+## Tech Stack
+
+This app uses Svelte and XYFlow on the front-end, and Tauri and SQLite on the back-end (for the desktop app). The server runs on Node.
 
 ## Build
 
