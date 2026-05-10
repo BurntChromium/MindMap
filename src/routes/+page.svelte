@@ -562,10 +562,6 @@
 				!event.altKey &&
 				!event.shiftKey
 			) {
-				if (!editingNodeId) {
-					return;
-				}
-
 				event.preventDefault();
 				void focusEditingNodeTitle();
 				return;
