@@ -130,9 +130,12 @@ test('prompts before discarding node edits and supports y/n shortcuts', async ({
 	await expect(nodeCard).toBeVisible();
 	await nodeCard.click();
 	await page.keyboard.press('e');
-	await page.keyboard.press('w');
 
 	const titleInput = page.getByLabel('Node title');
+	await expect(titleInput).toBeVisible();
+	await expect(titleInput).not.toBeFocused();
+
+	await page.keyboard.press('w');
 	await expect(titleInput).toBeFocused();
 	await titleInput.fill('Updated title');
 
