@@ -1701,6 +1701,7 @@
 			<CanvasStage
 				{flowNodes}
 				{flowEdges}
+				selectedNodeCount={selectedNodeIds.length}
 				onAddNode={addNode}
 				onUndo={() => void undoHistory()}
 				onRedo={() => void redoHistory()}
@@ -1730,12 +1731,6 @@
 					canvasStageApi = api;
 				}}
 			/>
-
-			{#if selectedNodeIds.length > 0}
-				<div class="canvas-hint canvas-hint--selection" aria-live="polite">
-					{selectedNodeIds.length} selected
-				</div>
-			{/if}
 
 			{#if exportNotice}
 				<div
@@ -1919,27 +1914,6 @@
 		position: relative;
 		min-width: 0;
 		min-height: 0;
-	}
-
-	.canvas-hint {
-		position: absolute;
-		z-index: 6;
-		display: inline-flex;
-		align-items: center;
-		gap: 0.35rem;
-		border: 1px solid rgba(148, 163, 184, 0.45);
-		border-radius: 999px;
-		background: rgba(255, 255, 255, 0.92);
-		box-shadow: var(--shadow-soft);
-		color: var(--text-muted);
-		font-size: 0.8rem;
-		padding: 0.4rem 0.65rem;
-		backdrop-filter: blur(8px);
-	}
-
-	.canvas-hint--selection {
-		right: 1rem;
-		bottom: 1rem;
 	}
 
 	.canvas-toast {

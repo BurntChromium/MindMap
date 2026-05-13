@@ -19,6 +19,7 @@
 	interface Props {
 		flowNodes: any[];
 		flowEdges: any[];
+		selectedNodeCount: number;
 		onAddNode: () => void;
 		onUndo: () => void;
 		onRedo: () => void;
@@ -38,6 +39,7 @@
 	let {
 		flowNodes,
 		flowEdges,
+		selectedNodeCount,
 		onAddNode,
 		onUndo,
 		onRedo,
@@ -133,6 +135,16 @@
 			>
 				{canvasStatusLabel}
 			</span>
+			{#if selectedNodeCount > 0}
+				<span
+					class="canvas-controls__status"
+					data-testid="canvas-selection-count"
+					aria-live="polite"
+					aria-atomic="true"
+				>
+					{selectedNodeCount} selected
+				</span>
+			{/if}
 		</Controls>
 	</SvelteFlow>
 </div>
