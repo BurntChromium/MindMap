@@ -155,10 +155,9 @@
 	.canvas-controls__status {
 		display: inline-flex;
 		align-items: center;
-		margin-left: 0.25rem;
+		margin-left: 0.1rem;
 		min-height: 26px;
-		padding: 0 0.55rem 0 0.7rem;
-		border-left: 1px solid var(--xy-controls-button-border-color-default);
+		padding: 0 0.55rem;
 		border-radius: 0;
 		background: transparent;
 		box-shadow: none;
