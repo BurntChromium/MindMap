@@ -1,3 +1,4 @@
+import Database from 'better-sqlite3';
 import { db } from './db';
 import { normalizeTagList, normalizeTagName } from '$lib/tagUtils';
 import { getTagColor } from '$lib/tagColors';
@@ -60,19 +61,28 @@ function parseTags(rawTags: unknown) {
 	}
 }
 
-export function getCanvases() {
-	return db
+type SqliteDatabase = InstanceType<typeof Database>;
+
+function getDb(database?: SqliteDatabase) {
+	return database ?? db;
+}
+
+export function getCanvases(database?: SqliteDatabase) {
+	return getDb(database)
 		.prepare('SELECT * FROM canvases ORDER BY updated_at DESC')
 		.all() as CanvasRow[];
 }
 
-export function getNodesByCanvasId(canvasId: string | null) {
+export function getNodesByCanvasId(
+	canvasId: string | null,
+	database?: SqliteDatabase,
+) {
 	if (!canvasId) {
 		return [];
 	}
 
 	return (
-		db
+		getDb(database)
 			.prepare(
 				`
       SELECT
@@ -99,12 +109,15 @@ export function getNodesByCanvasId(canvasId: string | null) {
 	})) as NodeRow[];
 }
 
-export function getNodeTitlesByCanvasId(canvasId: string | null) {
+export function getNodeTitlesByCanvasId(
+	canvasId: string | null,
+	database?: SqliteDatabase,
+) {
 	if (!canvasId) {
 		return [];
 	}
 
-	return db
+	return getDb(database)
 		.prepare(
 			`
         SELECT id, title
@@ -116,13 +129,16 @@ export function getNodeTitlesByCanvasId(canvasId: string | null) {
 		.all(canvasId) as NodeTitleRow[];
 }
 
-export function getTagsByCanvasId(canvasId: string | null) {
+export function getTagsByCanvasId(
+	canvasId: string | null,
+	database?: SqliteDatabase,
+) {
 	if (!canvasId) {
 		return [];
 	}
 
 	return (
-		db
+		getDb(database)
 			.prepare(
 				`
       SELECT
@@ -154,6 +170,7 @@ export function searchNodesByCanvasId(
 	canvasId: string | null,
 	query: string,
 	activeTag: string | null = null,
+	database?: SqliteDatabase,
 ) {
 	if (!canvasId) {
 		return [];
@@ -167,7 +184,7 @@ export function searchNodesByCanvasId(
 	}
 
 	const rows = (
-		db
+		getDb(database)
 			.prepare(
 				`
       SELECT
@@ -198,27 +215,30 @@ export function searchNodesByCanvasId(
 	}).map(({ score: _, ...node }) => node) as NodeRow[];
 }
 
-export function getEdgesByCanvasId(canvasId: string | null) {
+export function getEdgesByCanvasId(
+	canvasId: string | null,
+	database?: SqliteDatabase,
+) {
 	if (!canvasId) {
 		return [];
 	}
 
-	return db
+	return getDb(database)
 		.prepare('SELECT * FROM edges WHERE canvas_id = ?')
 		.all(canvasId) as EdgeRow[];
 }
 
-export function getInitialPageData() {
-	const canvases = getCanvases();
+export function getInitialPageData(database?: SqliteDatabase) {
+	const canvases = getCanvases(database);
 	const activeCanvasId = canvases[0]?.id ?? null;
 
 	return {
 		canvases,
 		activeCanvasId,
-		nodes: getNodesByCanvasId(activeCanvasId),
-		edges: getEdgesByCanvasId(activeCanvasId),
-		tags: getTagsByCanvasId(activeCanvasId),
-		entities: getEntitiesByCanvasId(activeCanvasId),
-		entityMentions: getEntityMentionsByCanvasId(activeCanvasId),
+		nodes: getNodesByCanvasId(activeCanvasId, database),
+		edges: getEdgesByCanvasId(activeCanvasId, database),
+		tags: getTagsByCanvasId(activeCanvasId, database),
+		entities: getEntitiesByCanvasId(activeCanvasId, database),
+		entityMentions: getEntityMentionsByCanvasId(activeCanvasId, database),
 	};
 }

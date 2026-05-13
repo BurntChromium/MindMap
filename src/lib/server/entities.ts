@@ -59,6 +59,10 @@ export type NodeEntitySource = {
 
 type SqliteDatabase = InstanceType<typeof Database>;
 
+function getDb(database?: SqliteDatabase) {
+	return database ?? db;
+}
+
 function escapeRegExp(value: string) {
 	return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
@@ -103,10 +107,6 @@ export function replaceEntityReferences(
 
 	const pattern = new RegExp(`\\[\\[\\s*${escapeRegExp(from)}\\s*\\]\\]`, 'gi');
 	return body.replace(pattern, `[[${to}]]`);
-}
-
-function getDb(database?: SqliteDatabase) {
-	return database ?? db;
 }
 
 function parseNodes(canvasId: string, database?: SqliteDatabase) {
@@ -258,12 +258,15 @@ export function rebuildEntitiesForCanvasId(
 	}
 }
 
-export function getEntitiesByCanvasId(canvasId: string | null) {
+export function getEntitiesByCanvasId(
+	canvasId: string | null,
+	database?: SqliteDatabase,
+) {
 	if (!canvasId) {
 		return [];
 	}
 
-	return db
+	return getDb(database)
 		.prepare(
 			`
         SELECT
@@ -292,12 +295,15 @@ export function getEntitiesByCanvasId(canvasId: string | null) {
 		.all(canvasId) as EntityRow[];
 }
 
-export function getEntityMentionsByCanvasId(canvasId: string | null) {
+export function getEntityMentionsByCanvasId(
+	canvasId: string | null,
+	database?: SqliteDatabase,
+) {
 	if (!canvasId) {
 		return [];
 	}
 
-	return db
+	return getDb(database)
 		.prepare(
 			`
         SELECT

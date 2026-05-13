@@ -9,18 +9,13 @@ import {
 } from './db';
 import { createId, now } from './utils';
 import { getTagColor } from '$lib/tagColors';
-import { normalizeTagList, normalizeTagName } from '$lib/tagUtils';
+import { normalizeTagList } from '$lib/tagUtils';
 import {
-	canonicalizeNodeTitle,
 	createNodeTitleAllocator,
 	hasNodeTitleConflict,
 	normalizeNodeTitle,
 	resolveUniqueNodeTitle,
 } from '$lib/nodeTitles';
-import {
-	parseInlineContent,
-	type InlineContentSegment,
-} from '$lib/inlineContent';
 import {
 	exportDatabaseSnapshot,
 	importDatabaseSnapshot,
@@ -32,7 +27,19 @@ import {
 	type AppDataBackupStatus,
 	restoreLatestBackup,
 } from './databaseBackup';
-import { searchDocuments } from '$lib/search/searchCore';
+import {
+	getCanvases as getGraphCanvases,
+	getEdgesByCanvasId as getGraphEdgesByCanvasId,
+	getNodeTitlesByCanvasId as getGraphNodeTitlesByCanvasId,
+	getNodesByCanvasId as getGraphNodesByCanvasId,
+	getTagsByCanvasId as getGraphTagsByCanvasId,
+	searchNodesByCanvasId as getGraphSearchNodesByCanvasId,
+} from './graphData';
+import {
+	getEntitiesByCanvasId as getEntityRowsByCanvasId,
+	getEntityMentionsByCanvasId as getEntityMentionRowsByCanvasId,
+	rebuildEntitiesForCanvasId as rebuildEntityRowsForCanvasId,
+} from './entities';
 
 export type AppDataCanvas = {
 	id: string;
@@ -105,309 +112,35 @@ export type AppDataDatabaseSettings = {
 	databaseFileName: string;
 };
 
-type NodeEntitySource = {
-	id: string;
-	canvas_id: string;
-	title: string;
-	body: string;
-	is_entity: number | null;
-};
-
-type EntitySeed = {
-	id: string;
-	canvas_id: string;
-	title: string;
-	title_key: string;
-	primary_node_id: string | null;
-	created_at: number;
-};
-
-function parseTags(rawTags: unknown) {
-	if (typeof rawTags !== 'string' || !rawTags) {
-		return [];
-	}
-
-	try {
-		const parsed = JSON.parse(rawTags);
-		return Array.isArray(parsed) ? normalizeTagList(parsed) : [];
-	} catch {
-		return [];
-	}
-}
-
 type SqliteDatabase = InstanceType<typeof Database>;
 
 function getDb(database?: SqliteDatabase) {
 	return database ?? db;
 }
 
-function rebuildEntitiesForCanvasId(
-	canvasId: string | null,
-	database?: SqliteDatabase,
-) {
-	const currentDb = getDb(database);
-
-	if (!canvasId) {
-		return;
-	}
-
-	const timestamp = now();
-	const nodes = currentDb
-		.prepare(
-			`
-        SELECT id, canvas_id, title, body, is_entity
-        FROM nodes
-        WHERE canvas_id = ?
-        ORDER BY created_at ASC
-      `,
-		)
-		.all(canvasId) as NodeEntitySource[];
-	const existingEntities = currentDb
-		.prepare(
-			`
-        SELECT id, title, title_key, primary_node_id, created_at
-        FROM entities
-        WHERE canvas_id = ?
-      `,
-		)
-		.all(canvasId) as Array<{
-		id: string;
-		title: string;
-		title_key: string;
-		primary_node_id: string | null;
-		created_at: number;
-	}>;
-	const existingEntitiesByKey = new Map(
-		existingEntities.map((entity) => [entity.title_key, entity]),
-	);
-	const nodeTitlesByKey = new Map<string, NodeEntitySource>();
-	const entitiesByKey = new Map<string, EntitySeed>();
-	const referencesByNodeId = new Map<
-		string,
-		Array<{
-			title: string;
-			titleKey: string;
-			referenceText: string;
-			startIndex: number;
-			endIndex: number;
-		}>
-	>();
-
-	for (const node of nodes) {
-		if (node.is_entity === 0) {
-			continue;
-		}
-
-		const title = normalizeNodeTitle(node.title);
-
-		if (!title) {
-			continue;
-		}
-
-		const titleKey = canonicalizeNodeTitle(title);
-		nodeTitlesByKey.set(titleKey, node);
-		const existing = existingEntitiesByKey.get(titleKey);
-		entitiesByKey.set(titleKey, {
-			id: existing?.id ?? createId(),
-			canvas_id: canvasId,
-			title,
-			title_key: titleKey,
-			primary_node_id: node.id,
-			created_at: existing?.created_at ?? timestamp,
-		});
-	}
-
-	for (const node of nodes) {
-		const references = parseInlineContent(node.body ?? '')
-			.filter(
-				(
-					segment,
-				): segment is Extract<InlineContentSegment, { type: 'entity' }> => {
-					return segment.type === 'entity';
-				},
-			)
-			.map((segment) => ({
-				title: segment.title,
-				titleKey: segment.titleKey,
-				referenceText: segment.referenceText,
-				startIndex: segment.startIndex,
-				endIndex: segment.endIndex,
-			}));
-
-		referencesByNodeId.set(node.id, references);
-
-		for (const reference of references) {
-			if (!entitiesByKey.has(reference.titleKey)) {
-				const existing = existingEntitiesByKey.get(reference.titleKey);
-				entitiesByKey.set(reference.titleKey, {
-					id: existing?.id ?? createId(),
-					canvas_id: canvasId,
-					title: reference.title,
-					title_key: reference.titleKey,
-					primary_node_id: nodeTitlesByKey.get(reference.titleKey)?.id ?? null,
-					created_at: existing?.created_at ?? timestamp,
-				});
-			}
-		}
-	}
-
-	const deleteMentions = currentDb.prepare(
-		'DELETE FROM entity_mentions WHERE canvas_id = ?',
-	);
-	const deleteEntities = currentDb.prepare(
-		'DELETE FROM entities WHERE canvas_id = ?',
-	);
-	const insertEntity = currentDb.prepare(`
-    INSERT INTO entities (
-      id, canvas_id, title, title_key, primary_node_id, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?)
-  `);
-	const insertMention = currentDb.prepare(`
-    INSERT INTO entity_mentions (
-      id, canvas_id, entity_id, node_id, reference_text, title, title_key,
-      start_index, end_index, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `);
-
-	deleteMentions.run(canvasId);
-	deleteEntities.run(canvasId);
-
-	for (const entity of entitiesByKey.values()) {
-		insertEntity.run(
-			entity.id,
-			entity.canvas_id,
-			entity.title,
-			entity.title_key,
-			entity.primary_node_id,
-			entity.created_at,
-			timestamp,
-		);
-	}
-
-	for (const node of nodes) {
-		const references = referencesByNodeId.get(node.id) ?? [];
-
-		for (const reference of references) {
-			const entity = entitiesByKey.get(reference.titleKey);
-
-			if (!entity) {
-				continue;
-			}
-
-			insertMention.run(
-				createId(),
-				canvasId,
-				entity.id,
-				node.id,
-				reference.referenceText,
-				reference.title,
-				reference.titleKey,
-				reference.startIndex,
-				reference.endIndex,
-				timestamp,
-				timestamp,
-			);
-		}
-	}
-}
-
 export function getCanvases(database?: SqliteDatabase) {
-	return getDb(database)
-		.prepare('SELECT * FROM canvases ORDER BY updated_at DESC')
-		.all() as AppDataCanvas[];
+	return getGraphCanvases(database);
 }
 
 export function getNodesByCanvasId(
 	canvasId: string | null,
 	database?: SqliteDatabase,
 ) {
-	if (!canvasId) {
-		return [];
-	}
-
-	return (
-		getDb(database)
-			.prepare(
-				`
-      SELECT
-        n.*,
-        COALESCE((
-          SELECT json_group_array(tag_name)
-          FROM (
-            SELECT t.name AS tag_name
-            FROM node_tags nt
-            JOIN tags t ON t.id = nt.tag_id
-            WHERE nt.node_id = n.id
-            ORDER BY nt.rowid
-          )
-        ), '[]') AS tags
-      FROM nodes n
-      WHERE n.canvas_id = ?
-      ORDER BY n.created_at ASC
-    `,
-			)
-			.all(canvasId) as Array<Record<string, unknown> & { tags?: unknown }>
-	).map((node) => ({
-		...node,
-		tags: parseTags(node.tags),
-	})) as AppDataNode[];
+	return getGraphNodesByCanvasId(canvasId, database);
 }
 
 export function getNodeTitlesByCanvasId(
 	canvasId: string | null,
 	database?: SqliteDatabase,
 ) {
-	if (!canvasId) {
-		return [];
-	}
-
-	return getDb(database)
-		.prepare(
-			`
-        SELECT id, title
-        FROM nodes
-        WHERE canvas_id = ?
-        ORDER BY created_at ASC
-      `,
-		)
-		.all(canvasId) as Array<{ id: string; title: string }>;
+	return getGraphNodeTitlesByCanvasId(canvasId, database);
 }
 
 export function getTagsByCanvasId(
 	canvasId: string | null,
 	database?: SqliteDatabase,
 ) {
-	if (!canvasId) {
-		return [];
-	}
-
-	return (
-		getDb(database)
-			.prepare(
-				`
-      SELECT
-        t.id,
-        t.name,
-        t.color AS color,
-        COUNT(nt.node_id) AS node_count
-      FROM tags t
-      JOIN node_tags nt ON nt.tag_id = t.id
-      JOIN nodes n ON n.id = nt.node_id
-      WHERE n.canvas_id = ?
-      GROUP BY t.id, t.name, t.color
-      ORDER BY node_count DESC, t.name ASC
-    `,
-			)
-			.all(canvasId) as Array<Record<string, unknown>>
-	).map((tag) => ({
-		id: String(tag.id),
-		name: String(tag.name),
-		color:
-			typeof tag.color === 'string' && tag.color
-				? tag.color
-				: getTagColor(String(tag.name)),
-		node_count: Number(tag.node_count ?? 0),
-	})) as Array<{ id: string; name: string; color: string; node_count: number }>;
+	return getGraphTagsByCanvasId(canvasId, database);
 }
 
 export function searchNodesByCanvasId(
@@ -416,132 +149,39 @@ export function searchNodesByCanvasId(
 	activeTag: string | null = null,
 	database?: SqliteDatabase,
 ) {
-	if (!canvasId) {
-		return [];
-	}
-
-	const normalizedQuery = query.trim().toLowerCase();
-	const normalizedTag = activeTag ? normalizeTagName(activeTag) : '';
-
-	if (!normalizedQuery && !normalizedTag) {
-		return [];
-	}
-
-	const rows = (
-		getDb(database)
-			.prepare(
-				`
-      SELECT
-        n.*,
-        COALESCE((
-          SELECT json_group_array(tag_name)
-          FROM (
-            SELECT t.name AS tag_name
-            FROM node_tags nt
-            JOIN tags t ON t.id = nt.tag_id
-            WHERE nt.node_id = n.id
-            ORDER BY nt.rowid
-          )
-        ), '[]') AS tags
-      FROM nodes n
-      WHERE n.canvas_id = ?
-    `,
-			)
-			.all(canvasId) as Array<Record<string, unknown> & { tags?: unknown }>
-	).map((node) => ({
-		...node,
-		tags: parseTags(node.tags),
-	})) as AppDataNode[];
-
-	return searchDocuments(rows, {
-		query: normalizedQuery,
-		tag: normalizedTag || null,
-	}).map(({ score: _, ...node }) => node) as AppDataNode[];
+	return getGraphSearchNodesByCanvasId(canvasId, query, activeTag, database);
 }
 
 export function getEdgesByCanvasId(
 	canvasId: string | null,
 	database?: SqliteDatabase,
 ) {
-	if (!canvasId) {
-		return [];
-	}
-
-	return getDb(database)
-		.prepare('SELECT * FROM edges WHERE canvas_id = ?')
-		.all(canvasId) as AppDataEdge[];
+	return getGraphEdgesByCanvasId(canvasId, database);
 }
 
 export function getEntitiesByCanvasId(
 	canvasId: string | null,
 	database?: SqliteDatabase,
 ) {
-	if (!canvasId) {
-		return [];
-	}
-
-	return getDb(database)
-		.prepare(
-			`
-        SELECT
-          e.id,
-          e.canvas_id,
-          e.title,
-          e.title_key,
-          e.primary_node_id,
-          e.created_at,
-          e.updated_at,
-          COUNT(em.id) AS mention_count
-        FROM entities e
-        LEFT JOIN entity_mentions em ON em.entity_id = e.id
-        WHERE e.canvas_id = ?
-        GROUP BY
-          e.id,
-          e.canvas_id,
-          e.title,
-          e.title_key,
-          e.primary_node_id,
-          e.created_at,
-          e.updated_at
-        ORDER BY e.primary_node_id IS NULL, e.title_key ASC
-      `,
-		)
-		.all(canvasId) as AppDataEntity[];
+	return getEntityRowsByCanvasId(canvasId, database);
 }
 
 export function getEntityMentionsByCanvasId(
 	canvasId: string | null,
 	database?: SqliteDatabase,
 ) {
-	if (!canvasId) {
-		return [];
-	}
+	return getEntityMentionRowsByCanvasId(canvasId, database);
+}
 
-	return getDb(database)
-		.prepare(
-			`
-        SELECT
-          em.id,
-          em.canvas_id,
-          em.entity_id,
-          em.node_id,
-          em.reference_text,
-          em.title,
-          em.title_key,
-          em.start_index,
-          em.end_index,
-          em.created_at,
-          em.updated_at
-        FROM entity_mentions em
-        WHERE em.canvas_id = ?
-        ORDER BY em.node_id ASC, em.start_index ASC
-      `,
-		)
-		.all(canvasId) as AppDataEntityMention[];
+export function rebuildEntitiesForCanvasId(
+	canvasId: string | null,
+	database?: SqliteDatabase,
+) {
+	return rebuildEntityRowsForCanvasId(canvasId, database);
 }
 
 export function getInitialPageData(database?: SqliteDatabase): AppDataPageData {
-	const canvases = getCanvases(database);
+	const canvases = getCanvases(database) as AppDataCanvas[];
 	const activeCanvasId = canvases[0]?.id ?? null;
 	const backupSettings = getDatabaseBackupSettings();
 	const backupStatus = getBackupStatus();
@@ -553,11 +193,19 @@ export function getInitialPageData(database?: SqliteDatabase): AppDataPageData {
 		backupSettings,
 		backupStatus,
 		backupDirectoryConfigurable: isBackupDirectoryConfigurable(),
-		nodes: getNodesByCanvasId(activeCanvasId, database),
-		edges: getEdgesByCanvasId(activeCanvasId, database),
-		tags: getTagsByCanvasId(activeCanvasId, database),
-		entities: getEntitiesByCanvasId(activeCanvasId, database),
-		entityMentions: getEntityMentionsByCanvasId(activeCanvasId, database),
+		nodes: getNodesByCanvasId(activeCanvasId, database) as AppDataNode[],
+		edges: getEdgesByCanvasId(activeCanvasId, database) as AppDataEdge[],
+		tags: getTagsByCanvasId(activeCanvasId, database) as Array<{
+			id: string;
+			name: string;
+			color: string;
+			node_count: number;
+		}>,
+		entities: getEntitiesByCanvasId(activeCanvasId, database) as AppDataEntity[],
+		entityMentions: getEntityMentionsByCanvasId(
+			activeCanvasId,
+			database,
+		) as AppDataEntityMention[],
 	};
 }
 

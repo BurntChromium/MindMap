@@ -4,6 +4,11 @@
 	import { formatTagLabel } from '$lib/tagUtils';
 	import type { EntityInspectorEntry } from '$lib/entityInspector';
 	import type { AssociativeFlowEdge } from '$lib/graph/associativeEdges';
+	import {
+		formatEntitySummary,
+		formatSharedEntitySummary,
+		truncatePreviewText,
+	} from '$lib/panelDisplay';
 	import PanelTabs from './PanelTabs.svelte';
 
 	type PanelTab = 'search' | 'tags' | 'entities';
@@ -110,21 +115,6 @@
 		activeEntityId = activeEntityId === entityId ? null : entityId;
 	}
 
-	function getEntitySummary(entry: EntityInspectorEntry) {
-		if (entry.primaryNode && entry.sourceNodeCount === 0) {
-			return 'Canonical node';
-		}
-
-		const noun = entry.sourceNodeCount === 1 ? 'node' : 'nodes';
-		return `${entry.mentionCount} mentions across ${entry.sourceNodeCount} ${noun}`;
-	}
-
-	function getAssociativeEdgeSummary(edge: AssociativeFlowEdge) {
-		const sharedCount = edge.data.sharedEntities.length;
-		const noun = sharedCount === 1 ? 'entity' : 'entities';
-
-		return `${sharedCount} shared ${noun}`;
-	}
 </script>
 
 <aside
@@ -227,9 +217,7 @@
 									>
 									{#if node.body}
 										<span class="panel-shell__result-body">
-											{node.body.length > 96
-												? `${node.body.slice(0, 96).trim()}…`
-												: node.body}
+											{truncatePreviewText(node.body)}
 										</span>
 									{/if}
 									{#if node.tags?.length}
@@ -379,9 +367,11 @@
 									{activeAssociativeEdge.data.targetNodeTitle ||
 										activeAssociativeEdge.data.targetNodeId}
 								</span>
-								<span class="entity-edge-card__meta">
-									{getAssociativeEdgeSummary(activeAssociativeEdge)}
-								</span>
+									<span class="entity-edge-card__meta">
+										{formatSharedEntitySummary(
+											activeAssociativeEdge.data.sharedEntities.length,
+										)}
+									</span>
 							</div>
 
 							<div class="entity-card__section">
@@ -458,7 +448,7 @@
 											>
 										</div>
 										<span class="entity-card__meta"
-											>{getEntitySummary(entity)}</span
+											>{formatEntitySummary(entity)}</span
 										>
 									</button>
 

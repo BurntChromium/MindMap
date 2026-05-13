@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onDestroy, onMount, tick } from 'svelte';
 	import type { Connection } from '@xyflow/svelte';
-	import { Check, Search, X } from 'lucide-svelte';
+	import { Check, X } from 'lucide-svelte';
 	import { createClientId } from '$lib/clientId';
 	import {
 		appDataClient,
@@ -10,7 +10,10 @@
 	} from '$lib/appDataClient';
 	import type { CanvasStageApi } from '$lib/canvasApi';
 	import CanvasSidebar from '$lib/components/CanvasSidebar.svelte';
+	import CanvasQuickSearch from '$lib/components/CanvasQuickSearch.svelte';
 	import CanvasStage from '$lib/components/CanvasStage.svelte';
+	import EditDiscardDialog from '$lib/components/EditDiscardDialog.svelte';
+	import ShortcutHelpDialog from '$lib/components/ShortcutHelpDialog.svelte';
 	import RightPanel from '$lib/components/RightPanel.svelte';
 	import {
 		buildClipboardFragment,
@@ -48,6 +51,10 @@
 		shouldClearFocusedNode,
 		toggleActiveTagFilter,
 	} from '$lib/routes/mindmapPage';
+	import {
+		shortcutHelpSections,
+		shouldBlockShortcutHelpKey,
+	} from '$lib/shortcutHelp';
 	import {
 		nodeStore,
 		type Node,
@@ -128,10 +135,6 @@
 	let isTauriRuntime = $state(false);
 	let canvasStageApi = $state<CanvasStageApi | null>(null);
 	let canvasShell: HTMLDivElement | undefined;
-	let quickSearchInputRef = $state<HTMLInputElement | undefined>(undefined);
-	let shortcutHelpCloseButtonRef = $state<HTMLButtonElement | undefined>(
-		undefined,
-	);
 	let backupTimer: ReturnType<typeof setTimeout> | null = null;
 	let backupInFlight = false;
 	let searchProvider = $state<SearchProvider | null>(null);
@@ -150,92 +153,6 @@
 		expandedNodeIds: {},
 		discardPrompt: null,
 	});
-	let discardPromptNoButtonRef = $state<HTMLButtonElement | undefined>(
-		undefined,
-	);
-	let discardPromptYesButtonRef = $state<HTMLButtonElement | undefined>(
-		undefined,
-	);
-	let previousDiscardPromptNodeId: string | null = null;
-	const shortcutHelpSections = [
-		{
-			title: 'Canvas',
-			shortcuts: [
-				{ keys: ['N'], description: 'Create a new note' },
-				{ keys: ['C'], description: 'Toggle the left canvas panel' },
-				{ keys: ['F'], description: 'Toggle the right search panel' },
-				{ keys: ['-'], description: 'Zoom out' },
-				{ keys: ['='], description: 'Zoom in' },
-				{ keys: ['E'], description: 'Edit the selected note' },
-				{ keys: ['V'], description: 'Toggle compact/view mode for a note' },
-				{ keys: ['Space'], description: 'Toggle the focused node selection' },
-				{ keys: ['Tab'], description: 'Cycle focus through visible nodes' },
-			],
-		},
-		{
-			title: 'Selection',
-			shortcuts: [
-				{ keys: ['Backspace', 'Delete'], description: 'Delete the selection' },
-				{ keys: ['Cmd/Ctrl', 'A'], description: 'Select all nodes' },
-				{ keys: ['Cmd/Ctrl', 'C'], description: 'Copy the selection' },
-				{ keys: ['Cmd/Ctrl', 'X'], description: 'Cut the selection' },
-				{ keys: ['Cmd/Ctrl', 'V'], description: 'Paste the copied fragment' },
-				{ keys: ['Cmd/Ctrl', 'D'], description: 'Duplicate the selection' },
-				{
-					keys: ['Cmd/Ctrl', 'Shift', 'D'],
-					description: 'Duplicate the selected subtree',
-				},
-				{ keys: ['Arrow keys'], description: 'Move selected nodes around' },
-				{ keys: ['Shift', '+', 'Arrow keys'], description: 'Move nodes faster' },
-				{
-					keys: ['Alt/Option', '+', 'Arrow keys'],
-					description: 'Jump focus to the nearest node',
-				},
-			],
-		},
-		{
-			title: 'Editing',
-			shortcuts: [
-				{ keys: ['w'], description: 'Focus the title field while editing' },
-				{ keys: ['Esc'], description: 'Clear selection or exit the current action' },
-				{ keys: ['y'], description: 'Confirm the discard prompt' },
-				{ keys: ['n'], description: 'Cancel the discard prompt' },
-				{ keys: ['/'], description: 'Open the quick search bar' },
-				{ keys: ['t'], description: 'Open or focus tag editing' },
-				{ keys: ['?'], description: 'Open keyboard shortcuts help' },
-				{ keys: ['Cmd/Ctrl', 'Z'], description: 'Undo the last canvas mutation' },
-				{
-					keys: ['Cmd/Ctrl', 'Shift', 'Z'],
-					description: 'Redo the last undone canvas mutation',
-				},
-			],
-		},
-	];
-	const shortcutHelpBlockedKeys = new Set([
-		'a',
-		'c',
-		'd',
-		'e',
-		'f',
-		'n',
-		't',
-		'v',
-		'w',
-		'x',
-		'y',
-		'z',
-		'/',
-		'-',
-		'=',
-		'backspace',
-		'delete',
-		'arrowup',
-		'arrowdown',
-		'arrowleft',
-		'arrowright',
-		'tab',
-		' ',
-	]);
 	const nodePositionDebouncer = createNodePositionDebouncer(
 		(updates) => nodeStore.updateNodePositions(updates),
 		150,
@@ -534,7 +451,7 @@
 					return;
 				}
 
-				if (shortcutHelpBlockedKeys.has(event.key.toLowerCase())) {
+				if (shouldBlockShortcutHelpKey(event.key)) {
 					event.preventDefault();
 				}
 
@@ -895,21 +812,6 @@
 	});
 
 	$effect(() => {
-		const nextDiscardPromptNodeId = nodeUiState.discardPrompt?.nodeId ?? null;
-
-		if (
-			nextDiscardPromptNodeId &&
-			nextDiscardPromptNodeId !== previousDiscardPromptNodeId
-		) {
-			queueMicrotask(() => {
-				discardPromptNoButtonRef?.focus();
-			});
-		}
-
-		previousDiscardPromptNodeId = nextDiscardPromptNodeId;
-	});
-
-	$effect(() => {
 		if (previousEditingNodeId && !editingNodeId) {
 			queueMicrotask(() => {
 				canvasShell?.focus();
@@ -968,16 +870,6 @@
 		}
 	});
 
-	$effect(() => {
-		if (!shortcutHelpOpen) {
-			return;
-		}
-
-		void tick().then(() => {
-			shortcutHelpCloseButtonRef?.focus();
-		});
-	});
-
 	function addNode() {
 		if (!activeCanvasId || !canvasStageApi || !canvasShell) return;
 
@@ -1029,11 +921,6 @@
 	function openQuickSearch() {
 		quickSearchOpen = true;
 		discoveryCollapsed = false;
-
-		queueMicrotask(() => {
-			quickSearchInputRef?.focus();
-			quickSearchInputRef?.select();
-		});
 	}
 
 	function closeQuickSearch() {
@@ -1052,15 +939,6 @@
 		queueMicrotask(() => {
 			canvasShell?.focus();
 		});
-	}
-
-	function handleShortcutHelpKeyDown(event: KeyboardEvent) {
-		if (event.key !== 'Escape') {
-			return;
-		}
-
-		event.preventDefault();
-		closeShortcutHelp();
 	}
 
 	function focusCanvasShell() {
@@ -1745,32 +1623,6 @@
 		nodeUiStore.endEditCollapsed(prompt.nodeId);
 	}
 
-	function handleDiscardPromptKeyDown(event: KeyboardEvent) {
-		event.stopPropagation();
-
-		if (event.key === 'Tab') {
-			event.preventDefault();
-			if (document.activeElement === discardPromptNoButtonRef) {
-				discardPromptYesButtonRef?.focus();
-				return;
-			}
-
-			discardPromptNoButtonRef?.focus();
-			return;
-		}
-
-		if (event.key.toLowerCase() === 'y') {
-			event.preventDefault();
-			confirmDiscardPrompt();
-			return;
-		}
-
-		if (event.key.toLowerCase() === 'n' || event.key === 'Escape') {
-			event.preventDefault();
-			cancelDiscardPrompt();
-		}
-	}
-
 	async function pasteClipboardFragment() {
 		if (
 			!activeCanvasId ||
@@ -1918,141 +1770,24 @@
 				</div>
 			{/if}
 
-			{#if quickSearchOpen}
-				<div class="canvas-search-bar">
-					<Search size={14} aria-hidden="true" />
-					<input
-						bind:this={quickSearchInputRef}
-						bind:value={searchQuery}
-						class="canvas-search-bar__input"
-						placeholder="Search nodes"
-						aria-label="Search nodes"
-						onkeydown={(event) => {
-							if (event.key === 'Escape') {
-								event.preventDefault();
-								closeQuickSearch();
-							}
-						}}
-					/>
-					<button
-						class="icon-button canvas-search-bar__clear"
-						type="button"
-						aria-label="Clear search"
-						title="Clear search"
-						onclick={() => {
-							searchQuery = '';
-							closeQuickSearch();
-						}}
-						disabled={!searchQuery.trim()}
-					>
-						<X size={12} aria-hidden="true" />
-					</button>
-				</div>
-			{/if}
+			<CanvasQuickSearch
+				open={quickSearchOpen}
+				bind:searchQuery
+				onClose={closeQuickSearch}
+			/>
 		</div>
 
-		{#if shortcutHelpOpen}
-			<div
-				class="shortcut-help-backdrop"
-				aria-hidden="true"
-				onclick={closeShortcutHelp}
-			></div>
-			<div class="shortcut-help-layer">
-				<div
-					class="shortcut-help-dialog"
-					tabindex="-1"
-					role="dialog"
-					aria-modal="true"
-					aria-labelledby="shortcut-help-title"
-					data-testid="shortcut-help-dialog"
-					onkeydown={handleShortcutHelpKeyDown}
-					onclick={(event) => event.stopPropagation()}
-				>
-					<div class="shortcut-help-dialog__header">
-						<div>
-							<p class="shortcut-help-dialog__eyebrow">Help</p>
-							<h3 id="shortcut-help-title">Keyboard shortcuts</h3>
-						</div>
-						<button
-							bind:this={shortcutHelpCloseButtonRef}
-							class="icon-button shortcut-help-dialog__close"
-							type="button"
-							aria-label="Close keyboard shortcuts help"
-							title="Close keyboard shortcuts help"
-							onclick={closeShortcutHelp}
-						>
-							<X size={12} aria-hidden="true" />
-						</button>
-					</div>
+		<ShortcutHelpDialog
+			open={shortcutHelpOpen}
+			sections={shortcutHelpSections}
+			onClose={closeShortcutHelp}
+		/>
 
-					<p class="shortcut-help-dialog__intro">
-						These are the shortcuts available in the canvas and editor.
-						Press <kbd>?</kbd> from the canvas to open this dialog.
-					</p>
-
-					<div class="shortcut-help-grid">
-						{#each shortcutHelpSections as section}
-							<section class="shortcut-help-section" aria-label={section.title}>
-								<h4>{section.title}</h4>
-								<ul class="shortcut-help-list">
-									{#each section.shortcuts as shortcut}
-										<li class="shortcut-help-item">
-											<div class="shortcut-help-item__keys">
-												{#each shortcut.keys as key}
-													<kbd>{key}</kbd>
-												{/each}
-											</div>
-											<span>{shortcut.description}</span>
-										</li>
-									{/each}
-								</ul>
-							</section>
-						{/each}
-					</div>
-				</div>
-			</div>
-		{/if}
-
-		{#if nodeUiState.discardPrompt}
-			<div class="edit-discard-backdrop" aria-hidden="true"></div>
-			<div class="edit-discard-layer">
-				<div
-					class="edit-discard-dialog"
-					tabindex="-1"
-					role="dialog"
-					aria-modal="true"
-					aria-labelledby="edit-discard-title"
-					aria-describedby="edit-discard-description"
-					onkeydown={handleDiscardPromptKeyDown}
-				>
-					<h3 id="edit-discard-title">Discard changes?</h3>
-					<p id="edit-discard-description">
-						Unsaved edits will be lost. Press <kbd>Y</kbd> for Yes or
-						<kbd>N</kbd> for No.
-					</p>
-					<div class="edit-discard-actions">
-						<button
-							class="button"
-							type="button"
-							bind:this={discardPromptNoButtonRef}
-							data-testid="discard-edit-no"
-							onclick={cancelDiscardPrompt}
-						>
-							No
-						</button>
-						<button
-							class="button"
-							type="button"
-							bind:this={discardPromptYesButtonRef}
-							data-testid="discard-edit-yes"
-							onclick={confirmDiscardPrompt}
-						>
-							Yes
-						</button>
-					</div>
-				</div>
-			</div>
-		{/if}
+		<EditDiscardDialog
+			prompt={nodeUiState.discardPrompt}
+			onCancel={cancelDiscardPrompt}
+			onConfirm={confirmDiscardPrompt}
+		/>
 
 		<RightPanel
 			bind:collapsed={discoveryCollapsed}
@@ -2199,221 +1934,5 @@
 
 	.canvas-empty-state--error {
 		border-color: rgba(239, 68, 68, 0.35);
-	}
-
-	.canvas-search-bar {
-		position: absolute;
-		right: 1rem;
-		bottom: 3.5rem;
-		z-index: 6;
-		display: inline-flex;
-		align-items: center;
-		gap: 0.45rem;
-		min-width: 260px;
-		padding: 0.5rem 0.65rem;
-		border: 1px solid rgba(148, 163, 184, 0.45);
-		border-radius: 0.9rem;
-		background: rgba(255, 255, 255, 0.96);
-		box-shadow: var(--shadow-soft);
-		backdrop-filter: blur(10px);
-	}
-
-	.canvas-search-bar__input {
-		flex: 1 1 auto;
-		min-width: 0;
-		border: 0;
-		background: transparent;
-		color: var(--text-main);
-		outline: none;
-	}
-
-	.canvas-search-bar__input::placeholder {
-		color: var(--text-muted);
-	}
-
-	.canvas-search-bar__clear {
-		flex: 0 0 auto;
-		width: 1.5rem;
-		height: 1.5rem;
-	}
-
-	.shortcut-help-backdrop {
-		position: fixed;
-		inset: 0;
-		z-index: 30;
-		background: rgba(15, 23, 42, 0.45);
-		backdrop-filter: blur(4px);
-	}
-
-	.shortcut-help-layer {
-		position: fixed;
-		inset: 0;
-		z-index: 31;
-		display: grid;
-		place-items: center;
-		padding: 1rem;
-		pointer-events: none;
-	}
-
-	.shortcut-help-dialog {
-		pointer-events: auto;
-		display: grid;
-		gap: 1rem;
-		width: min(720px, calc(100vw - 2rem));
-		max-height: min(80vh, 760px);
-		padding: 1rem 1.1rem 1.1rem;
-		border: 1px solid rgba(148, 163, 184, 0.45);
-		border-radius: 1rem;
-		background: rgba(255, 255, 255, 0.98);
-		box-shadow: var(--shadow-soft);
-		color: var(--text-main);
-		overflow: auto;
-	}
-
-	.shortcut-help-dialog__header {
-		display: flex;
-		align-items: flex-start;
-		justify-content: space-between;
-		gap: 1rem;
-	}
-
-	.shortcut-help-dialog__eyebrow {
-		margin: 0 0 0.15rem;
-		color: var(--text-muted);
-		font-size: 0.78rem;
-		font-weight: 600;
-		letter-spacing: 0.08em;
-		text-transform: uppercase;
-	}
-
-	.shortcut-help-dialog h3,
-	.shortcut-help-section h4 {
-		margin: 0;
-	}
-
-	.shortcut-help-dialog h3 {
-		font-size: 1.05rem;
-		line-height: 1.25;
-	}
-
-	.shortcut-help-dialog__close {
-		flex: none;
-	}
-
-	.shortcut-help-dialog__intro {
-		margin: 0;
-		color: var(--text-muted);
-		line-height: 1.45;
-	}
-
-	.shortcut-help-grid {
-		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
-		gap: 1rem;
-	}
-
-	.shortcut-help-section {
-		display: grid;
-		gap: 0.7rem;
-		padding: 0.85rem;
-		border: 1px solid rgba(226, 232, 240, 0.95);
-		border-radius: 0.85rem;
-		background: rgba(248, 250, 252, 0.95);
-	}
-
-	.shortcut-help-section h4 {
-		font-size: 0.92rem;
-		line-height: 1.25;
-	}
-
-	.shortcut-help-list {
-		display: grid;
-		gap: 0.7rem;
-	}
-
-	.shortcut-help-item {
-		display: grid;
-		gap: 0.35rem;
-	}
-
-	.shortcut-help-item__keys {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 0.35rem;
-	}
-
-	.shortcut-help-item kbd {
-		padding: 0.05rem 0.35rem;
-		border: 1px solid rgba(148, 163, 184, 0.6);
-		border-radius: 0.35rem;
-		background: rgba(255, 255, 255, 0.96);
-		font: inherit;
-		font-size: 0.82em;
-		color: var(--text-main);
-	}
-
-	.shortcut-help-item span {
-		color: var(--text-muted);
-		font-size: 0.9rem;
-		line-height: 1.35;
-	}
-
-	.edit-discard-backdrop {
-		position: fixed;
-		inset: 0;
-		z-index: 29;
-		background: rgba(15, 23, 42, 0.45);
-		backdrop-filter: blur(4px);
-	}
-
-	.edit-discard-layer {
-		position: fixed;
-		inset: 0;
-		z-index: 30;
-		display: grid;
-		place-items: center;
-		padding: 1rem;
-		pointer-events: none;
-	}
-
-	.edit-discard-dialog {
-		pointer-events: auto;
-		display: grid;
-		gap: 0.85rem;
-		width: min(420px, calc(100vw - 2rem));
-		padding: 1rem 1.1rem 1.1rem;
-		border: 1px solid rgba(148, 163, 184, 0.45);
-		border-radius: 1rem;
-		background: rgba(255, 255, 255, 0.98);
-		box-shadow: var(--shadow-soft);
-		color: var(--text-main);
-	}
-
-	.edit-discard-dialog h3 {
-		margin: 0;
-		font-size: 1rem;
-		line-height: 1.25;
-	}
-
-	.edit-discard-dialog p {
-		margin: 0;
-		color: var(--text-muted);
-		line-height: 1.45;
-	}
-
-	.edit-discard-dialog kbd {
-		padding: 0.05rem 0.35rem;
-		border: 1px solid rgba(148, 163, 184, 0.6);
-		border-radius: 0.35rem;
-		background: rgba(248, 250, 252, 0.95);
-		font: inherit;
-		font-size: 0.82em;
-		color: var(--text-main);
-	}
-
-	.edit-discard-actions {
-		display: flex;
-		justify-content: flex-end;
-		gap: 0.65rem;
 	}
 </style>
