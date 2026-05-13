@@ -144,7 +144,6 @@
 					</div>
 				</div>
 
-				{#if isExpanded}
 					{#if nodeTags.length}
 						<div
 							class="tags-area"
@@ -167,11 +166,12 @@
 						</div>
 					{/if}
 
-					<div class="body-area">
-						<CustomNodeReadOnlyBody
-							{bodyText}
-							onEntityClick={handleEntityReferenceClick}
-						/>
+					{#if isExpanded}
+						<div class="body-area">
+							<CustomNodeReadOnlyBody
+								{bodyText}
+								onEntityClick={handleEntityReferenceClick}
+							/>
 					</div>
 				{/if}
 			</div>
