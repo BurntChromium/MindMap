@@ -17,6 +17,8 @@
 		zoomIn: () => flow.zoomIn(),
 		zoomOut: () => flow.zoomOut(),
 		setCenter: (x, y, options) => flow.setCenter(x, y, options),
+		screenToFlowPosition: (position) => flow.screenToFlowPosition(position),
+		flowToScreenPosition: (position) => flow.flowToScreenPosition(position),
 	};
 
 	onMount(() => {

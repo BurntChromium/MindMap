@@ -48,6 +48,19 @@ pub struct AppDataEdge {
 }
 
 #[derive(Debug, Clone, Serialize)]
+pub struct AppDataTopic {
+    pub id: String,
+    pub canvas_id: String,
+    pub title: String,
+    pub x: f64,
+    pub y: f64,
+    pub width: f64,
+    pub height: f64,
+    pub created_at: i64,
+    pub updated_at: i64,
+}
+
+#[derive(Debug, Clone, Serialize)]
 pub struct AppDataEntity {
     pub id: String,
     pub canvas_id: String,
@@ -89,6 +102,7 @@ pub struct AppDataPageData {
     pub backup_directory_configurable: bool,
     pub nodes: Vec<AppDataNode>,
     pub edges: Vec<AppDataEdge>,
+    pub topics: Vec<AppDataTopic>,
     pub tags: Vec<AppDataTagSummary>,
     pub entities: Vec<AppDataEntity>,
     #[serde(rename = "entityMentions")]
@@ -234,6 +248,12 @@ struct NodeTitleSource {
     title: String,
 }
 
+#[derive(Debug, Clone)]
+struct TopicTitleSource {
+    id: String,
+    title: String,
+}
+
 #[derive(Debug, Deserialize)]
 struct CanvasCreateInput {
     id: Option<String>,
@@ -305,6 +325,29 @@ struct NodeUpdateInput {
     y: Option<f64>,
     collapsed: Option<i64>,
     tags: Option<Vec<String>>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct TopicCreateInput {
+    id: Option<String>,
+    canvas_id: String,
+    title: Option<String>,
+    x: Option<f64>,
+    y: Option<f64>,
+    width: Option<f64>,
+    height: Option<f64>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct TopicUpdateInput {
+    id: String,
+    title: Option<String>,
+    x: Option<f64>,
+    y: Option<f64>,
+    width: Option<f64>,
+    height: Option<f64>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -749,6 +792,19 @@ fn init_schema(connection: &Connection) -> DbResult<()> {
           FOREIGN KEY(canvas_id) REFERENCES canvases(id) ON DELETE CASCADE
         );
 
+        CREATE TABLE IF NOT EXISTS topics (
+          id TEXT PRIMARY KEY,
+          canvas_id TEXT NOT NULL,
+          title TEXT NOT NULL,
+          x REAL,
+          y REAL,
+          width REAL,
+          height REAL,
+          created_at INTEGER,
+          updated_at INTEGER,
+          FOREIGN KEY(canvas_id) REFERENCES canvases(id) ON DELETE CASCADE
+        );
+
         CREATE TABLE IF NOT EXISTS entities (
           id TEXT PRIMARY KEY,
           canvas_id TEXT NOT NULL,
@@ -797,6 +853,9 @@ fn init_schema(connection: &Connection) -> DbResult<()> {
 
         CREATE INDEX IF NOT EXISTS idx_edges_canvas_id
           ON edges(canvas_id);
+
+        CREATE INDEX IF NOT EXISTS idx_topics_canvas_id
+          ON topics(canvas_id);
 
         CREATE INDEX IF NOT EXISTS idx_node_tags_tag_id
           ON node_tags(tag_id);
@@ -1144,6 +1203,133 @@ fn resolve_unique_node_title(nodes: &[NodeTitleSource], requested_title: &str) -
     }
 }
 
+fn normalize_topic_title(raw_title: &str) -> String {
+    raw_title.trim().to_string()
+}
+
+fn canonicalize_topic_title(raw_title: &str) -> String {
+    normalize_topic_title(raw_title).to_lowercase()
+}
+
+fn build_used_topic_title_set(
+    topics: &[TopicTitleSource],
+    exclude_id: Option<&str>,
+) -> HashSet<String> {
+    let mut used = HashSet::new();
+
+    for topic in topics {
+        if exclude_id == Some(topic.id.as_str()) {
+            continue;
+        }
+
+        let normalized = normalize_topic_title(&topic.title);
+        if normalized.is_empty() {
+            continue;
+        }
+
+        used.insert(canonicalize_topic_title(&normalized));
+    }
+
+    used
+}
+
+fn has_topic_title_conflict(
+    topics: &[TopicTitleSource],
+    title: &str,
+    exclude_id: Option<&str>,
+) -> bool {
+    let normalized = normalize_topic_title(title);
+    if normalized.is_empty() {
+        return false;
+    }
+
+    build_used_topic_title_set(topics, exclude_id).contains(&canonicalize_topic_title(&normalized))
+}
+
+struct TopicTitleAllocator {
+    used_titles: HashSet<String>,
+}
+
+impl TopicTitleAllocator {
+    fn new(topics: &[TopicTitleSource], exclude_id: Option<&str>) -> Self {
+        Self {
+            used_titles: build_used_topic_title_set(topics, exclude_id),
+        }
+    }
+
+    fn has_title(&self, title: &str) -> bool {
+        let normalized = normalize_topic_title(title);
+        if normalized.is_empty() {
+            return false;
+        }
+
+        self.used_titles
+            .contains(&canonicalize_topic_title(&normalized))
+    }
+
+    fn reserve_title(&mut self, title: &str) {
+        let normalized = normalize_topic_title(title);
+        if !normalized.is_empty() {
+            self.used_titles
+                .insert(canonicalize_topic_title(&normalized));
+        }
+    }
+
+    fn next_enumerated_title(&mut self, base_title: &str) -> String {
+        let normalized_base = {
+            let normalized = normalize_topic_title(base_title);
+            if normalized.is_empty() {
+                "Topic".to_string()
+            } else {
+                normalized
+            }
+        };
+
+        let mut suffix = 1;
+        let mut candidate = format!("{normalized_base} {suffix}");
+        while self.has_title(&candidate) {
+            suffix += 1;
+            candidate = format!("{normalized_base} {suffix}");
+        }
+
+        self.reserve_title(&candidate);
+        candidate
+    }
+
+    fn next_copy_title(&mut self, base_title: &str) -> String {
+        let normalized_base = normalize_topic_title(base_title);
+        if normalized_base.is_empty() {
+            return self.next_enumerated_title("Topic");
+        }
+
+        if !self.has_title(&normalized_base) {
+            self.reserve_title(&normalized_base);
+            return normalized_base;
+        }
+
+        let mut suffix = 1;
+        let mut candidate = format!("{normalized_base} ({suffix})");
+        while self.has_title(&candidate) {
+            suffix += 1;
+            candidate = format!("{normalized_base} ({suffix})");
+        }
+
+        self.reserve_title(&candidate);
+        candidate
+    }
+}
+
+fn resolve_unique_topic_title(topics: &[TopicTitleSource], requested_title: &str) -> String {
+    let mut allocator = TopicTitleAllocator::new(topics, None);
+    let normalized = normalize_topic_title(requested_title);
+
+    if normalized.is_empty() {
+        allocator.next_enumerated_title("Topic")
+    } else {
+        allocator.next_copy_title(&normalized)
+    }
+}
+
 fn replace_entity_references(body: &str, from_title: &str, to_title: &str) -> String {
     let from = normalize_node_title(from_title);
     let to = normalize_node_title(to_title);
@@ -1330,6 +1516,42 @@ fn load_nodes_by_canvas_id(connection: &Connection, canvas_id: &str) -> DbResult
     }
 
     Ok(nodes)
+}
+
+fn load_topics_by_canvas_id(
+    connection: &Connection,
+    canvas_id: &str,
+) -> DbResult<Vec<AppDataTopic>> {
+    let mut stmt = connection
+        .prepare(
+            "
+        SELECT id, canvas_id, title, x, y, width, height, created_at, updated_at
+        FROM topics
+        WHERE canvas_id = ?
+        ORDER BY created_at ASC
+      ",
+        )
+        .map_err(|error| format!("Failed to load topics: {error}"))?;
+
+    let rows = stmt
+        .query_map(params![canvas_id], |row| {
+            Ok(AppDataTopic {
+                id: row.get(0)?,
+                canvas_id: row.get(1)?,
+                title: row.get(2)?,
+                x: row.get::<_, Option<f64>>(3)?.unwrap_or(0.0),
+                y: row.get::<_, Option<f64>>(4)?.unwrap_or(0.0),
+                width: row.get::<_, Option<f64>>(5)?.unwrap_or(280.0),
+                height: row.get::<_, Option<f64>>(6)?.unwrap_or(180.0),
+                created_at: row.get(7)?,
+                updated_at: row.get(8)?,
+            })
+        })
+        .map_err(|error| format!("Failed to load topics: {error}"))?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|error| format!("Failed to load topics: {error}"))?;
+
+    Ok(rows)
 }
 
 fn get_node_titles_by_canvas_id(
@@ -1843,6 +2065,7 @@ fn get_initial_page_data(connection: &Connection) -> DbResult<AppDataPageData> {
             backup_directory_configurable: true,
             nodes: load_nodes_by_canvas_id(connection, &canvas_id)?,
             edges: load_edges_by_canvas_id(connection, &canvas_id)?,
+            topics: load_topics_by_canvas_id(connection, &canvas_id)?,
             tags: get_tags_by_canvas_id(connection, &canvas_id)?,
             entities: load_entities_by_canvas_id(connection, &canvas_id)?,
             entity_mentions: load_entity_mentions_by_canvas_id(connection, &canvas_id)?,
@@ -1865,6 +2088,7 @@ fn get_initial_page_data(connection: &Connection) -> DbResult<AppDataPageData> {
             backup_directory_configurable: true,
             nodes: Vec::new(),
             edges: Vec::new(),
+            topics: Vec::new(),
             tags: Vec::new(),
             entities: Vec::new(),
             entity_mentions: Vec::new(),
@@ -2065,6 +2289,153 @@ fn delete_canvas(app: AppHandle, input: IdInput) -> DbResult<AppDataDeleteResult
 fn load_nodes(app: AppHandle, input: LoadCanvasInput) -> DbResult<Vec<AppDataNode>> {
     with_database(&app, |connection| {
         load_nodes_by_canvas_id(connection, &input.canvas_id)
+    })
+}
+
+#[tauri::command]
+fn load_topics(app: AppHandle, input: LoadCanvasInput) -> DbResult<Vec<AppDataTopic>> {
+    with_database(&app, |connection| {
+        load_topics_by_canvas_id(connection, &input.canvas_id)
+    })
+}
+
+#[tauri::command]
+fn create_topic(app: AppHandle, input: TopicCreateInput) -> DbResult<AppDataCreateNodeResult> {
+    with_database(&app, |connection| {
+        let id = input
+            .id
+            .as_deref()
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(|value| value.to_string())
+            .unwrap_or_else(create_id);
+        let topic_titles = load_topics_by_canvas_id(connection, &input.canvas_id)?
+            .into_iter()
+            .map(|topic| TopicTitleSource {
+                id: topic.id,
+                title: topic.title,
+            })
+            .collect::<Vec<_>>();
+        let title = resolve_unique_topic_title(&topic_titles, input.title.as_deref().unwrap_or(""));
+        let x = input.x.unwrap_or(0.0);
+        let y = input.y.unwrap_or(0.0);
+        let width = input.width.unwrap_or(280.0);
+        let height = input.height.unwrap_or(180.0);
+        let timestamp = now();
+
+        connection
+            .execute(
+                "
+          INSERT INTO topics (
+            id, canvas_id, title, x, y, width, height, created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ",
+                params![
+                    id.as_str(),
+                    input.canvas_id.as_str(),
+                    title.as_str(),
+                    x,
+                    y,
+                    width,
+                    height,
+                    timestamp,
+                    timestamp,
+                ],
+            )
+            .map_err(|error| format!("Failed to create topic: {error}"))?;
+
+        Ok(AppDataCreateNodeResult {
+            success: true,
+            id,
+            title,
+        })
+    })
+}
+
+#[tauri::command]
+fn update_topic(app: AppHandle, input: TopicUpdateInput) -> DbResult<AppDataUpdateNodeResult> {
+    with_database(&app, |connection| {
+        let topic = connection
+            .query_row(
+                "SELECT id, canvas_id, title FROM topics WHERE id = ?",
+                params![input.id.as_str()],
+                |row| {
+                    Ok((
+                        row.get::<_, String>(0)?,
+                        row.get::<_, String>(1)?,
+                        row.get::<_, String>(2)?,
+                    ))
+                },
+            )
+            .optional()
+            .map_err(|error| format!("Failed to load topic: {error}"))?;
+
+        let Some((_, canvas_id, _existing_title)) = topic else {
+            return Err("Missing id".to_string());
+        };
+
+        if let Some(title) = input.title.as_deref() {
+            let normalized = normalize_topic_title(title);
+            if normalized.is_empty() {
+                return Err("Topic title cannot be empty.".to_string());
+            }
+
+            let current_topics = load_topics_by_canvas_id(connection, &canvas_id)?
+                .into_iter()
+                .map(|topic| TopicTitleSource {
+                    id: topic.id,
+                    title: topic.title,
+                })
+                .collect::<Vec<_>>();
+
+            if has_topic_title_conflict(&current_topics, &normalized, Some(input.id.as_str())) {
+                return Err(format!(
+                    "A topic titled \"{}\" already exists in this canvas.",
+                    normalized
+                ));
+            }
+        }
+
+        connection
+            .execute(
+                "
+          UPDATE topics
+          SET
+            title = COALESCE(?, title),
+            x = COALESCE(?, x),
+            y = COALESCE(?, y),
+            width = COALESCE(?, width),
+            height = COALESCE(?, height),
+            updated_at = ?
+          WHERE id = ?
+        ",
+                params![
+                    input.title.as_deref(),
+                    input.x,
+                    input.y,
+                    input.width,
+                    input.height,
+                    now(),
+                    input.id.as_str(),
+                ],
+            )
+            .map_err(|error| format!("Failed to update topic: {error}"))?;
+
+        Ok(AppDataUpdateNodeResult {
+            success: true,
+            id: input.id,
+        })
+    })
+}
+
+#[tauri::command]
+fn delete_topic(app: AppHandle, input: IdInput) -> DbResult<AppDataDeleteResult> {
+    with_database(&app, |connection| {
+        connection
+            .execute("DELETE FROM topics WHERE id = ?", params![input.id.as_str()])
+            .map_err(|error| format!("Failed to delete topic: {error}"))?;
+
+        Ok(AppDataDeleteResult { success: true })
     })
 }
 
@@ -2796,6 +3167,10 @@ pub fn run() {
             load_edges,
             create_edge,
             delete_edge,
+            load_topics,
+            create_topic,
+            update_topic,
+            delete_topic,
             load_entities,
             search_nodes,
             mutate_graph_fragment,

@@ -11,14 +11,17 @@
 		RotateCcw,
 		RotateCw,
 		StickyNote,
+		Shapes,
 	} from 'lucide-svelte';
 	import CustomNode from '$lib/components/CustomNode.svelte';
+	import TopicNode from '$lib/components/TopicNode.svelte';
 	import CanvasStageApiBridge from '$lib/components/CanvasStageApiBridge.svelte';
 	import type { CanvasStageApi } from '$lib/canvasApi';
 	import { handleNodeDragStop } from '$lib/graph/graphAdapter';
 
 	const nodeTypes = {
 		custom: CustomNode,
+		topic: TopicNode,
 	};
 
 	interface Props {
@@ -26,6 +29,7 @@
 		flowEdges: any[];
 		selectedNodeCount: number;
 		onAddNode: () => void;
+		onAddTopic: () => void;
 		onUndo: () => void;
 		onRedo: () => void;
 		onHelp: () => void;
@@ -47,6 +51,7 @@
 		flowEdges,
 		selectedNodeCount,
 		onAddNode,
+		onAddTopic,
 		onUndo,
 		onRedo,
 		onHelp,
@@ -109,6 +114,15 @@
 				data-testid="canvas-add-node"
 			>
 				<StickyNote class="canvas-controls__icon" size={12} aria-hidden="true" />
+			</ControlButton>
+			<ControlButton
+				onclick={onAddTopic}
+				class="canvas-controls__button canvas-controls__button--outline"
+				aria-label="Add topic"
+				title="Add topic (G)"
+				data-testid="canvas-add-topic"
+			>
+				<Shapes class="canvas-controls__icon" size={12} aria-hidden="true" />
 			</ControlButton>
 			<ControlButton
 				onclick={onUndo}

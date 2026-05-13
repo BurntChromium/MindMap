@@ -129,6 +129,44 @@ export function buildEdgeCreateBody(input: {
 	};
 }
 
+export function buildTopicCreateBody(input: {
+	id?: string;
+	canvasId: string;
+	title?: string;
+	x: number;
+	y: number;
+	width: number;
+	height: number;
+}) {
+	return {
+		id: input.id,
+		canvasId: input.canvasId,
+		title: input.title ?? 'Topic',
+		x: input.x,
+		y: input.y,
+		width: input.width,
+		height: input.height,
+	};
+}
+
+export function buildTopicPatchBody(input: {
+	id: string;
+	title?: string;
+	x?: number;
+	y?: number;
+	width?: number;
+	height?: number;
+}) {
+	return {
+		id: input.id,
+		title: input.title,
+		x: input.x,
+		y: input.y,
+		width: input.width,
+		height: input.height,
+	};
+}
+
 export function buildBulkTagsBody(
 	nodes: Array<{ id: string; tags: string[] }>,
 ) {

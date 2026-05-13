@@ -1,4 +1,5 @@
 import { nodeStore, type Node as AppNode } from '$lib/stores/nodeStore';
+import { topicStore, type Topic as AppTopic } from '$lib/stores/topicStore';
 import { type Edge as AppEdge } from '$lib/stores/edgeStore';
 import {
 	getAssociativeEdgeStyle,
@@ -18,7 +19,20 @@ export type FlowNodeOptions = {
 	onEntityClick?: (title: string) => void;
 };
 
+export type FlowTopicNodeOptions = {
+	editingTopicId?: string | null;
+	onBeginEdit?: (topicId: string) => void;
+	onCancelEdit?: (topicId: string) => void;
+	onCommitTitle?: (topicId: string, title: string) => void;
+	onDelete?: (topicId: string) => void;
+	onResize?: (
+		topicId: string,
+		resize: { x: number; y: number; width: number; height: number },
+	) => void;
+};
+
 type FlowNode = ReturnType<typeof buildFlowNode>;
+type FlowTopicNode = ReturnType<typeof buildFlowTopicNode>;
 type FlowEdge = {
 	id: string;
 	source: string;
@@ -54,12 +68,33 @@ type CachedFlowNode = {
 	node: FlowNode;
 };
 
+type CachedFlowTopicNode = {
+	id: string;
+	title: string;
+	x: number;
+	y: number;
+	width: number;
+	height: number;
+	selected: boolean;
+	editingTopicId: string | null | undefined;
+	onBeginEdit?: (topicId: string) => void;
+	onCancelEdit?: (topicId: string) => void;
+	onCommitTitle?: (topicId: string, title: string) => void;
+	onDelete?: (topicId: string) => void;
+	onResize?: (
+		topicId: string,
+		resize: { x: number; y: number; width: number; height: number },
+	) => void;
+	node: FlowTopicNode;
+};
+
 type CachedFlowEdge = {
 	signature: string;
 	edge: FlowEdge;
 };
 
 const flowNodeCache = new Map<string, CachedFlowNode>();
+const flowTopicNodeCache = new Map<string, CachedFlowTopicNode>();
 const flowEdgeCache = new Map<string, CachedFlowEdge>();
 
 function buildFlowNode(
@@ -83,6 +118,7 @@ function buildFlowNode(
 		id: n.id,
 		position: { x: position.x, y: position.y },
 		selected: options.selected,
+		zIndex: 2,
 		data: {
 			label: n.title || 'Untitled',
 			body: n.body ?? '',
@@ -98,6 +134,44 @@ function buildFlowNode(
 		},
 		type: 'custom',
 		draggable: options.draggable,
+	};
+}
+
+function buildFlowTopicNode(
+	topic: AppTopic,
+	options: {
+		selected: boolean;
+		editingTopicId?: string | null;
+		onBeginEdit?: (topicId: string) => void;
+		onCancelEdit?: (topicId: string) => void;
+		onCommitTitle?: (topicId: string, title: string) => void;
+		onDelete?: (topicId: string) => void;
+		onResize?: (
+			topicId: string,
+			resize: { x: number; y: number; width: number; height: number },
+		) => void;
+	},
+) {
+	return {
+		id: topic.id,
+		position: { x: topic.x, y: topic.y },
+		width: topic.width,
+		height: topic.height,
+		selected: options.selected,
+		zIndex: 0,
+		connectable: false,
+		draggable: true,
+		deletable: true,
+		type: 'topic',
+		data: {
+			title: topic.title,
+			isEditing: options.editingTopicId === topic.id,
+			onBeginEdit: options.onBeginEdit,
+			onCancelEdit: options.onCancelEdit,
+			onCommitTitle: options.onCommitTitle,
+			onDelete: options.onDelete,
+			onResize: options.onResize,
+		},
 	};
 }
 
@@ -239,6 +313,76 @@ export function toFlowNodes(nodes: AppNode[], options: FlowNodeOptions) {
 	return flowNodes;
 }
 
+export function toFlowTopics(
+	topics: AppTopic[],
+	options: FlowTopicNodeOptions = {},
+) {
+	const { editingTopicId = null, onBeginEdit, onCancelEdit, onCommitTitle, onDelete, onResize } =
+		options;
+	const seenIds = new Set<string>();
+
+	const flowTopics = topics.map((topic) => {
+		seenIds.add(topic.id);
+		const cached = flowTopicNodeCache.get(topic.id);
+
+		if (
+			cached &&
+			cached.id === topic.id &&
+			cached.title === topic.title &&
+			cached.x === topic.x &&
+			cached.y === topic.y &&
+			cached.width === topic.width &&
+			cached.height === topic.height &&
+			cached.selected === false &&
+			cached.editingTopicId === editingTopicId &&
+			cached.onBeginEdit === onBeginEdit &&
+			cached.onCancelEdit === onCancelEdit &&
+			cached.onCommitTitle === onCommitTitle &&
+			cached.onDelete === onDelete &&
+			cached.onResize === onResize
+		) {
+			return cached.node;
+		}
+
+		const node = buildFlowTopicNode(topic, {
+			selected: false,
+			editingTopicId,
+			onBeginEdit,
+			onCancelEdit,
+			onCommitTitle,
+			onDelete,
+			onResize,
+		});
+
+		flowTopicNodeCache.set(topic.id, {
+			id: topic.id,
+			title: topic.title,
+			x: topic.x,
+			y: topic.y,
+			width: topic.width,
+			height: topic.height,
+			selected: false,
+			editingTopicId,
+			onBeginEdit,
+			onCancelEdit,
+			onCommitTitle,
+			onDelete,
+			onResize,
+			node,
+		});
+
+		return node;
+	});
+
+	for (const id of flowTopicNodeCache.keys()) {
+		if (!seenIds.has(id)) {
+			flowTopicNodeCache.delete(id);
+		}
+	}
+
+	return flowTopics;
+}
+
 export function toFlowEdges(
 	edges: AppEdge[],
 	associativeEdges: AssociativeFlowEdge[] = [],
@@ -277,6 +421,12 @@ export function handleNodeDragStop(...args: any[]) {
 	const [{ targetNode }] = args;
 	const node = targetNode;
 	const update = fromFlowPositionChange(node.id, node.position);
+
+	if (node.type === 'topic') {
+		topicStore.update(update);
+		return;
+	}
+
 	nodeStore.updateNode(update);
 }
 

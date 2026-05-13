@@ -33,6 +33,7 @@ import {
 	getNodeTitlesByCanvasId as getGraphNodeTitlesByCanvasId,
 	getNodesByCanvasId as getGraphNodesByCanvasId,
 	getTagsByCanvasId as getGraphTagsByCanvasId,
+	getTopicsByCanvasId as getGraphTopicsByCanvasId,
 	searchNodesByCanvasId as getGraphSearchNodesByCanvasId,
 } from './graphData';
 import {
@@ -40,6 +41,11 @@ import {
 	getEntityMentionsByCanvasId as getEntityMentionRowsByCanvasId,
 	rebuildEntitiesForCanvasId as rebuildEntityRowsForCanvasId,
 } from './entities';
+import {
+	hasTopicTitleConflict,
+	normalizeTopicTitle,
+	resolveUniqueTopicTitle,
+} from '$lib/topicTitles';
 
 export type AppDataCanvas = {
 	id: string;
@@ -67,6 +73,18 @@ export type AppDataEdge = {
 	canvas_id: string;
 	source_node_id: string;
 	target_node_id: string;
+};
+
+export type AppDataTopic = {
+	id: string;
+	canvas_id: string;
+	title: string;
+	x: number;
+	y: number;
+	width: number;
+	height: number;
+	created_at: number;
+	updated_at: number;
 };
 
 export type AppDataEntity = {
@@ -103,6 +121,7 @@ export type AppDataPageData = {
 	backupDirectoryConfigurable: boolean;
 	nodes: AppDataNode[];
 	edges: AppDataEdge[];
+	topics: AppDataTopic[];
 	tags: Array<{ id: string; name: string; color: string; node_count: number }>;
 	entities: AppDataEntity[];
 	entityMentions: AppDataEntityMention[];
@@ -159,6 +178,13 @@ export function getEdgesByCanvasId(
 	return getGraphEdgesByCanvasId(canvasId, database);
 }
 
+export function getTopicsByCanvasId(
+	canvasId: string | null,
+	database?: SqliteDatabase,
+) {
+	return getGraphTopicsByCanvasId(canvasId, database);
+}
+
 export function getEntitiesByCanvasId(
 	canvasId: string | null,
 	database?: SqliteDatabase,
@@ -195,6 +221,7 @@ export function getInitialPageData(database?: SqliteDatabase): AppDataPageData {
 		backupDirectoryConfigurable: isBackupDirectoryConfigurable(),
 		nodes: getNodesByCanvasId(activeCanvasId, database) as AppDataNode[],
 		edges: getEdgesByCanvasId(activeCanvasId, database) as AppDataEdge[],
+		topics: getTopicsByCanvasId(activeCanvasId, database) as AppDataTopic[],
 		tags: getTagsByCanvasId(activeCanvasId, database) as Array<{
 			id: string;
 			name: string;
@@ -221,6 +248,116 @@ export async function updateBackupSettings(input: {
 	backupRetentionCount: number;
 }): Promise<AppDataBackupSettings> {
 	return setBackupSettings(input);
+}
+
+export function createTopic(
+	input: {
+		id?: string;
+		canvasId: string;
+		title?: string;
+		x?: number;
+		y?: number;
+		width?: number;
+		height?: number;
+	},
+	database?: SqliteDatabase,
+) {
+	const currentDb = getDb(database);
+	const id = input.id && input.id.trim() ? input.id : createId();
+	const currentTopics = getTopicsByCanvasId(input.canvasId, database);
+	const title = resolveUniqueTopicTitle(currentTopics, input.title ?? '');
+	const timestamp = now();
+	const x = typeof input.x === 'number' ? input.x : 0;
+	const y = typeof input.y === 'number' ? input.y : 0;
+	const width = typeof input.width === 'number' ? input.width : 280;
+	const height = typeof input.height === 'number' ? input.height : 180;
+
+	currentDb
+		.prepare(
+			`
+    INSERT INTO topics (
+      id, canvas_id, title, x, y, width, height, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `,
+		)
+		.run(id, input.canvasId, title, x, y, width, height, timestamp, timestamp);
+
+	return { success: true, id, title };
+}
+
+export function updateTopic(
+	input: {
+		id: string;
+		title?: string;
+		x?: number;
+		y?: number;
+		width?: number;
+		height?: number;
+	},
+	database?: SqliteDatabase,
+) {
+	const currentDb = getDb(database);
+	const topic = currentDb
+		.prepare('SELECT id, canvas_id, title FROM topics WHERE id = ?')
+		.get(input.id) as
+		| { id: string; canvas_id: string; title: string }
+		| undefined;
+
+	if (!topic) {
+		return { success: false, error: 'Missing id' };
+	}
+
+	if (typeof input.title === 'string') {
+		const normalized = normalizeTopicTitle(input.title);
+
+		if (!normalized) {
+			return { success: false, error: 'Topic title cannot be empty.' };
+		}
+
+		if (
+			hasTopicTitleConflict(
+				getTopicsByCanvasId(topic.canvas_id, database),
+				normalized,
+				input.id,
+			)
+		) {
+			return {
+				success: false,
+				error: `A topic titled "${normalized}" already exists in this canvas.`,
+			};
+		}
+	}
+
+	currentDb
+		.prepare(
+			`
+    UPDATE topics
+    SET
+      title = COALESCE(?, title),
+      x = COALESCE(?, x),
+      y = COALESCE(?, y),
+      width = COALESCE(?, width),
+      height = COALESCE(?, height),
+      updated_at = ?
+    WHERE id = ?
+  `,
+		)
+		.run(
+			input.title,
+			input.x,
+			input.y,
+			input.width,
+			input.height,
+			now(),
+			input.id,
+		);
+
+	return { success: true, id: input.id };
+}
+
+export function deleteTopic(id: string, database?: SqliteDatabase) {
+	getDb(database).prepare('DELETE FROM topics WHERE id = ?').run(id);
+	return { success: true };
 }
 
 export function createCanvas(

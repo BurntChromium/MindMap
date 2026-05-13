@@ -22,6 +22,10 @@ export function isCreateNodeShortcut(event: KeyboardEvent) {
 	return isKeyShortcut(event, 'n');
 }
 
+export function isCreateTopicShortcut(event: KeyboardEvent) {
+	return isKeyShortcut(event, 'g');
+}
+
 export function isCanvasToggleShortcut(event: KeyboardEvent) {
 	return isKeyShortcut(event, 'c');
 }

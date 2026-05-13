@@ -48,6 +48,18 @@ export type EdgeRow = {
 	target_node_id: string;
 };
 
+export type TopicRow = {
+	id: string;
+	canvas_id: string;
+	title: string;
+	x: number;
+	y: number;
+	width: number;
+	height: number;
+	created_at: number;
+	updated_at: number;
+};
+
 function parseTags(rawTags: unknown) {
 	if (typeof rawTags !== 'string' || !rawTags) {
 		return [];
@@ -228,6 +240,19 @@ export function getEdgesByCanvasId(
 		.all(canvasId) as EdgeRow[];
 }
 
+export function getTopicsByCanvasId(
+	canvasId: string | null,
+	database?: SqliteDatabase,
+) {
+	if (!canvasId) {
+		return [];
+	}
+
+	return getDb(database)
+		.prepare('SELECT * FROM topics WHERE canvas_id = ? ORDER BY created_at ASC')
+		.all(canvasId) as TopicRow[];
+}
+
 export function getInitialPageData(database?: SqliteDatabase) {
 	const canvases = getCanvases(database);
 	const activeCanvasId = canvases[0]?.id ?? null;
@@ -237,6 +262,7 @@ export function getInitialPageData(database?: SqliteDatabase) {
 		activeCanvasId,
 		nodes: getNodesByCanvasId(activeCanvasId, database),
 		edges: getEdgesByCanvasId(activeCanvasId, database),
+		topics: getTopicsByCanvasId(activeCanvasId, database),
 		tags: getTagsByCanvasId(activeCanvasId, database),
 		entities: getEntitiesByCanvasId(activeCanvasId, database),
 		entityMentions: getEntityMentionsByCanvasId(activeCanvasId, database),

@@ -32,6 +32,19 @@ export function initSchema(database = db) {
       FOREIGN KEY(canvas_id) REFERENCES canvases(id) ON DELETE CASCADE
     );
 
+    CREATE TABLE IF NOT EXISTS topics (
+      id TEXT PRIMARY KEY,
+      canvas_id TEXT NOT NULL,
+      title TEXT NOT NULL,
+      x REAL,
+      y REAL,
+      width REAL,
+      height REAL,
+      created_at INTEGER,
+      updated_at INTEGER,
+      FOREIGN KEY(canvas_id) REFERENCES canvases(id) ON DELETE CASCADE
+    );
+
     CREATE TABLE IF NOT EXISTS entities (
       id TEXT PRIMARY KEY,
       canvas_id TEXT NOT NULL,
@@ -81,6 +94,9 @@ export function initSchema(database = db) {
     CREATE INDEX IF NOT EXISTS idx_edges_canvas_id
       ON edges(canvas_id);
 
+    CREATE INDEX IF NOT EXISTS idx_topics_canvas_id
+      ON topics(canvas_id);
+
     CREATE INDEX IF NOT EXISTS idx_node_tags_tag_id
       ON node_tags(tag_id);
 
@@ -114,5 +130,25 @@ export function initSchema(database = db) {
 		database.exec(`
       ALTER TABLE nodes ADD COLUMN is_entity INTEGER DEFAULT 0;
     `);
+	}
+
+	const topicColumns = database
+		.prepare(`PRAGMA table_info(topics)`)
+		.all() as Array<{ name: string }>;
+	const hasTopicCanvasColumn = topicColumns.some(
+		(column) => column.name === 'canvas_id',
+	);
+	const hasTopicTitleColumn = topicColumns.some(
+		(column) => column.name === 'title',
+	);
+	const hasTopicGeometryColumns = ['x', 'y', 'width', 'height'].every((name) =>
+		topicColumns.some((column) => column.name === name),
+	);
+
+	if (
+		topicColumns.length > 0 &&
+		(!hasTopicCanvasColumn || !hasTopicTitleColumn || !hasTopicGeometryColumns)
+	) {
+		throw new Error('Existing topics table is missing required columns.');
 	}
 }

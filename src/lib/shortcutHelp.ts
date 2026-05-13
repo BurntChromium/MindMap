@@ -11,6 +11,7 @@ export const shortcutHelpSections: ShortcutHelpSection[] = [
 		title: 'Canvas',
 		shortcuts: [
 			{ keys: ['N'], description: 'Create a new note' },
+			{ keys: ['G'], description: 'Create a new topic' },
 			{ keys: ['C'], description: 'Toggle the left canvas panel' },
 			{ keys: ['F'], description: 'Toggle the right search panel' },
 			{ keys: ['-'], description: 'Zoom out' },
@@ -71,6 +72,7 @@ export const shortcutHelpBlockedKeys = new Set([
 	'e',
 	'f',
 	'n',
+	'g',
 	't',
 	'v',
 	'w',

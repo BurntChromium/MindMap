@@ -23,4 +23,22 @@ export type CanvasStageApi = {
 			duration?: number;
 		},
 	) => Promise<boolean>;
+	screenToFlowPosition: (
+		position: {
+			x: number;
+			y: number;
+		},
+	) => {
+		x: number;
+		y: number;
+	};
+	flowToScreenPosition: (
+		position: {
+			x: number;
+			y: number;
+		},
+	) => {
+		x: number;
+		y: number;
+	};
 };

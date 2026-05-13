@@ -172,7 +172,7 @@ export function buildAssociativeFlowEdges(
 				selectable: false as const,
 				deletable: false as const,
 				focusable: false as const,
-				zIndex: 999,
+				zIndex: 1.5,
 				data: {
 					kind: 'associative' as const,
 					relation,

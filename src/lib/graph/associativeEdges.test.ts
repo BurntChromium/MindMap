@@ -39,7 +39,7 @@ describe('associativeEdges', () => {
 				selectable: false,
 				deletable: false,
 				focusable: false,
-				zIndex: 999,
+				zIndex: 1.5,
 				data: {
 					kind: 'associative',
 					relation: 'mixed',

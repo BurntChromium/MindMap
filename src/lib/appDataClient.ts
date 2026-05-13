@@ -7,6 +7,8 @@ import {
 	buildGraphFragmentBody,
 	buildNodeCreateBody,
 	buildNodePatchBody,
+	buildTopicCreateBody,
+	buildTopicPatchBody,
 } from '$lib/mutationPayloads';
 
 type JsonValue =
@@ -106,6 +108,15 @@ export type AppDataClient = {
 		input: Parameters<typeof buildEdgeCreateBody>[0],
 	) => Promise<JsonValue>;
 	deleteEdge: (input: { id: string }) => Promise<JsonValue>;
+
+	loadTopics: (canvasId: string) => Promise<JsonValue>;
+	createTopic: (
+		input: Parameters<typeof buildTopicCreateBody>[0],
+	) => Promise<JsonValue>;
+	updateTopic: (
+		input: Parameters<typeof buildTopicPatchBody>[0],
+	) => Promise<JsonValue>;
+	deleteTopic: (input: { id: string }) => Promise<JsonValue>;
 
 	loadEntities: (canvasId: string) => Promise<JsonValue>;
 	searchNodes: (input: {
@@ -209,6 +220,22 @@ function createFetchClient(): AppDataClient {
 		deleteEdge: (input) =>
 			requestJson(`/api/edges?id=${input.id}`, { method: 'DELETE' }),
 
+		loadTopics: (canvasId) => requestJson(`/api/topics?canvasId=${canvasId}`),
+		createTopic: (input) =>
+			requestJson('/api/topics', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify(buildTopicCreateBody(input)),
+			}),
+		updateTopic: (input) =>
+			requestJson('/api/topics', {
+				method: 'PATCH',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify(buildTopicPatchBody(input)),
+			}),
+		deleteTopic: (input) =>
+			requestJson(`/api/topics?id=${input.id}`, { method: 'DELETE' }),
+
 		loadEntities: (canvasId) =>
 			requestJson(`/api/entities?canvasId=${canvasId}`),
 		searchNodes: ({ canvasId, query, tag }) =>
@@ -264,6 +291,11 @@ function createTauriClient(bridge: AppDataTauriBridge): AppDataClient {
 		loadEdges: (canvasId) => invokeWithInput('load_edges', { canvasId }),
 		createEdge: (input) => invokeWithInput('create_edge', input),
 		deleteEdge: (input) => invokeWithInput('delete_edge', input),
+
+		loadTopics: (canvasId) => invokeWithInput('load_topics', { canvasId }),
+		createTopic: (input) => invokeWithInput('create_topic', buildTopicCreateBody(input)),
+		updateTopic: (input) => invokeWithInput('update_topic', buildTopicPatchBody(input)),
+		deleteTopic: (input) => invokeWithInput('delete_topic', input),
 
 		loadEntities: (canvasId) => invokeWithInput('load_entities', { canvasId }),
 		searchNodes: (input) => invokeWithInput('search_nodes', input),
@@ -351,6 +383,12 @@ export const appDataClient = {
 	createEdge: (input: Parameters<typeof buildEdgeCreateBody>[0]) =>
 		syncRuntimeClient().createEdge(input),
 	deleteEdge: (input: { id: string }) => syncRuntimeClient().deleteEdge(input),
+	loadTopics: (canvasId: string) => syncRuntimeClient().loadTopics(canvasId),
+	createTopic: (input: Parameters<typeof buildTopicCreateBody>[0]) =>
+		syncRuntimeClient().createTopic(input),
+	updateTopic: (input: Parameters<typeof buildTopicPatchBody>[0]) =>
+		syncRuntimeClient().updateTopic(input),
+	deleteTopic: (input: { id: string }) => syncRuntimeClient().deleteTopic(input),
 	loadEntities: (canvasId: string) =>
 		syncRuntimeClient().loadEntities(canvasId),
 	searchNodes: (input: {

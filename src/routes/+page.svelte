@@ -35,6 +35,7 @@
 	import {
 		isCanvasToggleShortcut,
 		isCreateNodeShortcut,
+		isCreateTopicShortcut,
 		isDiscoveryToggleShortcut,
 		isShortcutHelpShortcut,
 		isZoomInShortcut,
@@ -60,6 +61,7 @@
 		type Node,
 		type NodePositionUpdate,
 	} from '$lib/stores/nodeStore';
+	import { topicStore, type Topic } from '$lib/stores/topicStore';
 	import { createNodePositionDebouncer } from '$lib/nodePositionDebouncer';
 	import {
 		entityStore,
@@ -74,7 +76,11 @@
 		type NodeUiState,
 	} from '$lib/stores/nodeUiStore';
 	import { clipboardStore } from '$lib/stores/clipboardStore';
-	import { toFlowEdges, toFlowNodes } from '$lib/graph/graphAdapter';
+	import {
+		toFlowEdges,
+		toFlowNodes,
+		toFlowTopics,
+	} from '$lib/graph/graphAdapter';
 	import { buildAssociativeFlowEdges } from '$lib/graph/associativeEdges';
 	import { selectionStore } from '$lib/stores/selectionStore';
 	import {
@@ -87,6 +93,7 @@
 		getNodeOriginForFocusPoint,
 		type NodeFocusMode,
 	} from '$lib/canvasCenter';
+	import { getTopicDraftOverlayRect } from '$lib/topicDraftOverlay';
 	import type { AppDataPageData } from '$lib/server/appData';
 
 	let { data }: { data: AppDataPageData } = $props();
@@ -95,6 +102,7 @@
 	let storeActiveCanvasId = $state<string | null>(null);
 	let storeNodes = $state.raw<Node[] | null>(null);
 	let storeEdges = $state<Edge[] | null>(null);
+	let storeTopics = $state.raw<Topic[] | null>(null);
 	let storeEntities = $state.raw<Entity[] | null>(null);
 	let storeEntityMentions = $state.raw<EntityMention[] | null>(null);
 	let storeSelectedNodeIds = $state<string[] | null>(null);
@@ -125,6 +133,7 @@
 	let activeAssociativeEdgeId = $state<string | null>(null);
 	let focusedNodeId = $state<string | null>(null);
 	let editingNodeId = $state<string | null>(null);
+	let editingTopicId = $state<string | null>(null);
 	let previousEditingNodeId: string | null = null;
 	let sidebarCollapsed = $state(false);
 	let discoveryCollapsed = $state(false);
@@ -137,6 +146,12 @@
 	let canvasShell: HTMLDivElement | undefined;
 	let backupTimer: ReturnType<typeof setTimeout> | null = null;
 	let backupInFlight = false;
+	let topicCreationMode = $state(false);
+	let topicDraft = $state<{
+		start: { x: number; y: number };
+		current: { x: number; y: number };
+		pointerId: number;
+	} | null>(null);
 	let searchProvider = $state<SearchProvider | null>(null);
 	let searchCorpusRevision = 0;
 	let searchRequestRevision = 0;
@@ -169,6 +184,7 @@
 		})),
 	);
 	const initialEdges = $derived.by(() => data.edges);
+	const initialTopics = $derived.by(() => data.topics);
 	const initialEntities = $derived.by(() => data.entities);
 	const initialEntityMentions = $derived.by(() => data.entityMentions);
 
@@ -187,6 +203,7 @@
 	});
 	const nodes = $derived(storeNodes ?? initialNodes);
 	const edges = $derived(storeEdges ?? initialEdges);
+	const topics = $derived(storeTopics ?? initialTopics);
 	const entities = $derived(storeEntities ?? initialEntities);
 	const entityMentions = $derived(storeEntityMentions ?? initialEntityMentions);
 	const backupDirectoryConfigurable = $derived(
@@ -211,22 +228,36 @@
 	const associativeFlowEdges = $derived(
 		buildAssociativeFlowEdges(nodes, entities, entityMentions),
 	);
+	const topicCreationScreenRect = $derived.by(() => getTopicCreationScreenRect());
 	// Keep XYFlow inputs raw so its internal Svelte store does not wrap every node.
-	let flowNodes = $state.raw<ReturnType<typeof toFlowNodes>>([]);
+	type CanvasFlowNode =
+		| ReturnType<typeof toFlowNodes>[number]
+		| ReturnType<typeof toFlowTopics>[number];
+	let flowNodes = $state.raw<CanvasFlowNode[]>([]);
 	let flowEdges = $state.raw<ReturnType<typeof toFlowEdges>>([]);
 
 	$effect(() => {
-		flowNodes = toFlowNodes(nodes, {
-			editingNodeId,
-			focusedNodeId,
-			selectedNodeIds,
-			activeTag,
-			searchHitIds,
-			tagColors: tagColorMap,
-			positionOverrides: pendingNodePositionOverrides,
-			onTagClick: toggleTagFilter,
-			onEntityClick: focusEntityReference,
-		});
+		flowNodes = [
+			...toFlowTopics(topics, {
+				editingTopicId,
+				onBeginEdit: beginEditingTopic,
+				onCancelEdit: cancelEditingTopic,
+				onCommitTitle: commitTopicTitle,
+				onDelete: deleteTopic,
+				onResize: resizeTopic,
+			}),
+			...toFlowNodes(nodes, {
+				editingNodeId,
+				focusedNodeId,
+				selectedNodeIds,
+				activeTag,
+				searchHitIds,
+				tagColors: tagColorMap,
+				positionOverrides: pendingNodePositionOverrides,
+				onTagClick: toggleTagFilter,
+				onEntityClick: focusEntityReference,
+			}),
+		];
 		flowEdges = toFlowEdges(edges, associativeFlowEdges);
 	});
 	const activeAssociativeEdge = $derived(
@@ -431,6 +462,7 @@
 		canvasStore.hydrate(initialCanvases, initialActiveCanvasId);
 		nodeStore.hydrate(initialNodes, initialActiveCanvasId);
 		edgeStore.hydrate(initialEdges, initialActiveCanvasId);
+		topicStore.hydrate(initialTopics, initialActiveCanvasId);
 		entityStore.hydrate(
 			initialEntities,
 			initialEntityMentions,
@@ -453,6 +485,15 @@
 
 				if (shouldBlockShortcutHelpKey(event.key)) {
 					event.preventDefault();
+				}
+
+				return;
+			}
+
+			if (topicCreationMode) {
+				if (event.key === 'Escape') {
+					event.preventDefault();
+					cancelTopicCreation();
 				}
 
 				return;
@@ -527,6 +568,22 @@
 
 				event.preventDefault();
 				addNode();
+				return;
+			}
+
+			if (isCreateTopicShortcut(event)) {
+				if (
+					shouldBlockCreateNodeShortcut(
+						activeElement,
+						canvasShell,
+						document.body,
+					)
+				) {
+					return;
+				}
+
+				event.preventDefault();
+				beginTopicCreation();
 				return;
 			}
 
@@ -711,6 +768,10 @@
 			storeEdges = Array.from(v.edges.values());
 		});
 
+		const unsubTopics = topicStore.subscribe((v) => {
+			storeTopics = Array.from(v.topics.values());
+		});
+
 		const unsubEntities = entityStore.subscribe((v) => {
 			storeEntities = v.entities;
 			storeEntityMentions = v.mentions;
@@ -751,6 +812,7 @@
 			unsubCanvas();
 			unsubNodes();
 			unsubEdges();
+			unsubTopics();
 			unsubEntities();
 			unsubNodeUi();
 			unsubSelection();
@@ -799,6 +861,9 @@
 			return;
 		loadedCanvasId = activeCanvasId;
 		pendingNodePositionOverrides = {};
+		topicCreationMode = false;
+		topicDraft = null;
+		editingTopicId = null;
 
 		nodeUiStore.clear();
 		selectionStore.clear();
@@ -898,6 +963,176 @@
 
 			await beginEditingNode(nodeId);
 		})();
+	}
+
+	function beginTopicCreation() {
+		topicCreationMode = true;
+		topicDraft = null;
+		editingTopicId = null;
+	}
+
+	function cancelTopicCreation() {
+		topicCreationMode = false;
+		topicDraft = null;
+		queueMicrotask(() => {
+			canvasShell?.focus();
+		});
+	}
+
+	function beginEditingTopic(topicId: string) {
+		editingTopicId = topicId;
+	}
+
+	function cancelEditingTopic(topicId: string) {
+		if (editingTopicId === topicId) {
+			editingTopicId = null;
+		}
+	}
+
+	async function commitTopicTitle(topicId: string, title: string) {
+		const topic = topics.find((entry) => entry.id === topicId);
+
+		if (!topic) {
+			return;
+		}
+
+		const nextTitle = title.trim() || topic.title;
+		await topicStore.update({ id: topicId, title: nextTitle });
+		if (editingTopicId === topicId) {
+			editingTopicId = null;
+		}
+	}
+
+	async function deleteTopic(topicId: string) {
+		if (!topicId) {
+			return;
+		}
+
+		await topicStore.remove(topicId);
+		if (editingTopicId === topicId) {
+			editingTopicId = null;
+		}
+	}
+
+	async function resizeTopic(
+		topicId: string,
+		resize: { x: number; y: number; width: number; height: number },
+	) {
+		await topicStore.update({
+			id: topicId,
+			x: resize.x,
+			y: resize.y,
+			width: resize.width,
+			height: resize.height,
+		});
+	}
+
+	function getTopicCreationBounds() {
+		if (!topicDraft) {
+			return null;
+		}
+
+		const left = Math.min(topicDraft.start.x, topicDraft.current.x);
+		const top = Math.min(topicDraft.start.y, topicDraft.current.y);
+		const width = Math.max(Math.abs(topicDraft.current.x - topicDraft.start.x), 140);
+		const height = Math.max(
+			Math.abs(topicDraft.current.y - topicDraft.start.y),
+			100,
+		);
+
+		return {
+			x: left,
+			y: top,
+			width,
+			height,
+		};
+	}
+
+	function getTopicCreationScreenRect() {
+		const bounds = getTopicCreationBounds();
+
+		if (!bounds || !canvasStageApi || !canvasShell) {
+			return null;
+		}
+
+		const viewport = canvasStageApi.getViewport();
+		const shellRect = canvasShell.getBoundingClientRect();
+		return getTopicDraftOverlayRect(
+			bounds,
+			viewport,
+			{
+				left: shellRect.left,
+				top: shellRect.top,
+			},
+			canvasStageApi.flowToScreenPosition,
+		);
+	}
+
+	async function finalizeTopicCreation() {
+		const bounds = getTopicCreationBounds();
+
+		if (!activeCanvasId || !bounds) {
+			cancelTopicCreation();
+			return;
+		}
+
+		const topicId = await topicStore.create(activeCanvasId, bounds);
+		cancelTopicCreation();
+
+		if (topicId) {
+			editingTopicId = topicId;
+		}
+	}
+
+	function handleTopicPointerDown(event: PointerEvent) {
+		if (!canvasStageApi || event.button !== 0) {
+			return;
+		}
+
+		event.preventDefault();
+		const start = canvasStageApi.screenToFlowPosition({
+			x: event.clientX,
+			y: event.clientY,
+		});
+		topicDraft = {
+			start,
+			current: start,
+			pointerId: event.pointerId,
+		};
+		(event.currentTarget as HTMLElement | null)?.setPointerCapture(
+			event.pointerId,
+		);
+	}
+
+	function handleTopicPointerMove(event: PointerEvent) {
+		if (!canvasStageApi || !topicDraft || event.pointerId !== topicDraft.pointerId) {
+			return;
+		}
+
+		event.preventDefault();
+		topicDraft = {
+			...topicDraft,
+			current: canvasStageApi.screenToFlowPosition({
+				x: event.clientX,
+				y: event.clientY,
+			}),
+		};
+	}
+
+	function handleTopicPointerUp(event: PointerEvent) {
+		if (!topicDraft || event.pointerId !== topicDraft.pointerId) {
+			return;
+		}
+
+		event.preventDefault();
+		topicDraft = {
+			...topicDraft,
+			current: canvasStageApi?.screenToFlowPosition({
+				x: event.clientX,
+				y: event.clientY,
+			}) ?? topicDraft.current,
+		};
+		void finalizeTopicCreation();
 	}
 
 	function selectAllNodes() {
@@ -1655,6 +1890,7 @@
 		await Promise.all([
 			nodeStore.load(canvasId),
 			edgeStore.load(canvasId),
+			topicStore.load(canvasId),
 			entityStore.load(canvasId),
 		]);
 	}
@@ -1689,6 +1925,7 @@
 				{flowEdges}
 				selectedNodeCount={selectedNodeIds.length}
 				onAddNode={addNode}
+				onAddTopic={beginTopicCreation}
 				onUndo={() => void undoHistory()}
 				onRedo={() => void redoHistory()}
 				onHelp={openShortcutHelp}
@@ -1718,6 +1955,31 @@
 					canvasStageApi = api;
 				}}
 			/>
+
+			{#if topicCreationMode}
+				<div
+					class="topic-draw-overlay"
+					role="presentation"
+					aria-hidden="true"
+					onpointerdown={handleTopicPointerDown}
+					onpointermove={handleTopicPointerMove}
+					onpointerup={handleTopicPointerUp}
+					onpointercancel={cancelTopicCreation}
+				>
+					{#if topicCreationScreenRect}
+						{@const rect = topicCreationScreenRect ?? {
+							left: 0,
+							top: 0,
+							width: 0,
+							height: 0,
+						}}
+						<div
+							class="topic-draw-overlay__preview"
+							style={`left: ${rect.left}px; top: ${rect.top}px; width: ${rect.width}px; height: ${rect.height}px;`}
+						></div>
+					{/if}
+				</div>
+			{/if}
 
 			{#if exportNotice}
 				<div
@@ -1846,6 +2108,25 @@
 		position: relative;
 		min-width: 0;
 		min-height: 0;
+		overflow: hidden;
+	}
+
+	.topic-draw-overlay {
+		position: absolute;
+		inset: 0;
+		z-index: 4;
+		cursor: crosshair;
+		touch-action: none;
+	}
+
+	.topic-draw-overlay__preview {
+		position: absolute;
+		box-sizing: border-box;
+		border: 2px solid rgba(59, 130, 246, 0.82);
+		border-radius: 12px;
+		background: rgba(59, 130, 246, 0.12);
+		box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.18) inset;
+		pointer-events: none;
 	}
 
 	.canvas-toast {

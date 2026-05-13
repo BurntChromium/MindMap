@@ -11,6 +11,7 @@ import {
 	fromFlowPositionChange,
 	toFlowEdges,
 	toFlowNodes,
+	toFlowTopics,
 } from './graphAdapter';
 
 describe('graphAdapter', () => {
@@ -49,7 +50,7 @@ describe('graphAdapter', () => {
 		);
 
 		expect(flowNodes).toEqual([
-			{
+			expect.objectContaining({
 				id: '1',
 				position: { x: 1, y: 2 },
 				selected: true,
@@ -67,7 +68,8 @@ describe('graphAdapter', () => {
 				},
 				type: 'custom',
 				draggable: false,
-			},
+				zIndex: 2,
+			}),
 		]);
 	});
 
@@ -158,6 +160,36 @@ describe('graphAdapter', () => {
 		});
 	});
 
+	it('maps topics behind nodes with topic-specific geometry', () => {
+		const flowTopics = toFlowTopics([
+			{
+				id: 'topic-1',
+				canvas_id: 'canvas-1',
+				title: 'Research',
+				x: 10,
+				y: 20,
+				width: 320,
+				height: 200,
+			},
+		]);
+
+		expect(flowTopics).toEqual([
+			expect.objectContaining({
+				id: 'topic-1',
+				position: { x: 10, y: 20 },
+				width: 320,
+				height: 200,
+				selected: false,
+				zIndex: 0,
+				type: 'topic',
+				data: expect.objectContaining({
+					title: 'Research',
+					isEditing: false,
+				}),
+			}),
+		]);
+	});
+
 	it('builds associative flow edges with shared entity metadata', () => {
 		const associativeEdges = buildAssociativeFlowEdges(
 			[
@@ -187,7 +219,7 @@ describe('graphAdapter', () => {
 		);
 
 		expect(associativeEdges).toEqual([
-			{
+			expect.objectContaining({
 				id: 'assoc:node-a:node-b',
 				source: 'node-a',
 				target: 'node-b',
@@ -196,7 +228,7 @@ describe('graphAdapter', () => {
 				selectable: false,
 				deletable: false,
 				focusable: false,
-				zIndex: 999,
+				zIndex: 1.5,
 				data: {
 					kind: 'associative',
 					relation: 'direct',
@@ -217,8 +249,8 @@ describe('graphAdapter', () => {
 						},
 					],
 				},
-			},
-			{
+			}),
+			expect.objectContaining({
 				id: 'assoc:node-a:node-c',
 				source: 'node-a',
 				target: 'node-c',
@@ -227,7 +259,7 @@ describe('graphAdapter', () => {
 				selectable: false,
 				deletable: false,
 				focusable: false,
-				zIndex: 999,
+				zIndex: 1.5,
 				data: {
 					kind: 'associative',
 					relation: 'direct',
@@ -243,8 +275,8 @@ describe('graphAdapter', () => {
 						},
 					],
 				},
-			},
-			{
+			}),
+			expect.objectContaining({
 				id: 'assoc:node-b:node-c',
 				source: 'node-b',
 				target: 'node-c',
@@ -253,7 +285,7 @@ describe('graphAdapter', () => {
 				selectable: false,
 				deletable: false,
 				focusable: false,
-				zIndex: 999,
+				zIndex: 1.5,
 				data: {
 					kind: 'associative',
 					relation: 'indirect',
@@ -269,7 +301,7 @@ describe('graphAdapter', () => {
 						},
 					],
 				},
-			},
+			}),
 		]);
 	});
 

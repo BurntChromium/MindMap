@@ -19,6 +19,7 @@ vi.stubEnv('MINDMAP_DB_PATH', dbPath);
 
 let canvasesApi: typeof import('./api/canvases/+server');
 let nodesApi: typeof import('./api/nodes/+server');
+let topicsApi: typeof import('./api/topics/+server');
 let bulkTagsApi: typeof import('./api/nodes/bulk-tags/+server');
 let bulkPositionApi: typeof import('./api/nodes/bulk-position/+server');
 let graphFragmentsApi: typeof import('./api/graph-fragments/+server');
@@ -36,6 +37,7 @@ beforeAll(async () => {
 
 	canvasesApi = await import('./api/canvases/+server');
 	nodesApi = await import('./api/nodes/+server');
+	topicsApi = await import('./api/topics/+server');
 	bulkTagsApi = await import('./api/nodes/bulk-tags/+server');
 	bulkPositionApi = await import('./api/nodes/bulk-position/+server');
 	graphFragmentsApi = await import('./api/graph-fragments/+server');
@@ -58,6 +60,7 @@ beforeEach(() => {
 	dbModule.db.prepare('DELETE FROM nodes').run();
 	dbModule.db.prepare('DELETE FROM entity_mentions').run();
 	dbModule.db.prepare('DELETE FROM entities').run();
+	dbModule.db.prepare('DELETE FROM topics').run();
 	dbModule.db.prepare('DELETE FROM canvases').run();
 	dbModule.db.prepare('DELETE FROM tags').run();
 });
@@ -275,9 +278,28 @@ describe('API integration', () => {
 
 		const sourcePath = join(tempDir, 'import-source.db');
 		const sourceDb = new Database(sourcePath);
-		const schema = await import('$lib/server/schema');
+		sourceDb.exec(`
+			CREATE TABLE canvases (
+				id TEXT PRIMARY KEY,
+				name TEXT NOT NULL,
+				created_at INTEGER,
+				updated_at INTEGER
+			);
 
-		schema.initSchema(sourceDb);
+			CREATE TABLE nodes (
+				id TEXT PRIMARY KEY,
+				canvas_id TEXT,
+				title TEXT,
+				body TEXT,
+				is_entity INTEGER DEFAULT 0,
+				x REAL,
+				y REAL,
+				collapsed INTEGER,
+				color TEXT,
+				created_at INTEGER,
+				updated_at INTEGER
+			);
+		`);
 
 		sourceDb
 			.prepare(
@@ -383,6 +405,75 @@ describe('API integration', () => {
 		expect(canvases).toHaveLength(1);
 		expect(canvases[0].id).toBe('canvas-1');
 		expect(canvases[0].name).toBe('World');
+	});
+
+	it('creates, updates, lists, and deletes topics', async () => {
+		const createdCanvas = await canvasesApi.POST({
+			request: request({ id: 'canvas-topics', name: 'Topics' }),
+		} as any);
+		const { id: canvasId } = await createdCanvas.json();
+
+		const created = await topicsApi.POST({
+			request: request({
+				id: 'topic-1',
+				canvasId,
+				title: 'Research',
+				x: 10,
+				y: 20,
+				width: 300,
+				height: 200,
+			}),
+		} as any);
+		const createdJson = await created.json();
+
+		expect(createdJson).toEqual(
+			expect.objectContaining({
+				success: true,
+				id: 'topic-1',
+				title: 'Research',
+			}),
+		);
+
+		const listed = await topicsApi.GET({
+			url: new URL(`http://localhost/api/topics?canvasId=${canvasId}`),
+		} as any);
+		const topics = await listed.json();
+
+		expect(topics).toEqual([
+			expect.objectContaining({
+				id: 'topic-1',
+				canvas_id: canvasId,
+				title: 'Research',
+				x: 10,
+				y: 20,
+				width: 300,
+				height: 200,
+			}),
+		]);
+
+		const updated = await topicsApi.PATCH({
+			request: request({ id: 'topic-1', title: 'Planning', width: 360 }),
+		} as any);
+		const updatedJson = await updated.json();
+
+		expect(updatedJson).toEqual(
+			expect.objectContaining({
+				success: true,
+				id: 'topic-1',
+			}),
+		);
+
+		const deleted = await topicsApi.DELETE({
+			url: new URL('http://localhost/api/topics?id=topic-1'),
+		} as any);
+		const deletedJson = await deleted.json();
+
+		expect(deletedJson).toEqual({ success: true });
+
+		const remaining = await topicsApi.GET({
+			url: new URL(`http://localhost/api/topics?canvasId=${canvasId}`),
+		} as any);
+		expect(await remaining.json()).toEqual([]);
 	});
 
 	it('renames canvases through patch', async () => {
