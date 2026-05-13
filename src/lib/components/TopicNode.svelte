@@ -10,10 +10,19 @@
 
 	const titleSeed = $derived(data.isEditing ? titleDraft : data.title ?? 'Topic');
 	const titleColor = $derived(getTagColor(titleSeed));
-	const headerColor = $derived(rgbaFromHex(titleColor, 0.92));
-	const bodyColor = $derived(rgbaFromHex(titleColor, 0.22));
+	const headerColor = $derived(
+		rgbaFromHex(titleColor, selected || data.isEditing ? 0.96 : 0.9),
+	);
+	const bodyColor = $derived(
+		rgbaFromHex(titleColor, selected || data.isEditing ? 0.3 : 0.22),
+	);
 	const borderColor = $derived(
-		selected ? rgbaFromHex(titleColor, 0.9) : rgbaFromHex(titleColor, 0.5),
+		selected ? rgbaFromHex(titleColor, 0.95) : rgbaFromHex(titleColor, 0.5),
+	);
+	const boxShadow = $derived(
+		selected
+			? `0 0 0 2px ${rgbaFromHex(titleColor, 0.18)}, var(--shadow-soft)`
+			: 'var(--shadow-soft)',
 	);
 
 	$effect(() => {
@@ -57,8 +66,9 @@
 <div class="topic-shell" style={`width: ${width}px; height: ${height}px;`}>
 	<div
 		class="topic-card"
+		class:topic-card--selected={selected}
 		data-testid={`topic-card-${id}`}
-		style={`border-color: ${borderColor};`}
+		style={`border-color: ${borderColor}; box-shadow: ${boxShadow};`}
 	>
 		<div class="topic-card__header" style={`background: ${headerColor};`}>
 			{#if data.isEditing}
@@ -101,7 +111,7 @@
 	</div>
 
 	<NodeResizer
-		isVisible={true}
+		isVisible={selected}
 		minWidth={120}
 		minHeight={90}
 		color={titleColor}
@@ -125,7 +135,10 @@
 		overflow: hidden;
 		border: 1px solid transparent;
 		border-radius: 12px;
-		box-shadow: var(--shadow-soft);
+	}
+
+	.topic-card--selected {
+		border-width: 2px;
 	}
 
 	.topic-card__header {

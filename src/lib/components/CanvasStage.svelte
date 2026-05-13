@@ -38,11 +38,21 @@
 		canvasStatusLabel: string;
 		mutationPhase: 'loading' | 'syncing' | 'synced' | 'failed';
 		onConnect: (connection: Connection) => void;
-		onNodeClick: (nodeId: string, shiftKey: boolean) => void;
+		onNodeClick: (
+			nodeId: string,
+			nodeType: string | undefined,
+			shiftKey: boolean,
+		) => void;
 		onEdgeClick: (edgeId: string) => void;
-		onSelectionChange: (nodeIds: string[]) => void;
+		onSelectionChange: (
+			nodes: Array<{ id: string; type?: string | null }>,
+		) => void;
 		onPaneClick: () => void;
-		onDelete: (nodeIds: string[], edgeIds: string[]) => void | Promise<void>;
+		onDelete: (
+			nodeIds: string[],
+			topicIds: string[],
+			edgeIds: string[],
+		) => void | Promise<void>;
 		onApiReady: (api: CanvasStageApi | null) => void;
 	}
 
@@ -79,7 +89,8 @@
 		multiSelectionKey="Shift"
 		onconnect={onConnect}
 		onnodedragstop={handleNodeDragStop}
-		onnodeclick={(event) => onNodeClick(event.node.id, event.event.shiftKey)}
+		onnodeclick={(event) =>
+			onNodeClick(event.node.id, event.node.type, event.event.shiftKey)}
 		onedgeclick={({ edge }) => {
 			if (edge.data?.kind !== 'associative') {
 				return;
@@ -88,11 +99,21 @@
 			onEdgeClick(edge.id);
 		}}
 		onselectionchange={({ nodes }) =>
-			onSelectionChange(nodes.map((node) => node.id))}
+			onSelectionChange(nodes.map((node) => ({
+				id: node.id,
+				type: node.type ?? null,
+			})))}
 		onpaneclick={onPaneClick}
 		ondelete={(event) => {
+			const topicIds = event.nodes
+				.filter((node) => node.type === 'topic')
+				.map((node) => node.id);
+			const nodeIds = event.nodes
+				.filter((node) => node.type !== 'topic')
+				.map((node) => node.id);
 			onDelete(
-				event.nodes.map((node) => node.id),
+				nodeIds,
+				topicIds,
 				event.edges.map((edge) => edge.id),
 			);
 		}}

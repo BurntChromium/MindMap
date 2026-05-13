@@ -161,7 +161,7 @@ describe('graphAdapter', () => {
 	});
 
 	it('maps topics behind nodes with topic-specific geometry', () => {
-		const flowTopics = toFlowTopics([
+		const topics = [
 			{
 				id: 'topic-1',
 				canvas_id: 'canvas-1',
@@ -171,9 +171,9 @@ describe('graphAdapter', () => {
 				width: 320,
 				height: 200,
 			},
-		]);
+		];
 
-		expect(flowTopics).toEqual([
+		expect(toFlowTopics(topics)).toEqual([
 			expect.objectContaining({
 				id: 'topic-1',
 				position: { x: 10, y: 20 },
@@ -188,6 +188,15 @@ describe('graphAdapter', () => {
 				}),
 			}),
 		]);
+
+		expect(
+			toFlowTopics(topics, { selectedTopicId: 'topic-1' })[0],
+		).toMatchObject({
+			selected: true,
+			data: expect.objectContaining({
+				title: 'Research',
+			}),
+		});
 	});
 
 	it('builds associative flow edges with shared entity metadata', () => {

@@ -132,6 +132,7 @@
 	let activeEntityId = $state<string | null>(null);
 	let activeAssociativeEdgeId = $state<string | null>(null);
 	let focusedNodeId = $state<string | null>(null);
+	let selectedTopicId = $state<string | null>(null);
 	let editingNodeId = $state<string | null>(null);
 	let editingTopicId = $state<string | null>(null);
 	let previousEditingNodeId: string | null = null;
@@ -239,6 +240,7 @@
 	$effect(() => {
 		flowNodes = [
 			...toFlowTopics(topics, {
+				selectedTopicId,
 				editingTopicId,
 				onBeginEdit: beginEditingTopic,
 				onCancelEdit: cancelEditingTopic,
@@ -863,6 +865,7 @@
 		pendingNodePositionOverrides = {};
 		topicCreationMode = false;
 		topicDraft = null;
+		selectedTopicId = null;
 		editingTopicId = null;
 
 		nodeUiStore.clear();
@@ -968,6 +971,7 @@
 	function beginTopicCreation() {
 		topicCreationMode = true;
 		topicDraft = null;
+		selectedTopicId = null;
 		editingTopicId = null;
 	}
 
@@ -983,6 +987,7 @@
 	}
 
 	function beginEditingTopic(topicId: string) {
+		selectedTopicId = topicId;
 		editingTopicId = topicId;
 	}
 
@@ -1012,6 +1017,9 @@
 		}
 
 		await topicStore.remove(topicId);
+		if (selectedTopicId === topicId) {
+			selectedTopicId = null;
+		}
 		if (editingTopicId === topicId) {
 			editingTopicId = null;
 		}
@@ -1083,6 +1091,7 @@
 		cancelTopicCreation({ focusCanvas: false });
 
 		if (topicId) {
+			selectedTopicId = topicId;
 			editingTopicId = topicId;
 		} else {
 			queueMicrotask(() => {
@@ -1667,7 +1676,8 @@
 
 			historyStore.record({
 				label: historyLabel,
-				undo: async () => deleteGraphSelection(pastedNodeIds, pastedEdgeIds),
+				undo: async () =>
+					deleteGraphSelection(pastedNodeIds, [], pastedEdgeIds),
 				redo: async () => applyPreparedGraph(pastedGraph),
 			});
 		}
@@ -1690,6 +1700,7 @@
 		copySelection();
 		await deleteGraphSelection(
 			fragment.nodes.map((node) => node.id),
+			[],
 			getConnectedEdgeIds(
 				edges,
 				fragment.nodes.map((node) => node.id),
@@ -1736,12 +1747,17 @@
 		);
 	}
 
-	async function deleteGraphSelection(nodeIds: string[], edgeIds: string[]) {
+	async function deleteGraphSelection(
+		nodeIds: string[],
+		topicIds: string[],
+		edgeIds: string[],
+	) {
 		if (!activeCanvasId) {
 			return false;
 		}
 
 		const uniqueNodeIds = Array.from(new Set(nodeIds));
+		const uniqueTopicIds = Array.from(new Set(topicIds));
 		const uniqueEdgeIds = Array.from(new Set(edgeIds));
 		const previousNodes = [...nodes];
 		const previousEdges = [...edges];
@@ -1779,6 +1795,12 @@
 		nodeUiStore.clear();
 
 		try {
+			for (const topicId of uniqueTopicIds) {
+				if (selectedTopicId === topicId) {
+					selectedTopicId = null;
+				}
+				await topicStore.remove(topicId);
+			}
 			await appDataClient.mutateGraphFragment({
 				action: 'delete',
 				nodeIds: uniqueNodeIds,
@@ -1800,19 +1822,37 @@
 				label: 'Delete nodes',
 				undo: async () =>
 					applyPreparedGraph({ nodes: deletedNodes, edges: deletedEdges }),
-				redo: async () => deleteGraphSelection(uniqueNodeIds, uniqueEdgeIds),
-			});
-		}
+			redo: async () =>
+				deleteGraphSelection(uniqueNodeIds, uniqueTopicIds, uniqueEdgeIds),
+		});
+	}
 
 		return true;
 	}
 
-	function handleSelectionChange(nodeIds: string[]) {
-		selectionStore.setSelection(nodeIds);
+	function handleSelectionChange(
+		nodesWithTypes: Array<{ id: string; type?: string | null }>,
+	) {
+		const selectedTopic = nodesWithTypes.find((node) => node.type === 'topic');
+
+		if (selectedTopic) {
+			selectedTopicId = selectedTopic.id;
+			selectionStore.clear();
+			focusedNodeId = null;
+			return;
+		}
+
+		selectedTopicId = null;
+		selectionStore.setSelection(
+			nodesWithTypes
+				.filter((node) => node.type !== 'topic')
+				.map((node) => node.id),
+		);
 	}
 
 	function handlePaneClick() {
 		clearSelection();
+		selectedTopicId = null;
 	}
 
 	function addTagToSelection(tag: string) {
@@ -1849,6 +1889,7 @@
 		selectionStore.clear();
 		focusedNodeId = null;
 		activeAssociativeEdgeId = null;
+		selectedTopicId = null;
 	}
 
 	function cancelDiscardPrompt() {
@@ -1941,7 +1982,13 @@
 				{canvasStatusLabel}
 				mutationPhase={mutationPhase}
 				{onConnect}
-				onNodeClick={(nodeId, shiftKey) => {
+				onNodeClick={(nodeId, nodeType, shiftKey) => {
+					if (nodeType === 'topic') {
+						selectedTopicId = nodeId;
+						focusedNodeId = null;
+						return;
+					}
+
 					if (shiftKey) {
 						focusedNodeId = nodeId;
 						selectionStore.toggleNode(nodeId);
@@ -1955,8 +2002,8 @@
 				}}
 				onSelectionChange={handleSelectionChange}
 				onPaneClick={handlePaneClick}
-				onDelete={(nodeIds, edgeIds) => {
-					void deleteGraphSelection(nodeIds, edgeIds);
+				onDelete={(nodeIds, topicIds, edgeIds) => {
+					void deleteGraphSelection(nodeIds, topicIds, edgeIds);
 				}}
 				onApiReady={(api) => {
 					canvasStageApi = api;

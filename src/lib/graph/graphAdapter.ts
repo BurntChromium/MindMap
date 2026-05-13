@@ -20,6 +20,7 @@ export type FlowNodeOptions = {
 };
 
 export type FlowTopicNodeOptions = {
+	selectedTopicId?: string | null;
 	editingTopicId?: string | null;
 	onBeginEdit?: (topicId: string) => void;
 	onCancelEdit?: (topicId: string) => void;
@@ -76,6 +77,7 @@ type CachedFlowTopicNode = {
 	width: number;
 	height: number;
 	selected: boolean;
+	selectedTopicId: string | null;
 	editingTopicId: string | null | undefined;
 	onBeginEdit?: (topicId: string) => void;
 	onCancelEdit?: (topicId: string) => void;
@@ -317,12 +319,20 @@ export function toFlowTopics(
 	topics: AppTopic[],
 	options: FlowTopicNodeOptions = {},
 ) {
-	const { editingTopicId = null, onBeginEdit, onCancelEdit, onCommitTitle, onDelete, onResize } =
-		options;
+	const {
+		selectedTopicId = null,
+		editingTopicId = null,
+		onBeginEdit,
+		onCancelEdit,
+		onCommitTitle,
+		onDelete,
+		onResize,
+	} = options;
 	const seenIds = new Set<string>();
 
 	const flowTopics = topics.map((topic) => {
 		seenIds.add(topic.id);
+		const selected = selectedTopicId === topic.id;
 		const cached = flowTopicNodeCache.get(topic.id);
 
 		if (
@@ -333,7 +343,8 @@ export function toFlowTopics(
 			cached.y === topic.y &&
 			cached.width === topic.width &&
 			cached.height === topic.height &&
-			cached.selected === false &&
+			cached.selected === selected &&
+			cached.selectedTopicId === selectedTopicId &&
 			cached.editingTopicId === editingTopicId &&
 			cached.onBeginEdit === onBeginEdit &&
 			cached.onCancelEdit === onCancelEdit &&
@@ -345,7 +356,7 @@ export function toFlowTopics(
 		}
 
 		const node = buildFlowTopicNode(topic, {
-			selected: false,
+			selected,
 			editingTopicId,
 			onBeginEdit,
 			onCancelEdit,
@@ -361,7 +372,8 @@ export function toFlowTopics(
 			y: topic.y,
 			width: topic.width,
 			height: topic.height,
-			selected: false,
+			selected,
+			selectedTopicId,
 			editingTopicId,
 			onBeginEdit,
 			onCancelEdit,
