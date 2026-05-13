@@ -1,54 +1,24 @@
 <script lang="ts">
 	import { get } from 'svelte/store';
 	import { Handle, Position } from '@xyflow/svelte';
-	import { Check, ChevronDown, ChevronUp, Pencil } from 'lucide-svelte';
+	import { ChevronDown, ChevronUp, Pencil } from 'lucide-svelte';
 	import { nodeStore } from '$lib/stores/nodeStore';
 	import {
 		getNodeMode,
 		nodeUiStore,
-		type NodeEditDiscardField,
 		type NodeMode,
-		type NodeUiState,
 	} from '$lib/stores/nodeUiStore';
 	import {
 		formatTagLabel,
-		normalizeTagList,
 		normalizeTagName,
 	} from '$lib/tagUtils';
-	import { hasNodeTitleConflict, normalizeNodeTitle } from '$lib/nodeTitles';
-	import { parseInlineContent } from '$lib/inlineContent';
-	import {
-		getCommittedNodeEditTags,
-		isNodeEditDraftDirty,
-		type NodeEditBaseline,
-	} from '$lib/nodeEditDraft';
-	import {
-		getTagColor,
-		getTagColorWithAlpha,
-		rgbaFromHex,
-	} from '$lib/tagColors';
+	import { getTagColor, getTagColorWithAlpha, rgbaFromHex } from '$lib/tagColors';
+	import CustomNodeEditPanel from './CustomNodeEditPanel.svelte';
+	import CustomNodeReadOnlyBody from './CustomNodeReadOnlyBody.svelte';
 
 	let { id, data, selected } = $props();
 
 	let nodeMode = $state<NodeMode>('compact');
-	let titleInput = $state<HTMLInputElement | undefined>(undefined);
-	let tagInput = $state<HTMLInputElement | undefined>(undefined);
-	let bodyInput = $state<HTMLTextAreaElement | undefined>(undefined);
-	let draftTitle = $state('');
-	let draftBody = $state('');
-	let draftTags = $state<string[]>([]);
-	let draftTagInput = $state('');
-	let draftIsEntity = $state(true);
-	let titleError = $state<string | null>(null);
-	let editBaseline = $state<NodeEditBaseline | null>(null);
-	let discardPromptRestoreField = $state<NodeEditDiscardField | null>(null);
-	let previousDiscardPromptOpen = false;
-	let nodeUiState = $state<NodeUiState>({
-		editingNodeId: null,
-		expandedNodeIds: {},
-		discardPrompt: null,
-	});
-	let previousEditingState = false;
 
 	const isEditing = $derived(nodeMode === 'edit');
 	const isExpanded = $derived(nodeMode !== 'compact');
@@ -67,195 +37,17 @@
 	const overlayColor = $derived(
 		isTagHighlighted ? rgbaFromHex(highlightHex, 0.22) : 'transparent',
 	);
-	const bodySegments = $derived(parseInlineContent(bodyText));
 
 	$effect(() => {
-		const unsub = nodeUiStore.subscribe((v: NodeUiState) => {
-			nodeUiState = v;
+		const unsub = nodeUiStore.subscribe((v) => {
 			nodeMode = getNodeMode(v, id);
 		});
 
 		return unsub;
 	});
 
-	$effect(() => {
-		if (isEditing && !previousEditingState) {
-			editBaseline = {
-				title: data.label || 'Untitled',
-				body: bodyText,
-				tags: normalizeTagList(nodeTags),
-				isEntity: isEntityPage,
-			};
-			draftTitle = editBaseline.title;
-			draftBody = editBaseline.body;
-			draftTags = [...editBaseline.tags];
-			draftTagInput = '';
-			draftIsEntity = editBaseline.isEntity;
-			titleError = null;
-		}
-
-		if (!isEditing && previousEditingState) {
-			editBaseline = null;
-		}
-
-		if (!isEditing) {
-			draftTitle = data.label || 'Untitled';
-			draftBody = bodyText;
-			draftTags = normalizeTagList(nodeTags);
-			draftTagInput = '';
-			draftIsEntity = isEntityPage;
-			titleError = null;
-		}
-
-		previousEditingState = isEditing;
-	});
-
-	$effect(() => {
-		const promptOpen = nodeUiState.discardPrompt?.nodeId === id;
-
-		if (
-			!promptOpen &&
-			previousDiscardPromptOpen &&
-			isEditing &&
-			discardPromptRestoreField
-		) {
-			const fieldToRefocus = discardPromptRestoreField;
-			queueMicrotask(() => {
-				focusEditField(fieldToRefocus);
-			});
-			discardPromptRestoreField = null;
-		}
-
-		if (!promptOpen && !isEditing) {
-			discardPromptRestoreField = null;
-		}
-
-		previousDiscardPromptOpen = promptOpen;
-	});
-
-	function beginEdit() {
-		nodeUiStore.beginEdit(id);
-	}
-
-	function focusEditField(target: 'title' | 'tag' | 'body') {
-		if (target === 'title') {
-			titleInput?.focus();
-			titleInput?.select();
-			return;
-		}
-
-		if (target === 'tag') {
-			tagInput?.focus();
-			tagInput?.select();
-			return;
-		}
-
-		bodyInput?.focus();
-		bodyInput?.select();
-	}
-
-	function getEditBaseline() {
-		return (
-			editBaseline ?? {
-				title: data.label || 'Untitled',
-				body: bodyText,
-				tags: normalizeTagList(nodeTags),
-				isEntity: isEntityPage,
-			}
-		);
-	}
-
-	function focusNextEditField(current: 'title' | 'tag' | 'body') {
-		if (current === 'title') {
-			focusEditField(tagInput ? 'tag' : 'body');
-			return;
-		}
-
-		if (current === 'tag') {
-			focusEditField('body');
-			return;
-		}
-
-		focusEditField('title');
-	}
-
-	function addDraftTag(rawTag: string) {
-		const nextTag = normalizeTagName(rawTag);
-
-		if (!nextTag) {
-			draftTagInput = '';
-			return;
-		}
-
-		draftTags = normalizeTagList([...draftTags, nextTag]);
-		draftTagInput = '';
-	}
-
-	function commitDraftTagInput() {
-		addDraftTag(draftTagInput);
-	}
-
-	function removeDraftTag(tag: string) {
-		draftTags = draftTags.filter((currentTag) => currentTag !== tag);
-	}
-
-	async function saveAndLock() {
-		const baseline = getEditBaseline();
-		const nextTitle = draftTitle.trim() || 'Untitled';
-		const nextBody = draftBody;
-		const nextTags = getCommittedNodeEditTags(draftTags, draftTagInput);
-		const changed = isNodeEditDraftDirty(
-			{
-				title: draftTitle,
-				body: draftBody,
-				tags: draftTags,
-				tagInput: draftTagInput,
-				isEntity: draftIsEntity,
-			},
-			baseline,
-		);
-		const titleDisplayChanged =
-			normalizeNodeTitle(nextTitle) !== normalizeNodeTitle(baseline.title);
-
-		if (changed) {
-			const updatePayload: Parameters<typeof nodeStore.updateNode>[0] = {
-				id,
-				body: nextBody,
-				is_entity: draftIsEntity ? 1 : 0,
-				tags: nextTags,
-			};
-
-			if (titleDisplayChanged) {
-				const currentState = get(nodeStore);
-				const currentNodes = Array.from(currentState.nodes.values());
-
-				if (hasNodeTitleConflict(currentNodes, nextTitle, id)) {
-					titleError = `A node titled "${nextTitle}" already exists in this canvas.`;
-					return;
-				}
-
-				updatePayload.title = nextTitle;
-			}
-
-			const success = await nodeStore.updateNode(updatePayload);
-
-			if (!success) {
-				return;
-			}
-		}
-
-		titleError = null;
-		editBaseline = null;
-		nodeUiStore.endEdit(id);
-	}
-
 	function handleEditToggle() {
-		if (isEditing) {
-			void saveAndLock();
-			return;
-		}
-
-		void beginEdit();
+		nodeUiStore.beginEdit(id);
 	}
 
 	function handleExpandToggle() {
@@ -264,130 +56,6 @@
 		}
 
 		nodeUiStore.toggleExpanded(id);
-	}
-
-	function closeDiscardPrompt() {
-		nodeUiStore.clearDiscardPrompt();
-	}
-
-	function discardEdit() {
-		closeDiscardPrompt();
-		titleError = null;
-		editBaseline = null;
-		nodeUiStore.endEditCollapsed(id);
-	}
-
-	function openDiscardPrompt(field: NodeEditDiscardField) {
-		discardPromptRestoreField = field;
-		nodeUiStore.requestDiscardPrompt(id, field);
-	}
-
-	function handleEscapeFromField(field: NodeEditDiscardField) {
-		const baseline = getEditBaseline();
-		const dirty = isNodeEditDraftDirty(
-			{
-				title: draftTitle,
-				body: draftBody,
-				tags: draftTags,
-				tagInput: draftTagInput,
-				isEntity: draftIsEntity,
-			},
-			baseline,
-		);
-
-		if (!dirty) {
-			discardEdit();
-			return;
-		}
-
-		openDiscardPrompt(field);
-	}
-
-	function handleTitleKeyDown(e: KeyboardEvent) {
-		if (e.key === 'Tab') {
-			e.preventDefault();
-			focusNextEditField('title');
-			return;
-		}
-
-		if (e.key === 'Escape') {
-			e.preventDefault();
-			e.stopPropagation();
-			handleEscapeFromField('title');
-			return;
-		}
-
-		if (e.key === 'Enter') {
-			e.preventDefault();
-			void saveAndLock();
-		}
-	}
-
-	function handleBodyKeyDown(e: KeyboardEvent) {
-		if (e.key === 'Tab') {
-			e.preventDefault();
-			focusNextEditField('body');
-			return;
-		}
-
-		if (e.key === 'Escape') {
-			e.preventDefault();
-			e.stopPropagation();
-			handleEscapeFromField('body');
-			return;
-		}
-
-		if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-			e.preventDefault();
-			void saveAndLock();
-		}
-	}
-
-	function handleTagKeyDown(e: KeyboardEvent) {
-		if (e.key === 'Tab') {
-			e.preventDefault();
-			focusNextEditField('tag');
-			return;
-		}
-
-		if (e.key === 'Escape') {
-			e.preventDefault();
-			e.stopPropagation();
-			handleEscapeFromField('tag');
-			return;
-		}
-
-		if (e.key === 'Enter' || e.key === ',') {
-			e.preventDefault();
-			commitDraftTagInput();
-			return;
-		}
-
-		if (e.key === 'Backspace' && !draftTagInput && draftTags.length > 0) {
-			e.preventDefault();
-			draftTags = draftTags.slice(0, -1);
-		}
-	}
-
-	function handleTagPaste(e: ClipboardEvent) {
-		const pasted = e.clipboardData?.getData('text');
-
-		if (!pasted) {
-			return;
-		}
-
-		const nextTags = pasted
-			.split(/[\n,]+/)
-			.map((tag) => normalizeTagName(tag))
-			.filter(Boolean);
-
-		if (!nextTags.length) {
-			return;
-		}
-
-		e.preventDefault();
-		draftTags = normalizeTagList([...draftTags, ...nextTags]);
-		draftTagInput = '';
 	}
 
 	const nodeWidth = $derived(isExpanded ? '400px' : '180px');
@@ -427,182 +95,84 @@
 		data-testid={`node-card-${id}`}
 		style={`border: ${borderColor}; box-shadow: ${boxShadow}; --node-overlay-color: ${overlayColor};`}
 	>
-		<div class="node-header">
-			{#if isEditing}
-				<input
-					bind:this={titleInput}
-					bind:value={draftTitle}
-					class="title-input nodrag"
-					aria-label="Node title"
-					onkeydown={handleTitleKeyDown}
-					oninput={() => {
-						titleError = null;
-					}}
-				/>
-			{:else}
-				<div class="title-display">{data.label}</div>
-			{/if}
-
-			<div class="header-actions">
-				<button
-					class="mode-button nodrag"
-					type="button"
-					tabindex={isEditing ? -1 : 0}
-					disabled={isEditing}
-					aria-label={isExpanded
-						? 'Collapse node preview'
-						: 'Expand node preview'}
-					title={isExpanded ? 'Collapse node preview' : 'Expand node preview'}
-					data-testid={`node-expand-toggle-${id}`}
-					onclick={handleExpandToggle}
-				>
-					{#if isExpanded}
-						<ChevronUp size={12} aria-hidden="true" />
-					{:else}
-						<ChevronDown size={12} aria-hidden="true" />
-					{/if}
-				</button>
-
-				<button
-					class="mode-button nodrag"
-					type="button"
-					tabindex={isEditing ? -1 : 0}
-					aria-label={isEditing ? 'Save node' : 'Edit node'}
-					title={isEditing ? 'Save node' : 'Edit node'}
-					data-testid={isEditing ? `node-save-${id}` : `node-edit-${id}`}
-					onclick={handleEditToggle}
-				>
-					{#if isEditing}
-						<Check size={12} aria-hidden="true" />
-					{:else}
-						<Pencil size={12} aria-hidden="true" />
-					{/if}
-				</button>
-			</div>
-		</div>
-
-		{#if isEditing && titleError}
-			<p class="title-error" role="alert">{titleError}</p>
-		{/if}
-
 		{#if isEditing}
-			<label class="entity-toggle nodrag">
-				<input type="checkbox" tabindex="-1" bind:checked={draftIsEntity} />
-				<span>Treat as entity page</span>
-			</label>
-		{/if}
+			<CustomNodeEditPanel
+				{id}
+				label={data.label}
+				{bodyText}
+				{nodeTags}
+				isEntityPage={isEntityPage}
+				{isExpanded}
+			/>
+		{:else}
+			<div class="node-readonly">
+				<div class="node-header">
+					<div class="title-display">{data.label}</div>
 
-		{#if isEditing || nodeTags.length}
-			<div class="tags-area" class:tags-area--compact={nodeMode === 'compact'}>
-				{#if isEditing}
-					{#each draftTags as tag}
-						<span
-							class="tag-chip"
-							data-testid={`node-edit-tag-${id}-${tag}`}
-							style={tagChipStyle(tag)}
-						>
-							<span>{formatTagLabel(tag)}</span>
-							<button
-								class="tag-remove nodrag"
-								type="button"
-								tabindex={-1}
-								aria-label={`Remove ${formatTagLabel(tag)}`}
-								title={`Remove ${formatTagLabel(tag)}`}
-								data-testid={`node-edit-tag-remove-${id}-${tag}`}
-								onclick={() => removeDraftTag(tag)}
-							>
-								×
-							</button>
-						</span>
-					{/each}
-
-					<span class="tag-input-shell">
-						<span class="tag-prefix">#</span>
-						<input
-							bind:this={tagInput}
-							bind:value={draftTagInput}
-							class="tag-input nodrag"
-							aria-label="Add tag"
-							placeholder="Add tag"
-							data-testid={`node-tag-input-${id}`}
-							onkeydown={handleTagKeyDown}
-							onpaste={handleTagPaste}
-						/>
-					</span>
-				{:else}
-					{#each nodeTags as tag}
+					<div class="header-actions">
 						<button
+							class="mode-button nodrag"
 							type="button"
-							class="tag-chip tag-chip-readonly nodrag"
-							style={tagChipStyle(tag)}
-							aria-pressed={data.activeTag === tag}
-							aria-label={`Filter by ${formatTagLabel(tag)}`}
-							title={`Filter by ${formatTagLabel(tag)}`}
-							data-testid={`node-tag-${id}-${tag}`}
-							onclick={() => handleReadonlyTagClick(tag)}
+							tabindex={0}
+							aria-label={isExpanded
+								? 'Collapse node preview'
+								: 'Expand node preview'}
+							title={isExpanded
+								? 'Collapse node preview'
+								: 'Expand node preview'}
+							data-testid={`node-expand-toggle-${id}`}
+							onclick={handleExpandToggle}
 						>
-							{formatTagLabel(tag)}
-						</button>
-					{/each}
-				{/if}
-			</div>
-		{/if}
-
-		{#if isExpanded}
-			<div class="body-area">
-				{#if isEditing}
-					<textarea
-						bind:this={bodyInput}
-						bind:value={draftBody}
-						class="body-editor nodrag"
-						placeholder="Add body text"
-						onkeydown={handleBodyKeyDown}
-					></textarea>
-				{:else if bodyText}
-					<div class="body-display">
-						{#each bodySegments as segment (segment.startIndex)}
-							{#if segment.type === 'entity'}
-								<button
-									class="body-inline body-inline--entity nodrag"
-									class:body-inline--bold={segment.bold}
-									class:body-inline--italic={segment.italic}
-									type="button"
-									aria-label={`Jump to ${segment.title}`}
-									title={`Jump to ${segment.title}`}
-									onclick={(event) => {
-										event.stopPropagation();
-										handleEntityReferenceClick(segment.title);
-									}}
-								>
-									{segment.text}
-								</button>
-							{:else if segment.type === 'link'}
-								<a
-									class="body-inline body-inline--link nodrag"
-									class:body-inline--bold={segment.bold}
-									class:body-inline--italic={segment.italic}
-									href={segment.href}
-									rel="noreferrer"
-									target="_blank"
-									onclick={(event) => {
-										event.stopPropagation();
-									}}
-								>
-									{segment.text}
-								</a>
+							{#if isExpanded}
+								<ChevronUp size={12} aria-hidden="true" />
 							{:else}
-								<span
-									class="body-inline"
-									class:body-inline--bold={segment.bold}
-									class:body-inline--italic={segment.italic}
-								>
-									{segment.text}
-								</span>
+								<ChevronDown size={12} aria-hidden="true" />
 							{/if}
-						{/each}
+						</button>
+
+						<button
+							class="mode-button nodrag"
+							type="button"
+							tabindex={0}
+							aria-label="Edit node"
+							title="Edit node"
+							data-testid={`node-edit-${id}`}
+							onclick={handleEditToggle}
+						>
+							<Pencil size={12} aria-hidden="true" />
+						</button>
 					</div>
-				{:else}
-					<div class="body-placeholder">Add body text</div>
+				</div>
+
+				{#if isExpanded}
+					{#if nodeTags.length}
+						<div
+							class="tags-area"
+							class:tags-area--compact={!isExpanded}
+						>
+							{#each nodeTags as tag}
+								<button
+									type="button"
+									class="tag-chip tag-chip-readonly nodrag"
+									style={tagChipStyle(tag)}
+									aria-pressed={data.activeTag === tag}
+									aria-label={`Filter by ${formatTagLabel(tag)}`}
+									title={`Filter by ${formatTagLabel(tag)}`}
+									data-testid={`node-tag-${id}-${tag}`}
+									onclick={() => handleReadonlyTagClick(tag)}
+								>
+									{formatTagLabel(tag)}
+								</button>
+							{/each}
+						</div>
+					{/if}
+
+					<div class="body-area">
+						<CustomNodeReadOnlyBody
+							{bodyText}
+							onEntityClick={handleEntityReferenceClick}
+						/>
+					</div>
 				{/if}
 			</div>
 		{/if}
@@ -657,40 +227,6 @@
 		font-weight: 600;
 		word-break: break-word;
 		line-height: 1.25;
-	}
-
-	.title-input {
-		min-width: 0;
-		flex: 1;
-		border: 1px solid var(--border-color);
-		border-radius: 4px;
-		padding: 4px 6px;
-		font: inherit;
-		font-weight: 600;
-		line-height: 1.25;
-		outline: none;
-		box-sizing: border-box;
-	}
-
-	.title-error {
-		margin: 6px 0 0;
-		color: #b42318;
-		font-size: 0.75rem;
-		line-height: 1.35;
-	}
-
-	.entity-toggle {
-		display: inline-flex;
-		align-items: center;
-		gap: 0.45rem;
-		margin: 6px 0 8px;
-		color: var(--text-muted);
-		font-size: 0.8rem;
-		line-height: 1.2;
-	}
-
-	.entity-toggle input {
-		margin: 0;
 	}
 
 	.header-actions {
@@ -754,107 +290,5 @@
 
 	.tag-chip-readonly {
 		white-space: nowrap;
-	}
-
-	.tag-remove {
-		width: 14px;
-		height: 14px;
-		border: none;
-		background: transparent;
-		color: inherit;
-		padding: 0;
-		line-height: 1;
-		font-size: 14px;
-		cursor: pointer;
-	}
-
-	.tag-input-shell {
-		display: inline-flex;
-		align-items: center;
-		gap: 4px;
-		flex: 1 1 120px;
-		min-width: 120px;
-		border: 1px solid var(--border-color);
-		border-radius: 999px;
-		padding: 2px 8px;
-		background: var(--surface);
-		box-sizing: border-box;
-	}
-
-	.tag-prefix {
-		color: #888;
-		font-size: 12px;
-		line-height: 1;
-		flex: 0 0 auto;
-	}
-
-	.tag-input {
-		min-width: 0;
-		width: 100%;
-		border: none;
-		outline: none;
-		background: transparent;
-		padding: 0;
-		font: inherit;
-		font-size: 12px;
-		line-height: 1.2;
-	}
-
-	.body-display,
-	.body-placeholder,
-	.body-editor {
-		width: 100%;
-		box-sizing: border-box;
-		font-size: 13px;
-		line-height: 1.45;
-	}
-
-	.body-display {
-		white-space: pre-wrap;
-		word-break: break-word;
-		color: var(--text-main);
-	}
-
-	.body-inline {
-		display: inline;
-	}
-
-	.body-inline--bold {
-		font-weight: 700;
-	}
-
-	.body-inline--italic {
-		font-style: italic;
-	}
-
-	.body-inline--entity {
-		border: 0;
-		padding: 0;
-		background: transparent;
-		color: var(--accent);
-		cursor: pointer;
-		font: inherit;
-		text-decoration: underline;
-		text-underline-offset: 0.12em;
-	}
-
-	.body-inline--link {
-		color: var(--accent);
-	}
-
-	.body-placeholder {
-		color: var(--text-muted);
-	}
-
-	.body-editor {
-		min-height: 96px;
-		resize: vertical;
-		border: 1px solid var(--border-color);
-		border-radius: 4px;
-		padding: 8px;
-		outline: none;
-		font: inherit;
-		color: var(--text-main);
-		background: var(--surface);
 	}
 </style>
