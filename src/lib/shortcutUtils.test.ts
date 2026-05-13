@@ -4,6 +4,7 @@ import {
 	isCreateNodeShortcut,
 	isDiscoveryToggleShortcut,
 	isSaveAndExitEditShortcut,
+	isShortcutHelpShortcut,
 	isZoomInShortcut,
 	isZoomOutShortcut,
 	isTextInputElement,
@@ -47,6 +48,19 @@ describe('shortcutUtils', () => {
 		} as KeyboardEvent;
 
 		expect(isDiscoveryToggleShortcut(event)).toBe(true);
+	});
+
+	it('recognizes the help shortcut key', () => {
+		const event = {
+			key: '?',
+			metaKey: false,
+			ctrlKey: false,
+			altKey: false,
+			shiftKey: true,
+			defaultPrevented: false,
+		} as KeyboardEvent;
+
+		expect(isShortcutHelpShortcut(event)).toBe(true);
 	});
 
 	it('recognizes zoom shortcuts', () => {

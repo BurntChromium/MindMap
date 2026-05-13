@@ -33,6 +33,7 @@
 		isCanvasToggleShortcut,
 		isCreateNodeShortcut,
 		isDiscoveryToggleShortcut,
+		isShortcutHelpShortcut,
 		isZoomInShortcut,
 		isZoomOutShortcut,
 		isTextInputElement,
@@ -201,6 +202,7 @@
 				{ keys: ['n'], description: 'Cancel the discard prompt' },
 				{ keys: ['/'], description: 'Open the quick search bar' },
 				{ keys: ['t'], description: 'Open or focus tag editing' },
+				{ keys: ['?'], description: 'Open keyboard shortcuts help' },
 				{ keys: ['Cmd/Ctrl', 'Z'], description: 'Undo the last canvas mutation' },
 				{
 					keys: ['Cmd/Ctrl', 'Shift', 'Z'],
@@ -623,6 +625,18 @@
 				return;
 			}
 
+			if (isShortcutHelpShortcut(event)) {
+				event.preventDefault();
+				openShortcutHelp();
+				return;
+			}
+
+			if (event.key === '/') {
+				event.preventDefault();
+				openQuickSearch();
+				return;
+			}
+
 			if (isZoomOutShortcut(event)) {
 				if (
 					!canvasShell ||
@@ -690,12 +704,6 @@
 			if (event.key === ' ') {
 				event.preventDefault();
 				toggleFocusedNodeSelection();
-				return;
-			}
-
-			if (event.key === '/') {
-				event.preventDefault();
-				openQuickSearch();
 				return;
 			}
 
@@ -1979,6 +1987,7 @@
 
 					<p class="shortcut-help-dialog__intro">
 						These are the shortcuts available in the canvas and editor.
+						Press <kbd>?</kbd> from the canvas to open this dialog.
 					</p>
 
 					<div class="shortcut-help-grid">

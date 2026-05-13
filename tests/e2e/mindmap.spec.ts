@@ -252,6 +252,28 @@ test('opens and dismisses the keyboard shortcuts help modal from the ribbon', as
 	await page.keyboard.press('Escape');
 
 	await expect(helpDialog).toHaveCount(0);
+	await page.keyboard.press('Shift+/');
+
+	await expect(helpDialog).toBeVisible();
+	await expect(helpDialog.getByRole('heading', { name: 'Canvas' })).toBeVisible();
+
+	await page.keyboard.press('Escape');
+
+	await expect(helpDialog).toHaveCount(0);
+});
+
+test('opens the quick search bar from slash on first load', async ({
+	page,
+	request,
+}) => {
+	await resetDatabase(request);
+	await seedCanvas(request, { id: 'canvas-quick-search', name: 'Search' });
+
+	await page.goto('/');
+
+	await page.keyboard.press('/');
+
+	await expect(page.getByLabel('Search nodes')).toBeVisible();
 });
 
 test('filters search results by keyword and tag, then focuses a match', async ({
