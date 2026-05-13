@@ -194,6 +194,7 @@ test('undoes and redoes through the canvas control ribbon', async ({
 		'canvas-add-node',
 		'canvas-history-undo',
 		'canvas-history-redo',
+		'canvas-help',
 	]) {
 		const icon = page.getByTestId(testId).locator('svg');
 		await expect(icon).toHaveCSS('fill', 'none');
@@ -224,6 +225,33 @@ test('undoes and redoes through the canvas control ribbon', async ({
 	await page.getByTestId('canvas-history-redo').click();
 
 	await expect(page.getByText('Second title')).toBeVisible();
+});
+
+test('opens and dismisses the keyboard shortcuts help modal from the ribbon', async ({
+	page,
+	request,
+}) => {
+	await resetDatabase(request);
+	await seedCanvas(request, {
+		id: 'canvas-help-modal',
+		name: 'Help',
+	});
+
+	await page.goto('/');
+
+	await expect(page.getByTestId('canvas-help')).toBeVisible();
+	await page.getByTestId('canvas-help').click();
+
+	const helpDialog = page.getByRole('dialog', {
+		name: 'Keyboard shortcuts',
+	});
+
+	await expect(helpDialog).toBeVisible();
+	await expect(helpDialog.getByRole('heading', { name: 'Canvas' })).toBeVisible();
+
+	await page.keyboard.press('Escape');
+
+	await expect(helpDialog).toHaveCount(0);
 });
 
 test('filters search results by keyword and tag, then focuses a match', async ({
@@ -266,7 +294,7 @@ test('filters search results by keyword and tag, then focuses a match', async ({
 
 	await alphaResult.click();
 
-	await expect(page.locator('.canvas-hint--selection')).toHaveText(
+	await expect(page.getByTestId('canvas-selection-count')).toHaveText(
 		'1 selected',
 	);
 });

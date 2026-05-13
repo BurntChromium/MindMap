@@ -6,7 +6,12 @@
 		ControlButton,
 		type Connection,
 	} from '@xyflow/svelte';
-	import { RotateCcw, RotateCw, StickyNote } from 'lucide-svelte';
+	import {
+		CircleQuestionMark,
+		RotateCcw,
+		RotateCw,
+		StickyNote,
+	} from 'lucide-svelte';
 	import CustomNode from '$lib/components/CustomNode.svelte';
 	import CanvasStageApiBridge from '$lib/components/CanvasStageApiBridge.svelte';
 	import type { CanvasStageApi } from '$lib/canvasApi';
@@ -23,6 +28,7 @@
 		onAddNode: () => void;
 		onUndo: () => void;
 		onRedo: () => void;
+		onHelp: () => void;
 		canUndo: boolean;
 		canRedo: boolean;
 		canvasStatusLabel: string;
@@ -43,6 +49,7 @@
 		onAddNode,
 		onUndo,
 		onRedo,
+		onHelp,
 		canUndo,
 		canRedo,
 		canvasStatusLabel,
@@ -122,6 +129,19 @@
 				disabled={!canRedo}
 			>
 				<RotateCw class="canvas-controls__icon" size={12} aria-hidden="true" />
+			</ControlButton>
+			<ControlButton
+				onclick={onHelp}
+				class="canvas-controls__button canvas-controls__button--outline"
+				aria-label="Keyboard shortcuts help"
+				title="Keyboard shortcuts help"
+				data-testid="canvas-help"
+			>
+				<CircleQuestionMark
+					class="canvas-controls__icon"
+					size={12}
+					aria-hidden="true"
+				/>
 			</ControlButton>
 			<span
 				class="canvas-controls__status"
