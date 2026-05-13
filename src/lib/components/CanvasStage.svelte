@@ -6,7 +6,7 @@
 		ControlButton,
 		type Connection,
 	} from '@xyflow/svelte';
-	import { FileText, Redo, Undo } from 'lucide-svelte';
+	import { RotateCcw, RotateCw, StickyNote } from 'lucide-svelte';
 	import CustomNode from '$lib/components/CustomNode.svelte';
 	import CanvasStageApiBridge from '$lib/components/CanvasStageApiBridge.svelte';
 	import type { CanvasStageApi } from '$lib/canvasApi';
@@ -94,32 +94,32 @@
 		>
 			<ControlButton
 				onclick={onAddNode}
-				class="canvas-controls__button"
+				class="canvas-controls__button canvas-controls__button--outline"
 				aria-label="Add node"
 				title="Add node (N)"
 				data-testid="canvas-add-node"
 			>
-				<FileText size={12} aria-hidden="true" />
+				<StickyNote class="canvas-controls__icon" size={12} aria-hidden="true" />
 			</ControlButton>
 			<ControlButton
 				onclick={onUndo}
-				class="canvas-controls__button"
+				class="canvas-controls__button canvas-controls__button--outline"
 				aria-label="Undo"
 				title="Undo (Cmd/Ctrl+Z)"
 				data-testid="canvas-history-undo"
 				disabled={!canUndo}
 			>
-				<Undo size={12} aria-hidden="true" />
+				<RotateCcw class="canvas-controls__icon" size={12} aria-hidden="true" />
 			</ControlButton>
 			<ControlButton
 				onclick={onRedo}
-				class="canvas-controls__button"
+				class="canvas-controls__button canvas-controls__button--outline"
 				aria-label="Redo"
 				title="Redo (Cmd/Ctrl+Shift+Z)"
 				data-testid="canvas-history-redo"
 				disabled={!canRedo}
 			>
-				<Redo size={12} aria-hidden="true" />
+				<RotateCw class="canvas-controls__icon" size={12} aria-hidden="true" />
 			</ControlButton>
 			<span
 				class="canvas-controls__status"
@@ -157,10 +157,10 @@
 		align-items: center;
 		margin-left: 0.25rem;
 		min-height: 26px;
-		padding: 0 0.6rem;
-		border: 1px solid var(--xy-controls-button-border-color-default);
+		padding: 0 0.55rem 0 0.7rem;
+		border-left: 1px solid var(--xy-controls-button-border-color-default);
 		border-radius: 0;
-		background: var(--xy-controls-button-background-color-default);
+		background: transparent;
 		box-shadow: none;
 		color: var(--text-muted);
 		font-size: 0.72rem;
@@ -178,5 +178,17 @@
 
 	.canvas-controls__status--failed {
 		color: #b91c1c;
+	}
+
+	:global(.canvas-shell .canvas-controls .canvas-controls__button--outline) {
+		color: #000;
+	}
+
+	:global(.canvas-shell .canvas-controls .canvas-controls__button--outline:disabled) {
+		opacity: 0.4;
+	}
+
+	:global(.canvas-shell .canvas-controls .canvas-controls__button--outline .canvas-controls__icon) {
+		fill: none;
 	}
 </style>

@@ -190,6 +190,15 @@ test('undoes and redoes through the canvas control ribbon', async ({
 	await page.goto('/');
 
 	await expect(page.getByTestId('canvas-sync-status')).toHaveText('Synced');
+	for (const testId of [
+		'canvas-add-node',
+		'canvas-history-undo',
+		'canvas-history-redo',
+	]) {
+		const icon = page.getByTestId(testId).locator('svg');
+		await expect(icon).toHaveCSS('fill', 'none');
+		await expect(icon).toHaveCSS('stroke', 'rgb(0, 0, 0)');
+	}
 	await expect(page.getByTestId('canvas-history-undo')).toBeDisabled();
 	await expect(page.getByTestId('canvas-history-redo')).toBeDisabled();
 
