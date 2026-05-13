@@ -316,9 +316,25 @@ test('filters search results by keyword and tag, then focuses a match', async ({
 
 	await alphaResult.click();
 
+	const syncStatus = page.getByTestId('canvas-sync-status');
+	const selectionCount = page.getByTestId('canvas-selection-count');
+	await expect(syncStatus).toHaveCSS('background-color', 'rgb(250, 251, 252)');
+	await expect(selectionCount).toHaveCSS(
+		'background-color',
+		'rgb(250, 251, 252)',
+	);
 	await expect(page.getByTestId('canvas-selection-count')).toHaveText(
 		'1 selected',
 	);
+
+	const [syncBox, selectionBox] = await Promise.all([
+		syncStatus.boundingBox(),
+		selectionCount.boundingBox(),
+	]);
+
+	expect(syncBox).toBeTruthy();
+	expect(selectionBox).toBeTruthy();
+	expect(Math.abs((syncBox!.y ?? 0) - (selectionBox!.y ?? 0))).toBeLessThan(2);
 });
 
 test('undoes and redoes a node title change', async ({ page, request }) => {

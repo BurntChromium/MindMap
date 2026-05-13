@@ -143,28 +143,30 @@
 					aria-hidden="true"
 				/>
 			</ControlButton>
-			<span
-				class="canvas-controls__status"
-				class:canvas-controls__status--loading={mutationPhase === 'loading'}
-				class:canvas-controls__status--syncing={mutationPhase === 'syncing'}
-				class:canvas-controls__status--failed={mutationPhase === 'failed'}
-				data-testid="canvas-sync-status"
-				role="status"
-				aria-live="polite"
-				aria-atomic="true"
-			>
-				{canvasStatusLabel}
-			</span>
-			{#if selectedNodeCount > 0}
+			<span class="canvas-controls__status-group">
 				<span
 					class="canvas-controls__status"
-					data-testid="canvas-selection-count"
+					class:canvas-controls__status--loading={mutationPhase === 'loading'}
+					class:canvas-controls__status--syncing={mutationPhase === 'syncing'}
+					class:canvas-controls__status--failed={mutationPhase === 'failed'}
+					data-testid="canvas-sync-status"
+					role="status"
 					aria-live="polite"
 					aria-atomic="true"
 				>
-					{selectedNodeCount} selected
+					{canvasStatusLabel}
 				</span>
-			{/if}
+				{#if selectedNodeCount > 0}
+					<span
+						class="canvas-controls__status"
+						data-testid="canvas-selection-count"
+						aria-live="polite"
+						aria-atomic="true"
+					>
+						{selectedNodeCount} selected
+					</span>
+				{/if}
+			</span>
 		</Controls>
 	</SvelteFlow>
 </div>
@@ -179,9 +181,16 @@
 
 	:global(.canvas-shell .canvas-controls) {
 		flex-direction: row;
-		flex-wrap: wrap;
+		flex-wrap: nowrap;
 		align-items: center;
 		gap: 0;
+	}
+
+	.canvas-controls__status-group {
+		display: inline-flex;
+		flex: 0 0 auto;
+		align-items: center;
+		white-space: nowrap;
 	}
 
 	.canvas-controls__status {
@@ -191,7 +200,7 @@
 		min-height: 26px;
 		padding: 0 0.55rem;
 		border-radius: 0;
-		background: transparent;
+		background: var(--xy-controls-button-background-color-default);
 		box-shadow: none;
 		color: var(--text-muted);
 		font-size: 0.72rem;
