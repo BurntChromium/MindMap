@@ -971,12 +971,15 @@
 		editingTopicId = null;
 	}
 
-	function cancelTopicCreation() {
+	function cancelTopicCreation(options: { focusCanvas?: boolean } = {}) {
 		topicCreationMode = false;
 		topicDraft = null;
-		queueMicrotask(() => {
-			canvasShell?.focus();
-		});
+
+		if (options.focusCanvas !== false) {
+			queueMicrotask(() => {
+				canvasShell?.focus();
+			});
+		}
 	}
 
 	function beginEditingTopic(topicId: string) {
@@ -1077,10 +1080,14 @@
 		}
 
 		const topicId = await topicStore.create(activeCanvasId, bounds);
-		cancelTopicCreation();
+		cancelTopicCreation({ focusCanvas: false });
 
 		if (topicId) {
 			editingTopicId = topicId;
+		} else {
+			queueMicrotask(() => {
+				canvasShell?.focus();
+			});
 		}
 	}
 
@@ -1964,7 +1971,7 @@
 					onpointerdown={handleTopicPointerDown}
 					onpointermove={handleTopicPointerMove}
 					onpointerup={handleTopicPointerUp}
-					onpointercancel={cancelTopicCreation}
+					onpointercancel={() => cancelTopicCreation()}
 				>
 					{#if topicCreationScreenRect}
 						{@const rect = topicCreationScreenRect ?? {

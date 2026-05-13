@@ -5,15 +5,16 @@
 
 	let { id, data, selected, width = 280, height = 180 } = $props();
 
-	const titleColor = $derived(getTagColor(data.title ?? 'Topic'));
+	let titleDraft = $state('');
+	let titleInput = $state<HTMLInputElement | undefined>(undefined);
+
+	const titleSeed = $derived(data.isEditing ? titleDraft : data.title ?? 'Topic');
+	const titleColor = $derived(getTagColor(titleSeed));
 	const headerColor = $derived(rgbaFromHex(titleColor, 0.92));
 	const bodyColor = $derived(rgbaFromHex(titleColor, 0.22));
 	const borderColor = $derived(
 		selected ? rgbaFromHex(titleColor, 0.9) : rgbaFromHex(titleColor, 0.5),
 	);
-
-	let titleDraft = $state('');
-	let titleInput = $state<HTMLInputElement | undefined>(undefined);
 
 	$effect(() => {
 		titleDraft = data.title ?? 'Topic';
