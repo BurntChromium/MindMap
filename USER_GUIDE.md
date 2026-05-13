@@ -44,7 +44,7 @@ You can search via free text, tags, or entities from the right-hand panel.
 - `Cmd/Ctrl+C`: copy the current selection
 - `Cmd/Ctrl+X`: cut the current selection
 - `Cmd/Ctrl+V`: paste the copied fragment
-- Undo/redo buttons in the canvas status strip mirror the keyboard shortcuts below.
+- Undo/redo buttons in the canvas control ribbon mirror the keyboard shortcuts below.
 - `w` in edit mode: focus the title field for the current node
 - `Cmd/Ctrl+Z`: undo the last canvas mutation
 - `Cmd/Ctrl+Shift+Z`: redo the last undone canvas mutation

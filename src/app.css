@@ -608,27 +608,6 @@ ul {
 	background: var(--bg-canvas);
 }
 
-.canvas-toolbar {
-	position: absolute;
-	top: 1rem;
-	right: 1rem;
-	z-index: 5;
-	display: inline-flex;
-	gap: 0.5rem;
-}
-
-.canvas-create-button {
-	box-shadow: var(--shadow-soft);
-	background: #e1e7ef;
-	border-color: #b9c4d1;
-	color: #1f2937;
-}
-
-.canvas-create-button:hover {
-	background: #d6dee8;
-	border-color: #97a6b8;
-}
-
 .canvas-shell:focus-visible {
 	outline: 2px solid var(--accent);
 	outline-offset: -2px;

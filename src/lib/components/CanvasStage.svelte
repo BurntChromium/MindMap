@@ -3,9 +3,10 @@
 		SvelteFlow,
 		Background,
 		Controls,
+		ControlButton,
 		type Connection,
 	} from '@xyflow/svelte';
-	import { Plus } from 'lucide-svelte';
+	import { FileText, Redo, Undo } from 'lucide-svelte';
 	import CustomNode from '$lib/components/CustomNode.svelte';
 	import CanvasStageApiBridge from '$lib/components/CanvasStageApiBridge.svelte';
 	import type { CanvasStageApi } from '$lib/canvasApi';
@@ -19,6 +20,12 @@
 		flowNodes: any[];
 		flowEdges: any[];
 		onAddNode: () => void;
+		onUndo: () => void;
+		onRedo: () => void;
+		canUndo: boolean;
+		canRedo: boolean;
+		canvasStatusLabel: string;
+		mutationPhase: 'loading' | 'syncing' | 'synced' | 'failed';
 		onConnect: (connection: Connection) => void;
 		onNodeClick: (nodeId: string, shiftKey: boolean) => void;
 		onEdgeClick: (edgeId: string) => void;
@@ -32,6 +39,12 @@
 		flowNodes,
 		flowEdges,
 		onAddNode,
+		onUndo,
+		onRedo,
+		canUndo,
+		canRedo,
+		canvasStatusLabel,
+		mutationPhase,
 		onConnect,
 		onNodeClick,
 		onEdgeClick,
@@ -43,20 +56,6 @@
 </script>
 
 <div class="canvas-stage">
-	<div class="canvas-toolbar">
-		<button
-			class="button button--primary canvas-create-button"
-			type="button"
-			aria-label="Add node"
-			title="Add node (N)"
-			data-testid="canvas-add-node"
-			onclick={onAddNode}
-		>
-			<Plus size={16} aria-hidden="true" />
-			<span>Node</span>
-		</button>
-	</div>
-
 	<SvelteFlow
 		style="width: 100%; height: 100%;"
 		nodes={flowNodes}
@@ -87,7 +86,54 @@
 	>
 		<CanvasStageApiBridge {onApiReady} />
 		<Background />
-		<Controls />
+		<Controls
+			position="bottom-center"
+			orientation="horizontal"
+			class="canvas-controls"
+			aria-label="Canvas controls"
+		>
+			<ControlButton
+				onclick={onAddNode}
+				class="canvas-controls__button"
+				aria-label="Add node"
+				title="Add node (N)"
+				data-testid="canvas-add-node"
+			>
+				<FileText size={12} aria-hidden="true" />
+			</ControlButton>
+			<ControlButton
+				onclick={onUndo}
+				class="canvas-controls__button"
+				aria-label="Undo"
+				title="Undo (Cmd/Ctrl+Z)"
+				data-testid="canvas-history-undo"
+				disabled={!canUndo}
+			>
+				<Undo size={12} aria-hidden="true" />
+			</ControlButton>
+			<ControlButton
+				onclick={onRedo}
+				class="canvas-controls__button"
+				aria-label="Redo"
+				title="Redo (Cmd/Ctrl+Shift+Z)"
+				data-testid="canvas-history-redo"
+				disabled={!canRedo}
+			>
+				<Redo size={12} aria-hidden="true" />
+			</ControlButton>
+			<span
+				class="canvas-controls__status"
+				class:canvas-controls__status--loading={mutationPhase === 'loading'}
+				class:canvas-controls__status--syncing={mutationPhase === 'syncing'}
+				class:canvas-controls__status--failed={mutationPhase === 'failed'}
+				data-testid="canvas-sync-status"
+				role="status"
+				aria-live="polite"
+				aria-atomic="true"
+			>
+				{canvasStatusLabel}
+			</span>
+		</Controls>
 	</SvelteFlow>
 </div>
 
@@ -97,5 +143,40 @@
 		height: 100%;
 		min-width: 0;
 		min-height: 0;
+	}
+
+	:global(.canvas-shell .canvas-controls) {
+		flex-direction: row;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0;
+	}
+
+	.canvas-controls__status {
+		display: inline-flex;
+		align-items: center;
+		margin-left: 0.25rem;
+		min-height: 26px;
+		padding: 0 0.6rem;
+		border: 1px solid var(--xy-controls-button-border-color-default);
+		border-radius: 0;
+		background: var(--xy-controls-button-background-color-default);
+		box-shadow: none;
+		color: var(--text-muted);
+		font-size: 0.72rem;
+		line-height: 1;
+		white-space: nowrap;
+	}
+
+	.canvas-controls__status--loading {
+		color: var(--accent);
+	}
+
+	.canvas-controls__status--syncing {
+		color: #1d4ed8;
+	}
+
+	.canvas-controls__status--failed {
+		color: #b91c1c;
 	}
 </style>

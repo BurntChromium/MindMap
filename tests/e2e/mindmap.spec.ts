@@ -180,7 +180,7 @@ test('guides first-time canvas and note creation', async ({ page, request }) => 
 	).toBeVisible();
 });
 
-test('undoes and redoes through the canvas status buttons', async ({
+test('undoes and redoes through the canvas control ribbon', async ({
 	page,
 	request,
 }) => {
@@ -189,6 +189,7 @@ test('undoes and redoes through the canvas status buttons', async ({
 
 	await page.goto('/');
 
+	await expect(page.getByTestId('canvas-sync-status')).toHaveText('Synced');
 	await expect(page.getByTestId('canvas-history-undo')).toBeDisabled();
 	await expect(page.getByTestId('canvas-history-redo')).toBeDisabled();
 

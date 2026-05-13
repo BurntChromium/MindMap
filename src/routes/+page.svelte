@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onDestroy, onMount, tick } from 'svelte';
 	import type { Connection } from '@xyflow/svelte';
-	import { Check, RotateCcw, RotateCw, Search, X } from 'lucide-svelte';
+	import { Check, Search, X } from 'lucide-svelte';
 	import { createClientId } from '$lib/clientId';
 	import {
 		appDataClient,
@@ -1702,6 +1702,12 @@
 				{flowNodes}
 				{flowEdges}
 				onAddNode={addNode}
+				onUndo={() => void undoHistory()}
+				onRedo={() => void redoHistory()}
+				canUndo={historyState.undoCount > 0 && !historyState.replaying}
+				canRedo={historyState.redoCount > 0 && !historyState.replaying}
+				{canvasStatusLabel}
+				mutationPhase={mutationPhase}
 				{onConnect}
 				onNodeClick={(nodeId, shiftKey) => {
 					if (shiftKey) {
@@ -1756,40 +1762,6 @@
 					</button>
 				</div>
 			{/if}
-
-			<div
-				class="canvas-hint canvas-hint--status"
-				class:canvas-hint--status-loading={mutationPhase === 'loading'}
-				class:canvas-hint--status-syncing={mutationPhase === 'syncing'}
-				class:canvas-hint--status-failed={mutationPhase === 'failed'}
-				aria-live="polite"
-			>
-				<div class="canvas-hint__actions">
-					<button
-						class="icon-button canvas-hint__action"
-						type="button"
-						aria-label="Undo"
-						title="Undo (Cmd/Ctrl+Z)"
-						data-testid="canvas-history-undo"
-						onclick={() => void undoHistory()}
-						disabled={historyState.undoCount === 0 || historyState.replaying}
-					>
-						<RotateCcw size={14} aria-hidden="true" />
-					</button>
-					<button
-						class="icon-button canvas-hint__action"
-						type="button"
-						aria-label="Redo"
-						title="Redo (Cmd/Ctrl+Shift+Z)"
-						data-testid="canvas-history-redo"
-						onclick={() => void redoHistory()}
-						disabled={historyState.redoCount === 0 || historyState.replaying}
-					>
-						<RotateCw size={14} aria-hidden="true" />
-					</button>
-				</div>
-				<span class="canvas-hint__status-label">{canvasStatusLabel}</span>
-			</div>
 
 			{#if showCanvasLoadingState}
 				<div class="canvas-empty-state" role="status" aria-live="polite">
@@ -2024,47 +1996,6 @@
 		flex: none;
 		margin-left: auto;
 		color: #166534;
-	}
-
-	.canvas-hint--status {
-		left: 3.75rem;
-		bottom: 1rem;
-		gap: 0.45rem;
-		padding-inline: 0.55rem 0.7rem;
-		min-width: 11rem;
-	}
-
-	.canvas-hint__actions {
-		display: inline-flex;
-		align-items: center;
-		gap: 0.25rem;
-		flex: none;
-	}
-
-	.canvas-hint__action {
-		flex: none;
-		width: 1.8rem;
-		height: 1.8rem;
-	}
-
-	.canvas-hint__status-label {
-		white-space: nowrap;
-	}
-
-	.canvas-hint--status-loading {
-		background: rgba(255, 255, 255, 0.97);
-		color: var(--accent);
-	}
-
-	.canvas-hint--status-syncing {
-		background: rgba(239, 246, 255, 0.97);
-		color: #1d4ed8;
-	}
-
-	.canvas-hint--status-failed {
-		background: rgba(254, 242, 242, 0.97);
-		color: #b91c1c;
-		border-color: rgba(239, 68, 68, 0.4);
 	}
 
 	.canvas-empty-state {
